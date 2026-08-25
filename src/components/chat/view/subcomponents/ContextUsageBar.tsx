@@ -30,12 +30,12 @@ export default function ContextUsageBar({ tokenBudget }: ContextUsageBarProps) {
   const barColor = `hsl(${hue} 60% 45%)`;
 
   return (
-    <div className="mx-3 mb-1 flex items-center gap-2">
+    <div className="mb-1.5 flex items-center justify-end gap-2 px-3">
       <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
         Context
       </span>
       <div
-        className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted/60"
+        className="h-1 w-32 overflow-hidden rounded-full bg-muted/60"
         role="progressbar"
         aria-valuenow={percent}
         aria-valuemin={0}
@@ -47,7 +47,7 @@ export default function ContextUsageBar({ tokenBudget }: ContextUsageBarProps) {
           style={{ width: `${percent}%`, backgroundColor: barColor }}
         />
       </div>
-      <span className="w-10 text-right text-xs font-medium tabular-nums text-muted-foreground">
+      <span className="w-9 text-right text-xs font-medium tabular-nums text-muted-foreground">
         {percent}%
       </span>
     </div>

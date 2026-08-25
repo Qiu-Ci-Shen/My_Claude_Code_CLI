@@ -404,8 +404,6 @@ function ChatInterface({
             </div>
           )}
 
-          <ContextUsageBar tokenBudget={tokenBudget} />
-
           <ChatComposer
           pendingPermissionRequests={pendingPermissionRequests}
           handlePermissionDecision={handlePermissionDecision}
@@ -471,6 +469,8 @@ function ChatInterface({
           isTextareaExpanded={isTextareaExpanded}
           sendByCtrlEnter={sendByCtrlEnter}
         />
+
+        <ContextUsageBar tokenBudget={tokenBudget} />
         </div>
       </div>
 
