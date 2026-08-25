@@ -14,6 +14,7 @@ import { useSessionStore } from '../../../stores/useSessionStore';
 
 import ChatMessagesPane from './subcomponents/ChatMessagesPane';
 import ChatComposer from './subcomponents/ChatComposer';
+import ContextUsageBar from './subcomponents/ContextUsageBar';
 import CommandResultModal from './subcomponents/CommandResultModal';
 
 function ChatInterface({
@@ -402,6 +403,8 @@ function ChatInterface({
               </button>
             </div>
           )}
+
+          <ContextUsageBar tokenBudget={tokenBudget} />
 
           <ChatComposer
           pendingPermissionRequests={pendingPermissionRequests}

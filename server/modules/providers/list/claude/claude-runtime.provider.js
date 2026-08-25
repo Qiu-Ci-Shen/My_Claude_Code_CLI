@@ -351,6 +351,30 @@ function readNumber(value) {
  * @param {Object} sdkMessage - SDK stream message
  * @returns {Object|null} Token budget object or null
  */
+function resolveContextWindow(sdkMessage) {
+  // Prefer the SDK-reported model context window (real model capacity). Falls
+  // back to a `[1m]`/`[200k]`-style suffix on the model id, then to the
+  // configured CONTEXT_WINDOW so the context percent is never nonsense.
+  const modelUsage = sdkMessage?.modelUsage;
+  if (modelUsage && typeof modelUsage === 'object') {
+    const modelKey = Object.keys(modelUsage)[0] || '';
+    const modelData = modelUsage[modelKey];
+    const reportedWindow = readNumber(modelData?.contextWindow);
+    if (reportedWindow > 0) {
+      return reportedWindow;
+    }
+    const millionMatch = /\[([0-9]+)m\]/.exec(modelKey);
+    if (millionMatch) {
+      return parseInt(millionMatch[1], 10) * 1_000_000;
+    }
+    const kiloMatch = /\[([0-9]+)k\]/.exec(modelKey);
+    if (kiloMatch) {
+      return parseInt(kiloMatch[1], 10) * 1_000;
+    }
+  }
+  return parseInt(process.env.CONTEXT_WINDOW, 10) || 160000;
+}
+
 function extractTokenBudget(sdkMessage) {
   if (!sdkMessage || typeof sdkMessage !== 'object') {
     return null;
@@ -371,7 +395,8 @@ function extractTokenBudget(sdkMessage) {
     if (totalUsed <= 0) {
       return null;
     }
-    const contextWindow = parseInt(process.env.CONTEXT_WINDOW, 10) || 160000;
+    const contextWindow = resolveContextWindow(sdkMessage);
+    const contextPercent = Math.min(100, Math.max(0, Math.round((totalUsed / contextWindow) * 100)));
 
     return {
       used: totalUsed,
@@ -381,6 +406,8 @@ function extractTokenBudget(sdkMessage) {
       cacheReadTokens,
       cacheCreationTokens,
       cacheTokens,
+      contextWindow,
+      contextPercent,
       breakdown: {
         input: inputTokens,
         output: outputTokens,
@@ -406,13 +433,16 @@ function extractTokenBudget(sdkMessage) {
   if (totalUsed <= 0) {
     return null;
   }
-  const contextWindow = parseInt(process.env.CONTEXT_WINDOW, 10) || 160000;
+  const contextWindow = resolveContextWindow(sdkMessage);
+  const contextPercent = Math.min(100, Math.max(0, Math.round((totalUsed / contextWindow) * 100)));
 
   return {
     used: totalUsed,
     total: contextWindow,
     inputTokens,
     outputTokens,
+    contextWindow,
+    contextPercent,
     breakdown: {
       input: inputTokens,
       output: outputTokens,
