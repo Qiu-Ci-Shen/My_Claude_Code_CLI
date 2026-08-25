@@ -266,8 +266,11 @@ export function useChatSessionState({
       setHasMoreMessages(slot.hasMore);
       setTotalMessages(slot.total);
       messagesOffsetRef.current = slot.offset;
-      if (slot.tokenUsage !== undefined) {
-        setTokenBudget((slot.tokenUsage as Record<string, unknown> | null) ?? null);
+      // Only apply a real payload — Claude's history endpoint never returns
+      // tokenUsage, so a stale null slot must not clobber the budget already
+      // fetched by the initial token-usage effect below.
+      if (slot.tokenUsage) {
+        setTokenBudget(slot.tokenUsage as Record<string, unknown>);
       }
     }
     return !result.deferred;
@@ -411,8 +414,8 @@ export function useChatSessionState({
         setHasMoreMessages(slot.hasMore);
         setTotalMessages(slot.total);
         messagesOffsetRef.current = slot.offset;
-        if (slot.tokenUsage !== undefined) {
-          setTokenBudget((slot.tokenUsage as Record<string, unknown> | null) ?? null);
+        if (slot.tokenUsage) {
+          setTokenBudget(slot.tokenUsage as Record<string, unknown>);
         }
 
         if (prependedCount === 0) {
@@ -672,8 +675,8 @@ export function useChatSessionState({
         setHasMoreMessages(slot.hasMore);
         setTotalMessages(slot.total);
         messagesOffsetRef.current = slot.offset;
-        if (slot.tokenUsage !== undefined) {
-          setTokenBudget((slot.tokenUsage as Record<string, unknown> | null) ?? null);
+        if (slot.tokenUsage) {
+          setTokenBudget(slot.tokenUsage as Record<string, unknown>);
         }
       }
       setIsLoadingSessionMessages(false);

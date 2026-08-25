@@ -131,6 +131,26 @@ function readCodexTokenUsage(fileContent: string): TokenUsageResult {
   };
 }
 
+function resolveClaudeContextWindow(
+  fileContent: string,
+  configuredContextWindow: string | undefined,
+): number {
+  // Mirror the runtime provider: prefer the model id suffix recorded in the
+  // transcript (e.g. "sonnet[1m]" -> 1M) before falling back to the env value.
+  const modelMatch = /"model":"([^"]+)"/.exec(fileContent);
+  const modelName = modelMatch?.[1] ?? '';
+  const millionMatch = /\[([0-9]+)m\]/i.exec(modelName);
+  if (millionMatch) {
+    return parseInt(millionMatch[1], 10) * 1_000_000;
+  }
+  const kiloMatch = /\[([0-9]+)k\]/i.exec(modelName);
+  if (kiloMatch) {
+    return parseInt(kiloMatch[1], 10) * 1_000;
+  }
+  const parsedContextWindow = Number.parseInt(configuredContextWindow ?? '', 10);
+  return Number.isFinite(parsedContextWindow) ? parsedContextWindow : 160_000;
+}
+
 function readClaudeTokenUsage(fileContent: string, configuredContextWindow: string | undefined): TokenUsageResult {
   let inputTokens = 0;
   let outputTokens = 0;
@@ -163,8 +183,7 @@ function readClaudeTokenUsage(fileContent: string, configuredContextWindow: stri
     }
   }
 
-  const parsedContextWindow = Number.parseInt(configuredContextWindow ?? '', 10);
-  const contextWindow = Number.isFinite(parsedContextWindow) ? parsedContextWindow : 160_000;
+  const contextWindow = resolveClaudeContextWindow(fileContent, configuredContextWindow);
   const cacheTokens = cacheReadTokens + cacheCreationTokens;
 
   return {
