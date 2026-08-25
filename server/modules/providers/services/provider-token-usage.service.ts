@@ -8,6 +8,7 @@ import Database from 'better-sqlite3';
 import { sessionsDb } from '@/modules/database/index.js';
 import type { AnyRecord } from '@/shared/types.js';
 import { AppError, getOpenCodeDatabasePath } from '@/shared/utils.js';
+import { readClaudeSettingsContextWindow } from '@/shared/claude-context-window.js';
 
 type SessionRow = NonNullable<ReturnType<typeof sessionsDb.getSessionById>>;
 
@@ -146,6 +147,12 @@ function resolveClaudeContextWindow(
   const kiloMatch = /\[([0-9]+)k\]/i.exec(modelName);
   if (kiloMatch) {
     return parseInt(kiloMatch[1], 10) * 1_000;
+  }
+  // Proxies rewrite model ids, so the transcript suffix may be missing while
+  // settings.json still records what the user actually selected.
+  const settingsWindow = readClaudeSettingsContextWindow();
+  if (settingsWindow > 0) {
+    return settingsWindow;
   }
   const parsedContextWindow = Number.parseInt(configuredContextWindow ?? '', 10);
   return Number.isFinite(parsedContextWindow) ? parsedContextWindow : 160_000;

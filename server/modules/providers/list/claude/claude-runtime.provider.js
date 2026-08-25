@@ -25,6 +25,7 @@ import {
   normalizeImageDescriptors
 } from '@/shared/image-attachments.js';
 import { CLAUDE_PREDEFINED_MODELS } from '@/modules/providers/list/claude/claude-models.provider.js';
+import { readClaudeSettingsContextWindow } from '@/shared/claude-context-window.js';
 import { resolveClaudeCodeExecutablePath } from '@/shared/claude-cli-path.js';
 import {
   createNotificationEvent,
@@ -371,6 +372,12 @@ function resolveContextWindow(sdkMessage) {
     if (kiloMatch) {
       return parseInt(kiloMatch[1], 10) * 1_000;
     }
+  }
+  // Proxies rewrite model ids, so the suffix may be missing while
+  // settings.json still records what the user actually selected.
+  const settingsWindow = readClaudeSettingsContextWindow();
+  if (settingsWindow > 0) {
+    return settingsWindow;
   }
   return parseInt(process.env.CONTEXT_WINDOW, 10) || 160000;
 }
