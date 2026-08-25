@@ -776,7 +776,14 @@ export function useChatComposerState({
                 metadata: { type: 'builtin' },
               } as SlashCommand)
             : undefined);
-        if (matchedCommand && matchedCommand.type !== 'skill') {
+        // Passthrough commands (e.g. /compact) are not executed here: the CLI
+        // itself handles them when the text reaches it as a normal turn, and
+        // the resulting compact summary flows back through the message stream.
+        if (
+          matchedCommand
+          && matchedCommand.metadata?.passthrough !== true
+          && matchedCommand.type !== 'skill'
+        ) {
           executeCommand(matchedCommand, isHelpAlias ? '/help' : commandInput);
           setInput('');
           inputValueRef.current = '';

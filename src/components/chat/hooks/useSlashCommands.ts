@@ -69,6 +69,11 @@ const isPromiseLike = (value: unknown): value is Promise<unknown> =>
 const isSkillCommand = (command: SlashCommand) =>
   command.type === 'skill' || command.metadata?.type === 'skill';
 
+// Passthrough commands (e.g. /compact) must reach the CLI as a normal turn
+// instead of being executed through the commands API.
+const isPassthroughCommand = (command: SlashCommand) =>
+  command.metadata?.passthrough === true;
+
 const dedupeProviderSkills = (skills: ProviderSkill[]): ProviderSkill[] => {
   const seenCommands = new Set<string>();
 
@@ -332,7 +337,7 @@ export function useSlashCommands({
 
   const selectCommandFromKeyboard = useCallback(
     (command: SlashCommand) => {
-      if (isSkillCommand(command)) {
+      if (isSkillCommand(command) || isPassthroughCommand(command)) {
         insertCommandIntoInput(command);
         return;
       }
@@ -354,7 +359,7 @@ export function useSlashCommands({
       }
 
       trackCommandUsage(command);
-      if (isSkillCommand(command)) {
+      if (isSkillCommand(command) || isPassthroughCommand(command)) {
         insertCommandIntoInput(command);
         return;
       }

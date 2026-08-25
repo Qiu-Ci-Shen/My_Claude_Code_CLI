@@ -204,6 +204,12 @@ const builtInCommands = [
     namespace: "builtin",
     metadata: { type: "builtin" },
   },
+  {
+    name: "/compact",
+    description: "Compact the conversation context (passed through to Claude Code)",
+    namespace: "builtin",
+    metadata: { type: "builtin", passthrough: true },
+  },
 ];
 
 /**
