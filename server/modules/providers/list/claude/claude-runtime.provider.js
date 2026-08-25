@@ -365,6 +365,12 @@ function extractTokenBudget(sdkMessage) {
     const inputTokens = directInputTokens + cacheTokens;
     const outputTokens = readNumber(messageUsage.output_tokens ?? messageUsage.outputTokens);
     const totalUsed = inputTokens + outputTokens;
+    // SDK placeholder assistant messages carry a zeroed usage snapshot while the
+    // real numbers only arrive on the result message. Ignore zero snapshots so
+    // they don't overwrite a previously shown real budget with 0.
+    if (totalUsed <= 0) {
+      return null;
+    }
     const contextWindow = parseInt(process.env.CONTEXT_WINDOW, 10) || 160000;
 
     return {
@@ -397,6 +403,9 @@ function extractTokenBudget(sdkMessage) {
   const inputTokens = readNumber(modelData.cumulativeInputTokens ?? modelData.inputTokens);
   const outputTokens = readNumber(modelData.cumulativeOutputTokens ?? modelData.outputTokens);
   const totalUsed = inputTokens + outputTokens;
+  if (totalUsed <= 0) {
+    return null;
+  }
   const contextWindow = parseInt(process.env.CONTEXT_WINDOW, 10) || 160000;
 
   return {
