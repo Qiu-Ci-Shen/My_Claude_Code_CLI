@@ -101,53 +101,27 @@ export function createTaskmasterRouter(dependencies: TaskmasterRouterDependencie
      */
     async function checkTaskMasterInstallation() {
         return new Promise((resolve) => {
-            // Check if task-master command is available
-            const child = spawn('which', ['task-master'], {
+            // Detect by running `task-master --version` directly. The previous
+            // `which task-master` probe fails on Windows (no `which` binary,
+            // spawn ENOENT) and reported installed CLIs as missing.
+            const versionChild = spawn('task-master', ['--version'], {
                 stdio: ['ignore', 'pipe', 'pipe'],
                 shell: true
             });
 
-            let output = '';
-            let errorOutput = '';
+            let versionOutput = '';
 
-            child.stdout.on('data', (data) => {
-                output += data.toString();
+            versionChild.stdout.on('data', (data) => {
+                versionOutput += data.toString();
             });
 
-            child.stderr.on('data', (data) => {
-                errorOutput += data.toString();
-            });
-
-            child.on('close', (code) => {
-                if (code === 0 && output.trim()) {
-                    // TaskMaster is installed, get version
-                    const versionChild = spawn('task-master', ['--version'], {
-                        stdio: ['ignore', 'pipe', 'pipe'],
-                        shell: true
-                    });
-
-                    let versionOutput = '';
-
-                    versionChild.stdout.on('data', (data) => {
-                        versionOutput += data.toString();
-                    });
-
-                    versionChild.on('close', (versionCode) => {
-                        resolve({
-                            isInstalled: true,
-                            installPath: output.trim(),
-                            version: versionCode === 0 ? versionOutput.trim() : 'unknown',
-                            reason: null
-                        });
-                    });
-
-                    versionChild.on('error', () => {
-                        resolve({
-                            isInstalled: true,
-                            installPath: output.trim(),
-                            version: 'unknown',
-                            reason: null
-                        });
+            versionChild.on('close', (versionCode) => {
+                if (versionCode === 0 && versionOutput.trim()) {
+                    resolve({
+                        isInstalled: true,
+                        installPath: 'task-master',
+                        version: versionOutput.trim(),
+                        reason: null
                     });
                 } else {
                     resolve({
@@ -159,7 +133,7 @@ export function createTaskmasterRouter(dependencies: TaskmasterRouterDependencie
                 }
             });
 
-            child.on('error', (error) => {
+            versionChild.on('error', (error) => {
                 resolve({
                     isInstalled: false,
                     installPath: null,
