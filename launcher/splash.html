@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>正在启动 Claude Code UI…</title>
+<style>
+    html, body {
+        margin: 0; height: 100%; overflow: hidden;
+        /* Vignette baked into the base: warm ember heart fading to near-black edges */
+        background:
+            radial-gradient(120vmax 90vmax at 50% 42%, #211913 0%, #17130f 45%, #0e0b09 100%);
+        font: 13px/1.6 "Segoe UI", "Microsoft YaHei", sans-serif;
+    }
+
+    /* ---- Aurora field: drifting colour wash, never static ---- */
+    .aurora { position: fixed; inset: -20%; filter: blur(90px) saturate(1.15); }
+    .blob { position: absolute; border-radius: 50%; will-change: transform, opacity; }
+    .b1 { width: 55vmax; height: 55vmax; left: -10%; top: -15%; opacity: .42;
+          background: radial-gradient(circle, #d77655 0%, rgba(215,118,85,0) 70%);
+          animation: drift1 16s ease-in-out infinite alternate, blobPulse1 11s ease-in-out infinite alternate; }
+    .b2 { width: 45vmax; height: 45vmax; right: -12%; top: 20%; opacity: .38;
+          background: radial-gradient(circle, #a84838 0%, rgba(168,72,56,0) 70%);
+          animation: drift2 19s ease-in-out infinite alternate, blobPulse2 13s ease-in-out infinite alternate; }
+    .b3 { width: 40vmax; height: 40vmax; left: 25%; bottom: -20%; opacity: .34;
+          background: radial-gradient(circle, #8a4a52 0%, rgba(138,74,82,0) 70%);
+          animation: drift3 22s ease-in-out infinite alternate, blobPulse3 15s ease-in-out infinite alternate; }
+    .b4 { width: 26vmax; height: 26vmax; right: 22%; bottom: -8%; opacity: .30;
+          background: radial-gradient(circle, #c98a4b 0%, rgba(201,138,75,0) 70%);
+          animation: drift1 18s ease-in-out infinite alternate-reverse, blobPulse1 12s ease-in-out infinite alternate-reverse; }
+    @keyframes drift1 { to { transform: translate(12vw, 8vh) scale(1.15); } }
+    @keyframes drift2 { to { transform: translate(-10vw, -6vh) scale(0.9); } }
+    @keyframes drift3 { to { transform: translate(6vw, -10vh) scale(1.2); } }
+    /* each blob breathes its own opacity on its own period, so the wash
+       never sits still even between drifts */
+    @keyframes blobPulse1 { from { opacity: .42; } to { opacity: .58; } }
+    @keyframes blobPulse2 { from { opacity: .38; } to { opacity: .22; } }
+    @keyframes blobPulse3 { from { opacity: .34; } to { opacity: .48; } }
+
+    /* ---- Living dark: faint animated undertone so the base is never dead black ---- */
+    .undertone {
+        position: fixed; inset: 0; pointer-events: none;
+        background:
+            radial-gradient(60vmax 60vmax at 20% 30%, rgba(215,118,85,.05), transparent 60%),
+            radial-gradient(50vmax 50vmax at 80% 70%, rgba(184,84,58,.05), transparent 60%);
+        animation: undertoneShift 26s ease-in-out infinite alternate;
+    }
+    @keyframes undertoneShift {
+        from { background-position: 0% 0%, 100% 100%; filter: brightness(1); }
+        to   { background-position: 4% 6%, 94% 92%;  filter: brightness(1.25); }
+    }
+
+    /* ---- Mouse-follow ember blob (poppr.be style) ----
+       Rotating elliptical dual-color gradient, CSS-transitioned follow. */
+    #ember {
+        position: fixed; left: 0; top: 0;
+        width: 340px; height: 476px;         /* 1 : 1.4 ellipse */
+        border-radius: 50%;
+        background: linear-gradient(160deg, #d77655 0%, #f2b47e 55%, #ffe0b8 100%);
+        filter: blur(90px);
+        opacity: 0;
+        transition:
+            transform .4s cubic-bezier(0, 0, .2, 1),   /* poppr: 400ms easeOut */
+            opacity 1s ease-out;
+        will-change: transform;
+        z-index: 1;
+        pointer-events: none;
+        animation: emberSpin 20s linear infinite;  /* poppr: 20s rotation */
+    }
+    @keyframes emberSpin { to { rotate: 360deg; } }
+
+    /* ---- Starburst: slightly thicker rays + pinpoint core ----
+       Still the same auto-rotating 12-ray star (starSpin, JS-driven bloom
+       untouched); rays thickened from the original without going chunky. */
+    .star {
+        position: fixed; left: 50%; top: 40%;
+        width: 0; height: 0;
+        animation: starSpin 60s linear infinite;
+        will-change: transform;
+        opacity: .92;
+    }
+    @keyframes starSpin { to { transform: rotate(360deg); } }
+
+    .star i {
+        position: absolute; left: 0; top: 0;
+        width: 168px; height: 8px;
+        border-radius: 999px;
+        transform-origin: 0 50%;
+        /* tapered: transparent root -> ember body -> warm white tip */
+        background: linear-gradient(90deg,
+            rgba(215,118,85,0) 0%,
+            rgba(222,128,92,.28) 18%,
+            rgba(230,140,100,.85) 46%,
+            rgba(255,214,190,.95) 82%,
+            rgba(255,236,220,0) 100%);
+        animation: rayBreathe 4s cubic-bezier(.45,0,.55,1) infinite;
+    }
+    .star i:nth-child(odd)  { width: 112px; opacity: .7; }
+    .star i:nth-child(1)  { --r: rotate(0deg);   }
+    .star i:nth-child(2)  { --r: rotate(30deg);  animation-delay: -.4s; }
+    .star i:nth-child(3)  { --r: rotate(60deg);  animation-delay: -.8s; }
+    .star i:nth-child(4)  { --r: rotate(90deg);  animation-delay: -1.2s; }
+    .star i:nth-child(5)  { --r: rotate(120deg); animation-delay: -1.6s; }
+    .star i:nth-child(6)  { --r: rotate(150deg); animation-delay: -2s; }
+    .star i:nth-child(7)  { --r: rotate(180deg); animation-delay: -2.4s; }
+    .star i:nth-child(8)  { --r: rotate(210deg); animation-delay: -2.8s; }
+    .star i:nth-child(9)  { --r: rotate(240deg); animation-delay: -3.2s; }
+    .star i:nth-child(10) { --r: rotate(270deg); animation-delay: -3.6s; }
+    .star i:nth-child(11) { --r: rotate(300deg); animation-delay: -4s; }
+    .star i:nth-child(12) { --r: rotate(330deg); animation-delay: -4.4s; }
+    @keyframes rayBreathe {
+        0%, 100% { transform: var(--r, rotate(0deg)) scaleX(1);    opacity: .75; }
+        50%      { transform: var(--r, rotate(0deg)) scaleX(1.14); opacity: 1; }
+    }
+
+    /* Pinpoint core: bright heart + soft glow where rays converge */
+    .core {
+        position: fixed; left: 50%; top: 40%;
+        width: 130px; height: 130px; transform: translate(-50%,-50%);
+        border-radius: 50%;
+        background: radial-gradient(circle,
+            rgba(255,240,226,.55) 0%,
+            rgba(255,224,200,.22) 22%,
+            rgba(215,118,85,.10) 48%,
+            rgba(215,118,85,0) 70%);
+        animation: corePulse 4s cubic-bezier(.45,0,.55,1) infinite;
+        filter: blur(5px);
+    }
+    @keyframes corePulse {
+        0%, 100% { transform: translate(-50%,-50%) scale(1); opacity: .85; }
+        50%      { transform: translate(-50%,-50%) scale(1.12); opacity: 1; }
+    }
+
+    /* ---- Wordmark: text untouched, moved clear of the star ---- */
+    .stage {
+        position: fixed; left: 50%; top: 40%;
+        transform: translateX(-50%);
+        display: flex; flex-direction: column; align-items: center;
+        z-index: 5;
+        /* clear the star's airspace: longest ray 168px * breathe 1.14 ≈ 192px */
+        padding-top: 216px;
+    }
+    .wordmark {
+        color: #fff3ea;
+        font-size: 21px; font-weight: 300; letter-spacing: .34em;
+        text-indent: .34em; /* balance tracking */
+        text-shadow:
+            0 2px 24px rgba(0,0,0,.55),
+            0 0 18px rgba(255,214,190,.18);
+        white-space: nowrap;
+    }
+    .wordmark b { font-weight: 600; }
+
+    .status {
+        position: fixed; left: 50%; bottom: 9vh; transform: translateX(-50%);
+        color: rgba(255,236,224,.5); letter-spacing: .12em; font-size: 12.5px;
+        white-space: nowrap; transition: opacity .4s;
+    }
+    .status.error { color: #ffb59e; }
+
+    .fadeout { transition: opacity .45s ease-out; }
+</style>
+</head>
+<body>
+<div class="aurora">
+    <div class="blob b1"></div>
+    <div class="blob b2"></div>
+    <div class="blob b3"></div>
+    <div class="blob b4"></div>
+</div>
+<div class="undertone"></div>
+<div id="ember"></div>
+
+<div class="star" id="star">
+    <i></i><i></i><i></i><i></i><i></i><i></i>
+    <i></i><i></i><i></i><i></i><i></i><i></i>
+</div>
+<div class="core fadeout" id="core"></div>
+
+<div class="stage">
+    <div class="wordmark fadeout" id="wordmark">CLAUDE <b>CODE UI</b></div>
+</div>
+
+<div class="status fadeout" id="status">正在启动</div>
+
+<script>
+"use strict";
+
+const UI_URL = "http://localhost:5173";
+const FAIL_AFTER_MS = 90000;
+const MOUNT_BUFFER_MS = 700;
+
+const statusEl = document.getElementById("status");
+const fadeEls = ["star", "core", "wordmark", "status"]
+    .map(id => { const el = document.getElementById(id); el.classList.add("fadeout"); return el; });
+let navigated = false;
+const pollStart = performance.now();
+
+// ---- Mouse-follow ember blob: poppr.be style ----
+// A rotating dual-color ellipse that follows the cursor via a 400ms CSS
+// transition (browser easing, no manual lerp). Fade in on move, fade out
+// when the pointer leaves or rests.
+(function emberBlob() {
+    const blob = document.getElementById("ember");
+    const bw = 340, bh = 476;
+    let started = false;
+
+    window.addEventListener("mousemove", e => {
+        const x = e.clientX - bw / 2;
+        const y = e.clientY - bh / 2;
+        // translate3d moves the blob; the separate `rotate` animation keeps
+        // spinning untouched (transform and rotate are independent channels).
+        blob.style.transform = "translate3d(" + x + "px," + y + "px,0)";
+        if (!started) {
+            started = true;
+            requestAnimationFrame(() => { blob.style.opacity = "1"; });
+        }
+        clearTimeout(blob._hideTimer);
+        blob._hideTimer = setTimeout(() => { blob.style.opacity = "0"; }, 2600);
+    });
+    document.addEventListener("mouseleave", () => { blob.style.opacity = "0"; });
+})();
+
+function fadeOutAll() {
+    for (const el of fadeEls) el.style.opacity = "0";
+}
+
+// Two-phase: port reachable -> hidden iframe preloads the real UI (bundles
+// execute + cache) -> in-place navigation renders instantly.
+function pollServer() {
+    if (navigated) return;
+    fetch(UI_URL, { mode: "no-cors", cache: "no-store" })
+        .then(() => { navigated = true; preheat(); })
+        .catch(() => {});
+}
+
+function preheat() {
+    statusEl.textContent = "界面就绪中";
+    // Heartbeat: star blooms once as confirmation.
+    const star = document.getElementById("star");
+    star.style.animation = "starSpin 60s linear infinite, starBloom .9s cubic-bezier(.45,0,.55,1) 2 alternate";
+    const kf = document.createElement("style");
+    kf.textContent = "@keyframes starBloom { from { scale: 1; } to { scale: 1.12; } }";
+    document.head.appendChild(kf);
+
+    const frame = document.createElement("iframe");
+    frame.style.cssText =
+        "position:fixed;width:1px;height:1px;left:-10px;top:-10px;opacity:0;border:0;";
+    frame.src = UI_URL;
+    let done = false;
+    frame.addEventListener("load", () => {
+        setTimeout(() => {
+            if (done) return;
+            done = true;
+            statusEl.textContent = "启动完成";
+            fadeOutAll();
+            setTimeout(() => { window.location.href = UI_URL; }, 420);
+        }, MOUNT_BUFFER_MS);
+    });
+    document.body.appendChild(frame);
+    setTimeout(() => {
+        if (!done) {
+            done = true;
+            fadeOutAll();
+            setTimeout(() => { window.location.href = UI_URL; }, 420);
+        }
+    }, 20000);
+}
+
+setInterval(pollServer, 300);
+setInterval(() => {
+    if (!navigated && performance.now() - pollStart > FAIL_AFTER_MS) {
+        statusEl.classList.add("error");
+        statusEl.textContent = "启动超时，请查看 CCUI-Launcher\\logs 日志";
+    }
+}, 1000);
+</script>
+</body>
+</html>
