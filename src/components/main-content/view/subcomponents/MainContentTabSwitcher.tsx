@@ -69,7 +69,9 @@ export default function MainContentTabSwitcher({
   ];
 
   const pluginTabs: PluginTab[] = plugins
-    .filter((p) => p.enabled)
+    // backgroundOnly plugins (e.g. push-to-talk) auto-activate via PluginAutoBoot
+    // and have no tab UI — hide them from the tab bar.
+    .filter((p) => p.enabled && p.backgroundOnly !== true)
     .map((p) => ({
       kind: 'plugin',
       id: `plugin:${p.name}` as AppTab,

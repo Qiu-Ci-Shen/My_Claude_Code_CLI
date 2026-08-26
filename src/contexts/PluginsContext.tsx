@@ -14,6 +14,7 @@ export type Plugin = {
   entry: string;
   server: string | null;
   permissions: string[];
+  backgroundOnly?: boolean;
   enabled: boolean;
   serverRunning: boolean;
   dirName: string;

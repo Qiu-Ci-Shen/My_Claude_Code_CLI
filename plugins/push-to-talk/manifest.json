@@ -1,0 +1,11 @@
+{
+  "name": "push-to-talk",
+  "displayName": "Push to Talk",
+  "description": "长按 Alt 键说话，松开自动识别并填入聊天输入框。进入本插件标签页一次即激活，之后可在聊天界面直接使用。",
+  "version": "0.1.0",
+  "author": "Qiu",
+  "type": "module",
+  "slot": "tab",
+  "backgroundOnly": true,
+  "entry": "index.js"
+}
