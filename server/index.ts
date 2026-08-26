@@ -30,6 +30,7 @@ import { taskmasterRoutes } from './modules/taskmaster/index.js';
 import { commandsRoutes } from './modules/commands/index.js';
 import { settingsRoutes } from './modules/settings/index.js';
 import { createSystemModule } from './modules/system/index.js';
+import { createMobileAccessService, createMobileAccessRouter, pinLoginHandler } from './modules/mobile-access/index.js';
 import { createAgentModule } from './modules/agent/index.js';
 import projectModuleRoutes from './modules/projects/projects.routes.js';
 import notificationRoutes from './modules/notifications/notifications.routes.js';
@@ -173,6 +174,19 @@ app.use('/api/commands', authenticateToken, commandsRoutes);
 app.use('/api/settings', authenticateToken, settingsRoutes);
 
 app.use('/api/system', authenticateToken, systemRoutes);
+
+// Mobile access (LAN/public QR) routes (protected)
+// QR/tunnel must target the UI port: in dev mode (no dist build) that is the
+// Vite dev server, which proxies /api and /ws back here; in production the
+// backend port serves the built app directly.
+const MOBILE_ACCESS_UI_PORT = fs.existsSync(path.join(APP_ROOT, 'dist', 'index.html'))
+    ? Number.parseInt(process.env.SERVER_PORT || '3001', 10)
+    : Number.parseInt(process.env.VITE_PORT || '5173', 10);
+const mobileAccessService = createMobileAccessService({ uiPort: MOBILE_ACCESS_UI_PORT });
+// PIN login must be reachable WITHOUT a token — it is the endpoint that
+// issues one. Rate-limited per source IP inside the service.
+app.post('/api/mobile-access/pin-login', pinLoginHandler);
+app.use('/api/mobile-access', authenticateToken, createMobileAccessRouter(mobileAccessService));
 
 app.use('/api/notifications', authenticateToken, notificationRoutes);
 
@@ -367,6 +381,11 @@ async function startServer() {
             startEnabledPluginServers().catch(err => {
                 console.error('[Plugins] Error during startup:', err.message);
             });
+
+            // Re-launch a previously-opened public tunnel after a server restart
+            void mobileAccessService.restoreTunnelIfNeeded().catch((err) => {
+                console.warn('[MobileAccess] tunnel restore error:', err?.message);
+            });
         });
 
         await closeSessionsWatcher();
@@ -386,6 +405,11 @@ async function startServer() {
                 await removeLocalServerMarker();
             } catch (err) {
                 console.error('[Local Server] Error removing server marker during shutdown:', getErrorMessage(err));
+            }
+            try {
+                await mobileAccessService.dispose();
+            } catch (err) {
+                console.error('[MobileAccess] Error disposing during shutdown:', getErrorMessage(err));
             }
             process.exit(0);
         };

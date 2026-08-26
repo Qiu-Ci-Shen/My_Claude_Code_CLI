@@ -28,6 +28,9 @@ export default defineConfig(({ mode }) => {
     server: {
       host,
       port: parseInt(env.VITE_PORT) || 5173,
+      // Cloudflare quick tunnels terminate at random *.trycloudflare.com
+      // subdomains; without this the dev server rejects their Host header.
+      allowedHosts: ['.trycloudflare.com'],
       proxy: {
         '/api': `http://${proxyHost}:${serverPort}`,
         '/ws': {
