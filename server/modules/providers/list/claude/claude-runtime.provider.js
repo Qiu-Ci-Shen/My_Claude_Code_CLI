@@ -232,6 +232,10 @@ function mapCliOptionsToSDK(options = {}) {
   // but being explicit ensures forward compatibility and clarity.
   sdkOptions.tools = { type: 'preset', preset: 'claude_code' };
 
+  // [claude-rewind plugin] Enable file checkpointing so the rewind plugin can
+  // restore files to any user message's state via ~/.claude/file-history.
+  sdkOptions.enableFileCheckpointing = true;
+
   sdkOptions.disallowedTools = settings.disallowedTools || [];
 
   sdkOptions.model = options.model || CLAUDE_PREDEFINED_MODELS.DEFAULT;
@@ -393,9 +397,12 @@ function extractTokenBudget(sdkMessage) {
     const cacheCreationTokens = readNumber(messageUsage.cache_creation_input_tokens ?? messageUsage.cacheCreationInputTokens ?? messageUsage.cacheCreationTokens);
     const cacheReadTokens = readNumber(messageUsage.cache_read_input_tokens ?? messageUsage.cacheReadInputTokens ?? messageUsage.cacheReadTokens);
     const cacheTokens = cacheCreationTokens + cacheReadTokens;
+    // Context occupancy = what the next request will re-send: direct input
+    // plus cached content. output_tokens is generation volume for THIS turn,
+    // not context — counting it inflated the bar every turn.
     const inputTokens = directInputTokens + cacheTokens;
+    const totalUsed = inputTokens;
     const outputTokens = readNumber(messageUsage.output_tokens ?? messageUsage.outputTokens);
-    const totalUsed = inputTokens + outputTokens;
     // SDK placeholder assistant messages carry a zeroed usage snapshot while the
     // real numbers only arrive on the result message. Ignore zero snapshots so
     // they don't overwrite a previously shown real budget with 0.
@@ -426,7 +433,12 @@ function extractTokenBudget(sdkMessage) {
     return null;
   }
 
-  // Fallback for older SDK messages with only modelUsage
+  // Fallback for older SDK messages with only modelUsage. modelUsage totals
+  // are CUMULATIVE across turns, so they must never be presented as current
+  // context occupancy — that made the bar creep toward full the longer the
+  // session ran ("莫名爆满"). Report the window only when nothing better
+  // exists is wrong; instead derive from the largest single-model context
+  // window and refuse to fabricate a used figure we cannot trust.
   const modelKey = Object.keys(sdkMessage.modelUsage)[0];
   const modelData = sdkMessage.modelUsage[modelKey];
 
@@ -434,27 +446,7 @@ function extractTokenBudget(sdkMessage) {
     return null;
   }
 
-  const inputTokens = readNumber(modelData.cumulativeInputTokens ?? modelData.inputTokens);
-  const outputTokens = readNumber(modelData.cumulativeOutputTokens ?? modelData.outputTokens);
-  const totalUsed = inputTokens + outputTokens;
-  if (totalUsed <= 0) {
-    return null;
-  }
-  const contextWindow = resolveContextWindow(sdkMessage);
-  const contextPercent = Math.min(100, Math.max(0, Math.round((totalUsed / contextWindow) * 100)));
-
-  return {
-    used: totalUsed,
-    total: contextWindow,
-    inputTokens,
-    outputTokens,
-    contextWindow,
-    contextPercent,
-    breakdown: {
-      input: inputTokens,
-      output: outputTokens,
-    },
-  };
+  return null;
 }
 
 // Tool calls that leave work running past the end of a turn. Bash only counts
