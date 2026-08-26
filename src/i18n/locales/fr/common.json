@@ -86,7 +86,7 @@
     "openInEditor": "Ouvrir dans l'éditeur"
   },
   "mainContent": {
-    "loading": "Chargement de CloudCLI",
+    "loading": "Chargement de Qiu_Ai_LZ",
     "settingUpWorkspace": "Préparation de votre espace de travail...",
     "chooseProject": "Choisissez votre projet",
     "selectProjectDescription": "Sélectionnez un projet dans la barre latérale pour commencer à coder avec Claude. Chaque projet contient vos sessions de chat et l'historique des fichiers.",

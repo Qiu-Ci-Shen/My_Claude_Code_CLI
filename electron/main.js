@@ -11,7 +11,7 @@ import { TabsController } from './tabs.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const APP_NAME = 'CloudCLI';
+const APP_NAME = 'Qiu_Ai_LZ';
 const APP_USER_MODEL_ID = 'ai.cloudcli.desktop';
 const CALLBACK_PROTOCOL = 'cloudcli';
 const CALLBACK_URL = `${CALLBACK_PROTOCOL}://auth/callback`;
@@ -247,7 +247,7 @@ async function copyDiagnostics() {
   await dialog.showMessageBox(desktopWindow?.getMainWindow() || undefined, {
     type: 'info',
     title: 'Diagnostics copied',
-    message: 'CloudCLI desktop diagnostics were copied to the clipboard.',
+    message: 'Qiu_Ai_LZ desktop diagnostics were copied to the clipboard.',
   });
 }
 
@@ -259,15 +259,15 @@ async function refreshCloudEnvironments({ showErrors = false } = {}) {
   } catch (error) {
     const authState = cloud.getAuthState();
     if (authState === 'expired') {
-      const expiredError = new Error('Your CloudCLI session expired. Reconnect your account.');
+      const expiredError = new Error('Your Qiu_Ai_LZ session expired. Reconnect your account.');
       if (showErrors) {
-        await showError('CloudCLI login required', expiredError);
+        await showError('Qiu_Ai_LZ login required', expiredError);
         return [];
       }
       throw expiredError;
     }
     if (showErrors) {
-      await showError('Could not load CloudCLI environments', error);
+      await showError('Could not load Qiu_Ai_LZ environments', error);
       return [];
     }
     throw error;
@@ -299,13 +299,13 @@ async function handleDeepLink(url) {
   }
 
   if (!pendingCloudConnectStartedAt || Date.now() - pendingCloudConnectStartedAt > AUTH_CALLBACK_TTL_MS) {
-    await showError('CloudCLI account connection failed', new Error('No recent CloudCLI account connection was started from this app.'));
+    await showError('Qiu_Ai_LZ account connection failed', new Error('No recent Qiu_Ai_LZ account connection was started from this app.'));
     return;
   }
 
   const apiKey = parsed.searchParams.get('api_key');
   if (!apiKey) {
-    await showError('CloudCLI account connection failed', new Error('The callback did not include an API key.'));
+    await showError('Qiu_Ai_LZ account connection failed', new Error('The callback did not include an API key.'));
     return;
   }
 
@@ -318,8 +318,8 @@ async function handleDeepLink(url) {
 
   dialog.showMessageBox(desktopWindow?.getMainWindow() || undefined, {
     type: 'info',
-    title: 'CloudCLI account connected',
-    message: cloud.getAccount()?.email ? `Connected as ${cloud.getAccount().email}.` : 'CloudCLI account connected.',
+    title: 'Qiu_Ai_LZ account connected',
+    message: cloud.getAccount()?.email ? `Connected as ${cloud.getAccount().email}.` : 'Qiu_Ai_LZ account connected.',
   }).catch(() => {});
 }
 
@@ -329,7 +329,7 @@ async function copyLocalWebUrl() {
   const localUrl = localServer.getLocalServerUrl();
 
   if (!shareableUrl) {
-    throw new Error('Local CloudCLI URL is not available yet.');
+    throw new Error('Local Qiu_Ai_LZ URL is not available yet.');
   }
 
   clipboard.writeText(shareableUrl);
@@ -340,7 +340,7 @@ async function copyLocalWebUrl() {
     message: isLanUrl ? 'LAN web URL copied.' : 'Local web URL copied.',
     detail: isLanUrl
       ? `${shareableUrl}\n\nUse this URL from another device on the same network.`
-      : `${shareableUrl}\n\nThis URL works on this computer. Enable LAN access before starting Local CloudCLI to copy a phone-accessible URL.`,
+      : `${shareableUrl}\n\nThis URL works on this computer. Enable LAN access before starting Local Qiu_Ai_LZ to copy a phone-accessible URL.`,
   });
 
   return getDesktopState();
@@ -350,7 +350,7 @@ async function openLocalWebUi() {
   await localServer.ensureLocalServer();
   const url = localServer.getShareableWebUrl() || localServer.getLocalServerUrl();
   if (!url) {
-    throw new Error('Local CloudCLI URL is not available yet.');
+    throw new Error('Local Qiu_Ai_LZ URL is not available yet.');
   }
 
   await openExternalUrl(url);
@@ -366,7 +366,7 @@ async function updateDesktopSetting(key, value) {
       type: 'info',
       title: 'Restart local server to apply',
       message: 'LAN access changes apply the next time the local server starts.',
-      detail: 'Quit CloudCLI and stop the local server, then open Local CloudCLI again.',
+      detail: 'Quit Qiu_Ai_LZ and stop the local server, then open Local Qiu_Ai_LZ again.',
     });
   }
 
@@ -386,7 +386,7 @@ async function showEnvironmentPicker() {
     }
   }
 
-  const choices = ['Local CloudCLI', ...environments.map((environment) => {
+  const choices = ['Local Qiu_Ai_LZ', ...environments.map((environment) => {
     const status = environment.status === 'running' ? '' : ` (${environment.status})`;
     return `${environment.name || environment.subdomain}${status}`;
   })];
@@ -396,7 +396,7 @@ async function showEnvironmentPicker() {
     buttons: [...choices, 'Cancel'],
     defaultId: 0,
     cancelId: choices.length,
-    title: 'Switch CloudCLI Environment',
+    title: 'Switch Qiu_Ai_LZ Environment',
     message: 'Choose where this desktop window should connect.',
     detail: refreshError ? `Cloud environments could not be refreshed. Showing cached environments.\n\n${refreshError.message || refreshError}` : undefined,
   });
@@ -588,7 +588,7 @@ async function openEnvironmentInDesktop(environment) {
       cancelId: 1,
       title: 'Start environment?',
       message: `${pendingTarget.name} is ${environment.status}.`,
-      detail: 'CloudCLI can start it before opening the remote app.',
+      detail: 'Qiu_Ai_LZ can start it before opening the remote app.',
     });
 
     if (response.response !== 0) {
@@ -696,7 +696,7 @@ function getRemoteEnvironmentMenuItems() {
   const environments = cloud.getEnvironments();
 
   if (!cloudAccount?.apiKey) {
-    return [{ label: 'Connect CloudCLI Account...', click: () => void connectCloudAccount() }];
+    return [{ label: 'Connect Qiu_Ai_LZ Account...', click: () => void connectCloudAccount() }];
   }
 
   if (!environments.length) {
@@ -895,7 +895,7 @@ async function bootstrap() {
   app.setAboutPanelOptions({
     applicationName: APP_NAME,
     applicationVersion: app.getVersion(),
-    copyright: 'CloudCLI',
+    copyright: 'Qiu_Ai_LZ',
   });
 
   localServer = new LocalServerController({
@@ -938,7 +938,7 @@ async function bootstrap() {
 
 if (registerSingleInstance()) {
   bootstrap().catch(async (error) => {
-    await showError('CloudCLI failed to start', error);
+    await showError('Qiu_Ai_LZ failed to start', error);
     app.quit();
   });
 }

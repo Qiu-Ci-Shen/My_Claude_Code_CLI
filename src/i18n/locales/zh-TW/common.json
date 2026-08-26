@@ -86,7 +86,7 @@
     "openInEditor": "在編輯器中開啟"
   },
   "mainContent": {
-    "loading": "正在載入 CloudCLI",
+    "loading": "正在載入 Qiu_Ai_LZ",
     "settingUpWorkspace": "正在設定您的工作區...",
     "chooseProject": "選擇您的專案",
     "selectProjectDescription": "從側邊欄選擇一個專案以開始使用 Claude 進行程式開發。每個專案包含您的聊天紀錄和檔案歷史。",

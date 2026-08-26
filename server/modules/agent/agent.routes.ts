@@ -1166,7 +1166,7 @@ export function createAgentRouter(dependencies: AgentRouterDependencies): expres
             } else {
               prBody += `Agent task: ${message}`;
             }
-            prBody += '\n\n---\n*This pull request was automatically created by CloudCLI.ai Agent.*';
+            prBody += '\n\n---\n*This pull request was automatically created by Qiu_Ai_LZ.ai Agent.*';
 
             console.log(`📝 PR Title: ${prTitle}`);
 

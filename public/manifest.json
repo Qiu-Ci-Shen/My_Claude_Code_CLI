@@ -1,7 +1,7 @@
 {
-  "name": "CloudCLI UI",
-  "short_name": "CloudCLI UI",
-  "description": "CloudCLI UI web application",
+  "name": "Qiu_Ai_LZ",
+  "short_name": "Qiu_Ai_LZ",
+  "description": "Qiu_Ai_LZ web application",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

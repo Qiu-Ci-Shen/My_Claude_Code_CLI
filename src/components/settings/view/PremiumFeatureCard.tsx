@@ -14,7 +14,7 @@ export default function PremiumFeatureCard({
   icon,
   title,
   description,
-  ctaText = 'Available with CloudCLI Pro',
+  ctaText = 'Available with Qiu_Ai_LZ Pro',
 }: PremiumFeatureCardProps) {
   return (
     <div className="rounded-xl border border-dashed border-border/60 bg-muted/20 p-5">

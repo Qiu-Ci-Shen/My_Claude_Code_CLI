@@ -83,7 +83,7 @@ export default function SetupForm() {
 
   return (
     <AuthScreenLayout
-      title="Welcome to CloudCLI"
+      title="Welcome to Qiu_Ai_LZ"
       description="Set up your account to get started"
       footerText="This is a single-user system. Only one account can be created."
     >

@@ -145,7 +145,7 @@ export class DesktopNotificationsController {
     if (!deviceId) {
       this.stop();
       this.lastEvent = 'missing-device';
-      this.lastError = 'Connect a CloudCLI account before enabling desktop notifications.';
+      this.lastError = 'Connect a Qiu_Ai_LZ account before enabling desktop notifications.';
       this.onChange?.();
       return;
     }

@@ -59,7 +59,7 @@ export default function LoginForm() {
     <AuthScreenLayout
       title={t('login.title')}
       description={t('login.description')}
-      footerText="Enter your credentials to access CloudCLI"
+      footerText="Enter your credentials to access Qiu_Ai_LZ"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <AuthInputField

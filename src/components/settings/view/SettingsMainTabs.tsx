@@ -1,4 +1,4 @@
-import { GitBranch, Info, Key, Puzzle, Smartphone } from 'lucide-react';
+import { GitBranch, Key, Puzzle, Smartphone } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { SettingsMainTab } from '../types/types';
 
@@ -23,7 +23,6 @@ const TAB_CONFIG: MainTabConfig[] = [
   { id: 'notifications', labelKey: 'mainTabs.notifications' },
   { id: 'plugins', labelKey: 'mainTabs.plugins', icon: Puzzle },
   { id: 'mobileAccess', labelKey: 'mainTabs.mobileAccess', icon: Smartphone },
-  { id: 'about', labelKey: 'mainTabs.about', icon: Info },
 ];
 
 export default function SettingsMainTabs({ activeTab, onChange }: SettingsMainTabsProps) {

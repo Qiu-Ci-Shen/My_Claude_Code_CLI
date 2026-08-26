@@ -10,17 +10,11 @@ export default function AuthLoadingScreen() {
       </div>
 
       <div className="relative text-center" role="status" aria-live="polite">
-        <div className="mb-5 flex justify-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary/80 shadow-lg shadow-primary/25 ring-1 ring-inset ring-white/20">
-            <img src="/logo.svg" alt="CloudCLI" className="h-9 w-9" />
-          </div>
-        </div>
-
         <h1
           className="mb-4 text-2xl font-bold tracking-tight text-foreground"
           style={{ fontFamily: CLOUDCLI_WORDMARK_FONT_FAMILY }}
         >
-          CloudCLI
+          Qiu_Ai_LZ
         </h1>
         <p className="sr-only">Loading authentication state…</p>
         <div aria-hidden className="flex items-center justify-center gap-2">

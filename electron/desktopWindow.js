@@ -393,7 +393,7 @@ export class DesktopWindowManager {
         {
           label: cloudState.account?.email ? `Reconnect ${cloudState.account.email}` : 'Login',
           click: () => void this.actions.connectCloudAccount()
-            .catch((error) => this.actions.showError('Could not connect CloudCLI account', error)),
+            .catch((error) => this.actions.showError('Could not connect Qiu_Ai_LZ account', error)),
         },
       ];
     }
@@ -414,8 +414,8 @@ export class DesktopWindowManager {
     const localState = this.getLocalState();
     const remoteItems = this.getRemoteEnvironmentMenuItems();
     const cloudAccountLabel = cloudState.account?.apiKey
-      ? (cloudState.account?.email ? `Connected: ${cloudState.account.email}` : 'CloudCLI Connected')
-      : (cloudState.account?.email ? `Reconnect: ${cloudState.account.email}` : 'Connect CloudCLI Account...');
+      ? (cloudState.account?.email ? `Connected: ${cloudState.account.email}` : 'Qiu_Ai_LZ Connected')
+      : (cloudState.account?.email ? `Reconnect: ${cloudState.account.email}` : 'Connect Qiu_Ai_LZ Account...');
 
     const template = [
       {
@@ -469,9 +469,9 @@ export class DesktopWindowManager {
           },
           { type: 'separator' },
           {
-            label: 'Open Local CloudCLI',
+            label: 'Open Local Qiu_Ai_LZ',
             accelerator: 'CmdOrCtrl+L',
-            click: () => void this.actions.openLocalInDesktop().catch((error) => this.actions.showError('Could not open local CloudCLI', error)),
+            click: () => void this.actions.openLocalInDesktop().catch((error) => this.actions.showError('Could not open local Qiu_Ai_LZ', error)),
           },
           {
             label: 'Open Local Web UI in Browser',
@@ -506,15 +506,15 @@ export class DesktopWindowManager {
           {
             label: cloudAccountLabel,
             accelerator: 'CmdOrCtrl+Shift+C',
-            click: () => void this.actions.connectCloudAccount().catch((error) => this.actions.showError('Could not connect CloudCLI account', error)),
+            click: () => void this.actions.connectCloudAccount().catch((error) => this.actions.showError('Could not connect Qiu_Ai_LZ account', error)),
           },
           {
             label: 'Refresh Cloud Environments',
-            click: () => void this.actions.refreshCloudEnvironments().catch((error) => this.actions.showError('Could not load CloudCLI environments', error)),
+            click: () => void this.actions.refreshCloudEnvironments().catch((error) => this.actions.showError('Could not load Qiu_Ai_LZ environments', error)),
             enabled: Boolean(cloudState.account?.apiKey),
           },
           {
-            label: 'Logout CloudCLI Account',
+            label: 'Logout Qiu_Ai_LZ Account',
             click: () => void this.actions.clearCloudAccount().catch((error) => this.actions.showError('Could not logout', error)),
             enabled: Boolean(cloudState.account?.apiKey),
           },
@@ -604,8 +604,8 @@ export class DesktopWindowManager {
         label: 'Local',
         submenu: [
           {
-            label: localState.localServerRunning ? 'Open Local in CloudCLI' : 'Start Local in CloudCLI',
-            click: () => void this.actions.openLocalInDesktop().catch((error) => this.actions.showError('Could not open local CloudCLI', error)),
+            label: localState.localServerRunning ? 'Open Local in Qiu_Ai_LZ' : 'Start Local in Qiu_Ai_LZ',
+            click: () => void this.actions.openLocalInDesktop().catch((error) => this.actions.showError('Could not open local Qiu_Ai_LZ', error)),
           },
           {
             label: 'Open Local in Browser',
@@ -624,10 +624,10 @@ export class DesktopWindowManager {
       { type: 'separator' },
       {
         label: cloudState.account?.email ? `Connected: ${cloudState.account.email}` : 'Login',
-        click: () => void this.actions.connectCloudAccount().catch((error) => this.actions.showError('Could not connect CloudCLI account', error)),
+        click: () => void this.actions.connectCloudAccount().catch((error) => this.actions.showError('Could not connect Qiu_Ai_LZ account', error)),
       },
       {
-        label: 'Logout CloudCLI Account',
+        label: 'Logout Qiu_Ai_LZ Account',
         click: () => void this.actions.clearCloudAccount().catch((error) => this.actions.showError('Could not logout', error)),
         enabled: Boolean(cloudState.account?.apiKey),
       },

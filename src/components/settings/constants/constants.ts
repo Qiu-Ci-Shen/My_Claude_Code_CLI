@@ -3,7 +3,6 @@ import {
   Bell,
   Bot,
   GitBranch,
-  Info,
   KeyRound,
   ListChecks,
   MonitorPlay,
@@ -36,7 +35,6 @@ export const SETTINGS_MAIN_TABS: SettingsMainTabMeta[] = [
   { id: 'browser', label: 'Browser', keywords: 'browser playwright chromium automation', icon: MonitorPlay },
   { id: 'notifications', label: 'Notifications', keywords: 'notifications alerts push', icon: Bell },
   { id: 'plugins', label: 'Plugins', keywords: 'plugins extensions integrations', icon: Plug },
-  { id: 'about', label: 'About', keywords: 'about version info', icon: Info },
 ];
 
 export const AGENT_PROVIDERS: AgentProvider[] = ['claude', 'cursor', 'codex', 'opencode'];

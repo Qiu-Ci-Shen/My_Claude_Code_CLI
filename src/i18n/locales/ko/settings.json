@@ -472,7 +472,7 @@
     },
     "managed": {
       "badge": "관리됨",
-      "hint": "CloudCLI가 관리합니다."
+      "hint": "Qiu_Ai_LZ가 관리합니다."
     },
     "help": {
       "title": "Codex MCP 정보",
@@ -504,7 +504,7 @@
     "docs": "문서",
     "sections": {
       "officialTitle": "공식 플러그인",
-      "officialDescription": "CloudCLI 팀이 관리하며 바로 설치할 수 있습니다.",
+      "officialDescription": "Qiu_Ai_LZ 팀이 관리하며 바로 설치할 수 있습니다.",
       "unofficialTitle": "기타 플러그인",
       "unofficialDescription": "다른 사용자가 만든 비공식 플러그인과 통합입니다. 설치 전에 소스 코드를 검토하세요."
     },
@@ -535,7 +535,7 @@
     "prismCloudCLI": {
       "name": "PRISM CloudCLI",
       "badge": "비공식",
-      "description": "CloudCLI 안에서 제공되는 Claude Code용 세션 인텔리전스입니다. 브라우저를 벗어나지 않고도 세션에서 토큰이 왜 소모되는지 확인하세요.",
+      "description": "Qiu_Ai_LZ 안에서 제공되는 Claude Code용 세션 인텔리전스입니다. 브라우저를 벗어나지 않고도 세션에서 토큰이 왜 소모되는지 확인하세요.",
       "install": "설치"
     },
     "sessionManagerPlugin": {

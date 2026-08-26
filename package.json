@@ -1,7 +1,7 @@
 {
   "name": "@cloudcli-ai/cloudcli",
   "version": "1.37.2",
-  "productName": "CloudCLI",
+  "productName": "Qiu_Ai_LZ",
   "description": "A web-based UI for Claude Code CLI",
   "type": "module",
   "main": "dist-server/server/index.js",
@@ -61,7 +61,7 @@
   },
   "build": {
     "appId": "ai.cloudcli.desktop",
-    "productName": "CloudCLI",
+    "productName": "Qiu_Ai_LZ",
     "asar": false,
     "artifactName": "cloudcli-desktop-${version}-${os}-${arch}.${ext}",
     "directories": {
@@ -82,7 +82,7 @@
     ],
     "protocols": [
       {
-        "name": "CloudCLI",
+        "name": "Qiu_Ai_LZ",
         "schemes": [
           "cloudcli"
         ]
@@ -96,11 +96,11 @@
         "dmg"
       ],
       "extendInfo": {
-        "CFBundleName": "CloudCLI",
-        "CFBundleDisplayName": "CloudCLI",
+        "CFBundleName": "Qiu_Ai_LZ",
+        "CFBundleDisplayName": "Qiu_Ai_LZ",
         "CFBundleURLTypes": [
           {
-            "CFBundleURLName": "CloudCLI",
+            "CFBundleURLName": "Qiu_Ai_LZ",
             "CFBundleURLSchemes": [
               "cloudcli"
             ]
