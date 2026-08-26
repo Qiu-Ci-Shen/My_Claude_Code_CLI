@@ -49,24 +49,32 @@
         to   { background-position: 4% 6%, 94% 92%;  filter: brightness(1.25); }
     }
 
-    /* ---- Mouse-follow ember blob (poppr.be style) ----
-       Rotating elliptical dual-color gradient, CSS-transitioned follow. */
-    #ember {
-        position: fixed; left: 0; top: 0;
-        width: 340px; height: 476px;         /* 1 : 1.4 ellipse */
+    /* ---- Water ripples: concentric rings bloom from the cursor ----
+       Each mousemove (throttled) drops a ring that expands and dissolves,
+       like touching water. A fainter outer ring trails behind it. */
+    .ripple {
+        position: fixed;
         border-radius: 50%;
-        background: linear-gradient(160deg, #d77655 0%, #f2b47e 55%, #ffe0b8 100%);
-        filter: blur(90px);
-        opacity: 0;
-        transition:
-            transform .4s cubic-bezier(0, 0, .2, 1),   /* poppr: 400ms easeOut */
-            opacity 1s ease-out;
-        will-change: transform;
-        z-index: 1;
         pointer-events: none;
-        animation: emberSpin 20s linear infinite;  /* poppr: 20s rotation */
+        z-index: 1;
+        transform: translate(-50%,-50%) scale(.15);
+        border: 1.5px solid rgba(242,180,126,.55);
+        box-shadow:
+            0 0 18px rgba(215,118,85,.22),
+            inset 0 0 18px rgba(215,118,85,.12);
+        animation: rippleExpand 1.3s cubic-bezier(.2,.6,.35,1) forwards;
+        will-change: transform, opacity;
     }
-    @keyframes emberSpin { to { rotate: 360deg; } }
+    .ripple.outer {
+        border-color: rgba(215,118,85,.28);
+        box-shadow: none;
+        animation-duration: 1.9s;
+    }
+    @keyframes rippleExpand {
+        from { transform: translate(-50%,-50%) scale(.15); opacity: .75; }
+        60%  { opacity: .38; }
+        to   { transform: translate(-50%,-50%) scale(1);   opacity: 0; }
+    }
 
     /* ---- Starburst: slightly thicker rays + pinpoint core ----
        Still the same auto-rotating 12-ray star (starSpin, JS-driven bloom
@@ -168,7 +176,6 @@
     <div class="blob b4"></div>
 </div>
 <div class="undertone"></div>
-<div id="ember"></div>
 
 <div class="star" id="star">
     <i></i><i></i><i></i><i></i><i></i><i></i>
@@ -195,29 +202,40 @@ const fadeEls = ["star", "core", "wordmark", "status"]
 let navigated = false;
 const pollStart = performance.now();
 
-// ---- Mouse-follow ember blob: poppr.be style ----
-// A rotating dual-color ellipse that follows the cursor via a 400ms CSS
-// transition (browser easing, no manual lerp). Fade in on move, fade out
-// when the pointer leaves or rests.
-(function emberBlob() {
-    const blob = document.getElementById("ember");
-    const bw = 340, bh = 476;
-    let started = false;
+// ---- Water ripples: cursor drops expanding rings ----
+// Throttled spawns keep node count bounded; each ring removes itself on
+// animationend, so nothing accumulates. An outer faint ring trails the main
+// one for the double-wave feel of a real water drop.
+(function waterRipples() {
+    const SPAWN_INTERVAL_MS = 90;
+    let lastSpawn = 0;
+
+    function spawnRing(x, y, size, outer, delayMs) {
+        setTimeout(() => {
+            const el = document.createElement("div");
+            el.className = outer ? "ripple outer" : "ripple";
+            el.style.left = x + "px";
+            el.style.top = y + "px";
+            el.style.width = size + "px";
+            el.style.height = size + "px";
+            el.addEventListener("animationend", () => el.remove());
+            document.body.appendChild(el);
+        }, delayMs);
+    }
 
     window.addEventListener("mousemove", e => {
-        const x = e.clientX - bw / 2;
-        const y = e.clientY - bh / 2;
-        // translate3d moves the blob; the separate `rotate` animation keeps
-        // spinning untouched (transform and rotate are independent channels).
-        blob.style.transform = "translate3d(" + x + "px," + y + "px,0)";
-        if (!started) {
-            started = true;
-            requestAnimationFrame(() => { blob.style.opacity = "1"; });
-        }
-        clearTimeout(blob._hideTimer);
-        blob._hideTimer = setTimeout(() => { blob.style.opacity = "0"; }, 2600);
+        const now = performance.now();
+        if (now - lastSpawn < SPAWN_INTERVAL_MS) return;
+        lastSpawn = now;
+        spawnRing(e.clientX, e.clientY, 90, false, 0);
+        spawnRing(e.clientX, e.clientY, 150, true, 110);
     });
-    document.addEventListener("mouseleave", () => { blob.style.opacity = "0"; });
+
+    // A bigger splash on click / tap.
+    window.addEventListener("pointerdown", e => {
+        spawnRing(e.clientX, e.clientY, 200, false, 0);
+        spawnRing(e.clientX, e.clientY, 300, true, 130);
+    });
 })();
 
 function fadeOutAll() {
