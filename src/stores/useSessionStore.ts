@@ -909,6 +909,17 @@ export function useSessionStore() {
     return storeRef.current.get(sessionId);
   }, []);
 
+  /**
+   * Persist the live token budget into the session slot. The history endpoint
+   * never returns tokenUsage for Claude, so without this a session switch
+   * wipes the bar ("莫名清零") until the next turn arrives.
+   */
+  const setTokenUsage = useCallback((sessionId: string, tokenUsage: unknown) => {
+    const slot = getSlot(sessionId);
+    slot.tokenUsage = tokenUsage;
+    notify(sessionId);
+  }, [getSlot, notify]);
+
   return useMemo(() => ({
     getSlot,
     has,
@@ -923,13 +934,14 @@ export function useSessionStore() {
     updateStreaming,
     finalizeStreaming,
     clearRealtime,
+    setTokenUsage,
     getMessages,
     getSessionSlot,
   }), [
     getSlot, has, fetchFromServer, fetchMore,
     appendRealtime, appendRealtimeBatch, refreshLatestFromServer,
     setActiveSession, setStatus, isStale, updateStreaming, finalizeStreaming,
-    clearRealtime, getMessages, getSessionSlot,
+    clearRealtime, setTokenUsage, getMessages, getSessionSlot,
   ]);
 }
 

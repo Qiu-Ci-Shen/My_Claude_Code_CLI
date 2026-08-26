@@ -654,7 +654,12 @@ export function useChatSessionState({
     if (loadAllFinishedTimerRef.current) clearTimeout(loadAllFinishedTimerRef.current);
 
     if (sessionChanged) {
-      setTokenBudget(null);
+      // Restore the persisted budget immediately; null only when this session
+      // never reported one. The history endpoint never carries tokenUsage, so
+      // without the slot read the bar would drop to zero on every switch.
+      setTokenBudget(
+        (sessionStore.getSessionSlot(selectedSessionId)?.tokenUsage as Record<string, unknown> | undefined) ?? null,
+      );
     }
 
     setCurrentSessionId(selectedSessionId);

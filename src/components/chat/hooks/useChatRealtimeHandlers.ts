@@ -316,6 +316,9 @@ export function useChatRealtimeHandlers({
 
         case 'status': {
           if (msg.text === 'token_budget' && msg.tokenBudget) {
+            // Persist per-session so switching away and back keeps the bar
+            // instead of dropping to zero until the next turn.
+            if (sid) sessionStore.setTokenUsage(sid, msg.tokenBudget);
             setTokenBudget(msg.tokenBudget as Record<string, unknown>);
           } else if (msg.text && sid) {
             onSessionProcessing?.(sid, {
