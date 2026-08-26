@@ -112,7 +112,8 @@
     "browser": "浏览器",
     "notifications": "通知",
     "plugins": "插件",
-    "about": "关于"
+    "about": "关于",
+    "mobileAccess": "手机访问"
   },
   "notifications": {
     "title": "通知",
@@ -568,5 +569,40 @@
     "installAriaLabel": "插件 git 仓库 URL",
     "tab": "标签",
     "runningStatus": "运行中"
+  },
+  "mobileAccess": {
+    "lanTitle": "局域网",
+    "lanDescription": "手机连同一 WiFi：扫二维码即可在手机上打开本界面。",
+    "lanQrAlt": "局域网二维码",
+    "scanHint": "用手机相机扫码打开",
+    "openInBrowser": "打开链接",
+    "lanUnavailable": "未检测到可访问的局域网地址。",
+    "lanIpLabel": "局域网地址",
+    "autoDetect": "自动识别",
+    "save": "保存",
+    "lanIpHint": "一般自动识别即可。若扫码后打不开（VPN/Tailscale 等），可手动选择地址。",
+    "tunnelTitle": "公网访问",
+    "tunnelDescription": "开启 Cloudflare 快速隧道，任何网络（4G 等）都能访问本界面。公网链接每次开启都会变化。",
+    "tunnelQrAlt": "公网二维码",
+    "tunnelActive": "隧道已开启——任何网络扫码即可访问",
+    "stopTunnel": "关闭公网访问",
+    "tunnelStarting": "正在启动隧道…",
+    "tunnelStartingHint": "首次使用会下载 cloudflared（约 50MB）。若开着代理/VPN（Clash TUN 模式）可能掐断隧道连接。",
+    "tunnelIdle": "未开启。开启期间，持有链接的任何人都能打开本界面。",
+    "startTunnel": "开启公网访问",
+    "securityTitle": "安全提示",
+    "securityItem1": "本界面能在你的电脑上执行代码，切勿把链接或二维码发给别人。",
+    "securityItem2": "公网链接与随机子域在关闭或重启后即失效。",
+    "securityItem3": "在家优先用局域网方式；公网用完请立即关闭。",
+    "retry": "重试",
+    "pinTitle": "手机登录密码",
+    "pinDescription": "手机扫码后会进入密码页，输入下面 6 位数字即可登录，无需输账号密码。",
+    "pinLabel": "6 位数字密码",
+    "pinCopy": "复制",
+    "pinCopied": "已复制",
+    "pinRegenerate": "随机换一个",
+    "pinSave": "保存密码",
+    "pinInvalid": "密码必须是 6 位数字",
+    "pinHint": "请勿外泄——拿到二维码链接 + 这组密码的人都能登录。随时点「随机换一个」可让旧密码立即失效。"
   }
 }

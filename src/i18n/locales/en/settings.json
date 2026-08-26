@@ -112,6 +112,7 @@
     "browser": "Browser",
     "notifications": "Notifications",
     "plugins": "Plugins",
+    "mobileAccess": "Mobile Access",
     "about": "About"
   },
   "notifications": {
@@ -580,5 +581,40 @@
     "installAriaLabel": "Plugin git repository URL",
     "tab": "tab",
     "runningStatus": "running"
+  },
+  "mobileAccess": {
+    "lanTitle": "Local Network",
+    "lanDescription": "Phone on the same WiFi: scan the QR code to open this UI on your phone.",
+    "lanQrAlt": "LAN QR code",
+    "scanHint": "Scan with your phone camera to open",
+    "openInBrowser": "Open link",
+    "lanUnavailable": "Could not detect a reachable LAN address.",
+    "lanIpLabel": "LAN address",
+    "autoDetect": "Auto-detect",
+    "save": "Save",
+    "lanIpHint": "Usually auto-detection works. Pick manually if the QR opens a dead address (VPN/Tailscale etc.).",
+    "tunnelTitle": "Public Internet",
+    "tunnelDescription": "Start a Cloudflare quick tunnel to reach this UI from anywhere (4G etc.). The URL changes each time you start it.",
+    "tunnelQrAlt": "Public URL QR code",
+    "tunnelActive": "Tunnel is active — scan to open from any network",
+    "stopTunnel": "Stop public access",
+    "tunnelStarting": "Starting tunnel...",
+    "tunnelStartingHint": "First run downloads cloudflared (~50MB). If a proxy/VPN (Clash TUN mode) is running it may block the tunnel.",
+    "tunnelIdle": "Not started. While active, anyone with the URL can open this UI.",
+    "startTunnel": "Start public access",
+    "securityTitle": "Security notes",
+    "securityItem1": "This UI runs code on your computer. Never share the URL or QR code with others.",
+    "securityItem2": "The public URL and its random subdomain expire when stopped or restarted.",
+    "securityItem3": "Prefer the local network option when at home; stop public access right after use.",
+    "retry": "Retry",
+    "pinTitle": "Phone Sign-In PIN",
+    "pinDescription": "Phones that scan either QR code land on a PIN pad. Entering this 6-digit code signs them in without username/password.",
+    "pinLabel": "6-digit PIN",
+    "pinCopy": "Copy",
+    "pinCopied": "Copied",
+    "pinRegenerate": "Regenerate",
+    "pinSave": "Save PIN",
+    "pinInvalid": "PIN must be exactly 6 digits",
+    "pinHint": "Keep this PIN private — anyone with the QR link plus this PIN can sign in. Regenerate it any time to revoke access."
   }
 }
