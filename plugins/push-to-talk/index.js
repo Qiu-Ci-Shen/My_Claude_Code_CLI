@@ -97,7 +97,27 @@ function readVoiceConfig() {
   }
 }
 
-async function transcribe(blob, ext) {
+// 把上游返回的错误体拼进异常消息，避免只看到干巴巴的 "HTTP 503"
+async function httpError(res) {
+  let detail = '';
+  try {
+    const text = await res.text();
+    try {
+      const parsed = JSON.parse(text);
+      detail = (parsed && (parsed.error || parsed.message)) || text;
+    } catch {
+      detail = text;
+    }
+  } catch {
+    // 无响应体
+  }
+  detail = String(detail || '').replace(/\s+/g, ' ').trim().slice(0, 160);
+  const err = new Error('HTTP ' + res.status + (detail ? ' - ' + detail : ''));
+  err.status = res.status;
+  return err;
+}
+
+async function transcribeOnce(blob, ext) {
   const cfg = readVoiceConfig();
   const baseUrl = typeof cfg.baseUrl === 'string' ? cfg.baseUrl.trim() : '';
   const filename = 'recording.' + ext;
@@ -111,7 +131,7 @@ async function transcribe(blob, ext) {
       headers: cfg.apiKey ? { Authorization: 'Bearer ' + cfg.apiKey } : {},
       body: fd,
     });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
+    if (!res.ok) throw await httpError(res);
     const data = await res.json();
     return String((data && data.text) || '').trim();
   }
@@ -124,9 +144,28 @@ async function transcribe(blob, ext) {
   if (cfg.apiKey) headers['x-voice-api-key'] = cfg.apiKey;
   if (cfg.sttModel) headers['x-voice-stt-model'] = cfg.sttModel;
   const res = await fetch('/api/voice/transcribe', { method: 'POST', headers, body: fd });
-  if (!res.ok) throw new Error('HTTP ' + res.status);
+  if (!res.ok) throw await httpError(res);
   const data = await res.json();
   return String((data && data.text) || '').trim();
+}
+
+async function transcribe(blob, ext) {
+  // 429/5xx 基本都是识别服务瞬时过载，静默重试两次再报错
+  const delays = [800, 2000];
+  for (let attempt = 0; attempt <= delays.length; attempt++) {
+    if (attempt > 0) {
+      show('识别服务繁忙，自动重试 ' + attempt + '/' + delays.length + '…', 'busy');
+      await new Promise((resolve) => setTimeout(resolve, delays[attempt - 1]));
+    }
+    try {
+      return await transcribeOnce(blob, ext);
+    } catch (err) {
+      const status = err && err.status;
+      const retryable = status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
+      if (!retryable || attempt === delays.length) throw err;
+    }
+  }
+  throw new Error('unreachable');
 }
 
 function insertText(el, text) {
