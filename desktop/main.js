@@ -234,6 +234,12 @@ async function enterApp() {
   win.focus();
 }
 
+function getWindowIconPath() {
+  return process.platform === 'darwin'
+    ? path.join(PROJECT_ROOT, 'desktop', 'assets', 'logo-macos.png')
+    : path.join(PROJECT_ROOT, 'desktop', 'assets', 'logo-windows.ico');
+}
+
 function createWindow() {
   win = new BrowserWindow({
     width: 460,
@@ -242,7 +248,7 @@ function createWindow() {
     autoHideMenuBar: true,
     backgroundColor: '#141414',
     title: APP_NAME,
-    icon: path.join(PROJECT_ROOT, 'public', 'logo-512.png'),
+    icon: getWindowIconPath(),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
