@@ -115,10 +115,14 @@ export class AppError extends Error {
 /**
  * Root directory that all workspace/project paths must stay under.
  *
- * This is resolved from `WORKSPACES_ROOT` when configured; otherwise it falls
- * back to the current user's home directory.
+ * Resolved from `WORKSPACES_ROOT` when configured. When unset (the common local
+ * desktop case), no root containment is enforced and only the forbidden system
+ * directories below remain blocked — this lets the Electron desktop folder
+ * picker surface any local drive. Set `WORKSPACES_ROOT` explicitly to restore
+ * the strict "must live under this root" behaviour for hosted deployments.
  */
-export const WORKSPACES_ROOT = process.env.WORKSPACES_ROOT || os.homedir();
+export const WORKSPACES_ROOT = process.env.WORKSPACES_ROOT || '';
+export const IS_WORKSPACE_ROOT_ENFORCED = WORKSPACES_ROOT.length > 0;
 
 /**
  * System-critical paths that must never be used as workspace roots.
@@ -281,38 +285,40 @@ export async function validateWorkspacePath(requestedPath: string): Promise<Work
       }
     }
 
-    const resolvedWorkspaceRoot = normalizeProjectPath(await realpath(WORKSPACES_ROOT));
-    if (
-      !resolvedPath.startsWith(`${resolvedWorkspaceRoot}${path.sep}`)
-      && resolvedPath !== resolvedWorkspaceRoot
-    ) {
-      return {
-        valid: false,
-        error: `Workspace path must be within the allowed workspace root: ${WORKSPACES_ROOT}`,
-      };
-    }
-
-    try {
-      await access(absolutePath);
-      const pathStats = await lstat(absolutePath);
-      if (pathStats.isSymbolicLink()) {
-        const symlinkTarget = await readlink(absolutePath);
-        const resolvedSymlinkPath = path.resolve(path.dirname(absolutePath), symlinkTarget);
-        const realSymlinkPath = await realpath(resolvedSymlinkPath);
-        if (
-          !realSymlinkPath.startsWith(`${resolvedWorkspaceRoot}${path.sep}`)
-          && realSymlinkPath !== resolvedWorkspaceRoot
-        ) {
-          return {
-            valid: false,
-            error: 'Symlink target is outside the allowed workspace root',
-          };
-        }
+    if (IS_WORKSPACE_ROOT_ENFORCED) {
+      const resolvedWorkspaceRoot = normalizeProjectPath(await realpath(WORKSPACES_ROOT));
+      if (
+        !resolvedPath.startsWith(`${resolvedWorkspaceRoot}${path.sep}`)
+        && resolvedPath !== resolvedWorkspaceRoot
+      ) {
+        return {
+          valid: false,
+          error: `Workspace path must be within the allowed workspace root: ${WORKSPACES_ROOT}`,
+        };
       }
-    } catch (error) {
-      const fileError = error as NodeJS.ErrnoException;
-      if (fileError.code !== 'ENOENT') {
-        throw fileError;
+
+      try {
+        await access(absolutePath);
+        const pathStats = await lstat(absolutePath);
+        if (pathStats.isSymbolicLink()) {
+          const symlinkTarget = await readlink(absolutePath);
+          const resolvedSymlinkPath = path.resolve(path.dirname(absolutePath), symlinkTarget);
+          const realSymlinkPath = await realpath(resolvedSymlinkPath);
+          if (
+            !realSymlinkPath.startsWith(`${resolvedWorkspaceRoot}${path.sep}`)
+            && realSymlinkPath !== resolvedWorkspaceRoot
+          ) {
+            return {
+              valid: false,
+              error: 'Symlink target is outside the allowed workspace root',
+            };
+          }
+        }
+      } catch (error) {
+        const fileError = error as NodeJS.ErrnoException;
+        if (fileError.code !== 'ENOENT') {
+          throw fileError;
+        }
       }
     }
 

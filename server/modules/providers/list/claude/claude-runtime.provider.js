@@ -350,11 +350,11 @@ function readNumber(value) {
 }
 
 /**
- * Extracts token usage from SDK messages.
- * Prefers per-step `message.usage` (Claude message payload), then falls back
- * to result-level usage/modelUsage for compatibility across SDK versions.
+ * Resolves the effective context window for a message: SDK-reported model
+ * capacity first, then a `[1m]`/`[200k]`-style model-id suffix, then the
+ * configured CONTEXT_WINDOW, so the context percent is never nonsense.
  * @param {Object} sdkMessage - SDK stream message
- * @returns {Object|null} Token budget object or null
+ * @returns {number} Context window size in tokens
  */
 function resolveContextWindow(sdkMessage) {
   // Prefer the SDK-reported model context window (real model capacity). Falls
@@ -386,6 +386,27 @@ function resolveContextWindow(sdkMessage) {
   return parseInt(process.env.CONTEXT_WINDOW, 10) || 160000;
 }
 
+/**
+ * @typedef {Object} TokenBudget
+ * @property {number} used
+ * @property {number} total
+ * @property {number} inputTokens
+ * @property {number} outputTokens
+ * @property {number} cacheReadTokens
+ * @property {number} cacheCreationTokens
+ * @property {number} cacheTokens
+ * @property {number} contextWindow
+ * @property {number} contextPercent
+ * @property {{input: number, output: number}} breakdown
+ */
+
+/**
+ * Extracts token usage from SDK messages.
+ * Prefers per-step `message.usage` (Claude message payload), then falls back
+ * to result-level usage/modelUsage for compatibility across SDK versions.
+ * @param {unknown} sdkMessage - SDK stream message
+ * @returns {TokenBudget|null} Token budget object or null
+ */
 function extractTokenBudget(sdkMessage) {
   if (!sdkMessage || typeof sdkMessage !== 'object') {
     return null;

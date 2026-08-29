@@ -11,7 +11,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { extractTokenBudget } from '../claude-runtime.provider.js';
 
-function expectTotalContext(result) {
+type TokenBudget = NonNullable<ReturnType<typeof extractTokenBudget>>;
+
+function expectTotalContext(result: TokenBudget) {
   assert.ok(result.total > 0, 'context window 应解析出正值');
 }
 
@@ -75,6 +77,7 @@ test('message.usage 优先于顶层 usage', () => {
     message: { usage: { input_tokens: 5 } },
     usage: { input_tokens: 999, cache_creation_input_tokens: 999, cache_read_input_tokens: 999 },
   });
+  assert.ok(result);
   assert.equal(result.used, 5);
 });
 

@@ -71,7 +71,10 @@ const fileTreeProjects: FileTreeProjectGateway = {
  * the path policy explicit for every service instance.
  */
 const fileTreeWorkspace: FileTreeWorkspaceGateway = {
-  rootPath: WORKSPACES_ROOT,
+  // Default browse landing point when the user has not picked a folder yet.
+  // Falls back to the user's home directory if WORKSPACES_ROOT is unset; the
+  // actual "may I use this path?" gate lives in validateWorkspacePath().
+  rootPath: WORKSPACES_ROOT || os.homedir(),
   validatePath: (candidatePath) => validateWorkspacePath(candidatePath),
 };
 
