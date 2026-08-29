@@ -4,9 +4,11 @@ import { useTranslation } from 'react-i18next';
 import { useWebSocket } from '../../../../contexts/WebSocketContext';
 import {
   currentSessionIdFromPath,
+  PENDING_EDIT_RESEND_KEY,
   rewindExecute,
   rewindLocate,
 } from '../../../../lib/rewindRpc';
+import { safeLocalStorage } from '../../utils/chatStorage';
 import LLMProviderLogo from '../../../llm-provider-logo/LLMProviderLogo';
 import type {
   ChatMessage,
@@ -89,7 +91,7 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
   const [editBusy, setEditBusy] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
-  const handleEditResend = async (newText: string, restoreFiles: boolean) => {
+  const handleEditResend = async (newText: string) => {
     const sessionId = currentSessionIdFromPath();
     if (!sessionId) {
       setEditError('当前不在会话页面，无法定位会话');
@@ -110,14 +112,16 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
       if (!locate.found || !locate.uuid) {
         throw new Error('未能在会话记录中定位到这条消息');
       }
-      const result = await rewindExecute(sessionId, locate.uuid, restoreFiles);
+      // 只截断转录，不恢复代码文件
+      const result = await rewindExecute(sessionId, locate.uuid, false);
       if (!result.ok) {
         throw new Error(result.error || '会话回退失败');
       }
 
-      // 截断成功：暂存编辑文本，刷新后由 composer 消费并自动发送
-      sessionStorage.setItem(
-        'qiu:pending-edit-resend',
+      // 截断成功：暂存编辑文本（与 composer 消费侧同用 safeLocalStorage），
+      // 刷新后由 composer 等连接就绪后自动发送
+      safeLocalStorage.setItem(
+        PENDING_EDIT_RESEND_KEY,
         JSON.stringify({ sessionId, text: newText, at: Date.now() }),
       );
       window.location.reload();

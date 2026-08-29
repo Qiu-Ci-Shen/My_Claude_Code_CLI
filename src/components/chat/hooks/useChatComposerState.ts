@@ -11,6 +11,8 @@ import type {
 } from 'react';
 import { useDropzone } from 'react-dropzone';
 
+import { useWebSocket } from '../../../contexts/WebSocketContext';
+
 import { authenticatedFetch } from '../../../utils/api';
 import { PENDING_EDIT_RESEND_KEY } from '../../../lib/rewindRpc';
 import type { MarkSessionProcessing, SessionActivityMap } from '../../../hooks/useSessionProtection';
@@ -255,6 +257,14 @@ export function useChatComposerState({
   setIsUserScrolledUp,
   setPendingPermissionRequests,
 }: UseChatComposerStateArgs) {
+  // 编辑重发的自动发送需要知道连接是否就绪；sendMessage 由 props 传入，
+  // 连接状态直接从 context 读取（hook 始终在 provider 内使用）。
+  const { isConnected } = useWebSocket();
+  const isConnectedRef = useRef(isConnected);
+  useEffect(() => {
+    isConnectedRef.current = isConnected;
+  }, [isConnected]);
+
   const [input, setInput] = useState(() => {
     if (typeof window !== 'undefined' && selectedProject) {
       // Draft inputs are keyed by the DB projectId so per-project drafts
@@ -1261,8 +1271,10 @@ export function useChatComposerState({
   );
 
   // ── 编辑重发：截断完成后 MessageComponent 暂存编辑文本并整页刷新，
-  // 这里在页面加载时消费暂存文本，自动填入输入框并提交。即使自动提交
-  // 因 WebSocket 未就绪而失败，文本也已留在输入框，回车即可手动发送。──
+  // 这里在页面加载时消费暂存文本。先立即填入输入框（用户随时能看到），
+  // 等 WebSocket 连接就绪后自动提交——刷新后重连需要时间，盲目定时发送
+  // 会把消息发进没连上的 socket 里丢失。最多等 20s，超时则留在输入框，
+  // 回车即可手动发送。──
   useEffect(() => {
     const raw = safeLocalStorage.getItem(PENDING_EDIT_RESEND_KEY);
     if (!raw) return;
@@ -1283,10 +1295,27 @@ export function useChatComposerState({
     inputValueRef.current = pendingText;
     if (!sessionMatches) return;
 
-    const timer = setTimeout(() => {
+    const attemptSend = () => {
+      if (!isConnectedRef.current) return false;
       handleSubmitRef.current?.(createFakeSubmitEvent());
+      return true;
+    };
+
+    let retryTimer: ReturnType<typeof setInterval> | null = null;
+    let attempts = 0;
+    const firstTimer = setTimeout(() => {
+      if (attemptSend()) return;
+      retryTimer = setInterval(() => {
+        attempts++;
+        if (attemptSend() || attempts >= 38) {
+          if (retryTimer) clearInterval(retryTimer);
+        }
+      }, 500);
     }, 1200);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(firstTimer);
+      if (retryTimer) clearInterval(retryTimer);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
