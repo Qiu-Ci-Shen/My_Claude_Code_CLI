@@ -1,4 +1,4 @@
-/* ClaudeCodeUI 插件：长按 Alt 键说话（push-to-talk）
+/* Qiu_Ai_LZ 插件：长按 Alt 键说话（push-to-talk）
  *
  * 标准 ESM 插件：必须 export mount/unmount，PluginTabContent 通过动态 import
  * 加载后调用 mod.mount(container)。键盘监听挂在 window（capture 阶段），首次
@@ -373,7 +373,7 @@ function ensureGlobalListeners() {
   window.addEventListener('blur', onBlurWindow);
 }
 
-// ---------- 插件生命周期（claudecodeui 调用约定：export mount/unmount）----------
+// ---------- 插件生命周期（宿主调用约定：export mount/unmount）----------
 export async function mount(container) {
   ensureGlobalListeners();
   if (container) {

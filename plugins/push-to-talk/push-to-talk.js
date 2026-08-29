@@ -1,6 +1,6 @@
-/* ClaudeCodeUI Push-to-Talk（书签注入版，零源码侵入）
+/* Qiu_Ai_LZ Push-to-Talk（书签注入版，零源码侵入）
  *
- * 用法：把本文件整体包成 javascript: 书签，在 claudecodeui 页面点击一次即开启，
+ * 用法：把本文件整体包成 javascript: 书签，在 Qiu_Ai_LZ 页面点击一次即开启，
  *       再次点击即关闭。长按空格说话、松开自动识别并追加进聊天输入框；
  *       快速轻敲仍是普通空格；拼音选字不受影响；Esc 取消本次录音。
  */
