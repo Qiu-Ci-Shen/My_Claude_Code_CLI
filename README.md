@@ -118,4 +118,3 @@ Claude Code 的全部工具（文件写入、bash 执行等）默认处于禁用
 
 本项目遵循 [AGPL-3.0](LICENSE)（继承自上游）。基于 [siteboon/claudecodeui](https://github.com/siteboon/claudecodeui) 修改，感谢上游贡献者。
 
-反向代理子路径部署模板见 [docs/nginx-subpath-template.conf](docs/nginx-subpath-template.conf)。
