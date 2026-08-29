@@ -47,6 +47,12 @@ const abortedSessionIds = new Set();
 // (see addSession). Their run loops must stay silent on wind-down: the map
 // entry, the abort flag, and all client-facing events belong to the new run.
 const supersededInstances = new WeakSet();
+// Query instances killed via abort. interrupt() stops the CLI from *generating*,
+// but everything it already generated (often the whole turn, buffered) still
+// streams out of the generator afterwards — and the registry already sent the
+// terminal `complete`. The run loop must swallow those leftovers, otherwise
+// aborted content pops into the UI seconds after the user pressed stop.
+const abortedInstances = new WeakSet();
 
 const TOOL_APPROVAL_TIMEOUT_MS = parseInt(process.env.CLAUDE_TOOL_APPROVAL_TIMEOUT_MS, 10) || 55000;
 
@@ -909,6 +915,12 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
         // session_id already captured
       }
 
+      // 已打断的实例：生成器可能还在吐出打断前已生成的内容，全部吞掉
+      // （终止 complete 已由打断流程发出，这里不得再向客户端转发任何事件）
+      if (abortedInstances.has(queryInstance)) {
+        continue;
+      }
+
       // Transform and normalize message via adapter
       const transformedMessage = transformMessage(message);
       const sid = capturedSessionId || sessionId || null;
@@ -1077,6 +1089,9 @@ async function abortClaudeSDKSession(sessionId) {
     // Mark before interrupting so the run loop knows not to emit its own
     // terminal complete (the abort handler sends the aborted one).
     abortedSessionIds.add(sessionId);
+    // Per-instance kill mark: the run loop checks this to swallow the
+    // already-generated leftovers the generator still yields after interrupt.
+    abortedInstances.add(session.instance);
 
     // Call interrupt() on the query instance. It requests the interrupt over
     // the streaming control protocol and can fail/hang when the CLI is wedged;
