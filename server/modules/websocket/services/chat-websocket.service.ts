@@ -263,18 +263,23 @@ async function handleChatAbort(
   }
 
   const run = chatRunRegistry.getRun(sessionId);
-  if (!run || run.status !== 'running') {
+  if (!run) {
     // 打断空闲会话是幂等的无害操作（如编辑重发前的预打断），静默返回，
     // 不向会话注入错误消息
     return;
   }
 
-  const success = await dependencies.runtime.abort(run.provider, sessionId);
+  const success = await dependencies.runtime.abort(run.provider, sessionId).catch(() => false);
 
-  chatRunRegistry.completeRun(sessionId, {
-    exitCode: success ? 0 : 1,
-    aborted: true,
-  });
+  if (success) {
+    chatRunRegistry.completeRun(sessionId, {
+      exitCode: 0,
+      aborted: true,
+    });
+  }
+  // 打断失败时运行仍在进行：必须保持 running 状态，否则后续所有打断
+  // 都会被误判为"已完成"而静默吞掉（agent 永远停不下来）。此时由运行
+  // 自身的退出流程发出 terminal complete。
 }
 
 /**

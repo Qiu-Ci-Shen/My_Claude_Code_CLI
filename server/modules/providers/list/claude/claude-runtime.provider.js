@@ -1078,8 +1078,16 @@ async function abortClaudeSDKSession(sessionId) {
     // terminal complete (the abort handler sends the aborted one).
     abortedSessionIds.add(sessionId);
 
-    // Call interrupt() on the query instance
-    await session.instance.interrupt();
+    // Call interrupt() on the query instance. It requests the interrupt over
+    // the streaming control protocol and can fail/hang when the CLI is wedged;
+    // fall back to closing the generator, whose finally block tears the
+    // subprocess down for good.
+    try {
+      await session.instance.interrupt();
+    } catch (interruptError) {
+      console.error(`interrupt() failed for session ${sessionId}, closing query generator:`, interruptError);
+      await session.instance.return?.();
+    }
 
     // Release the held stdin stream; without this the CLI stays up for the rest
     // of the post-turn hold even though the user cancelled.

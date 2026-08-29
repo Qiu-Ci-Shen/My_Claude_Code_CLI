@@ -3,6 +3,8 @@ import http from 'node:http';
 
 import express from 'express';
 
+import { chatRunRegistry } from '@/modules/websocket/index.js';
+
 import type { createPluginsService } from './plugins.service.js';
 
 function wildcardPath(req: express.Request): string {
@@ -38,7 +40,20 @@ export function createPluginsRouter(service: ReturnType<typeof createPluginsServ
   router.post('/:name/update', respond((req) => service.update(routeParameter(req.params.name))));
   router.all('/:name/rpc/*', async (req, res, next) => {
     try {
-      const { port, secrets } = await service.prepareRpc(routeParameter(req.params.name));
+      const pluginName = routeParameter(req.params.name);
+      const rpcPath = wildcardPath(req);
+      // claude-rewind 的截断会重写转录 jsonl；会话仍在生成时 CLI 也在并发
+      // 写同一个文件，必须先拒绝，避免截断与写入竞态（打断失败的兜底）。
+      if (
+        pluginName === 'claude-rewind'
+        && rpcPath === '/rewind'
+        && req.body?.sessionId
+        && chatRunRegistry.isProcessing(String(req.body.sessionId))
+      ) {
+        res.status(409).json({ ok: false, error: '会话仍在生成中，请先打断再回退' });
+        return;
+      }
+      const { port, secrets } = await service.prepareRpc(pluginName);
       const headers: Record<string, string> = {
         'content-type': String(req.headers['content-type'] ?? 'application/json'),
       };

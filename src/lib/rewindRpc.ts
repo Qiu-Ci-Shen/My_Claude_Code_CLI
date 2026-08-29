@@ -26,7 +26,9 @@ async function rpc<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
   if (!response.ok) {
-    throw new Error(`rewind RPC ${path} failed: ${response.status}`);
+    // 宿主/插件返回的 error 字段是可直接展示的中文文案（如"会话仍在生成中"）
+    const detail = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(detail?.error || `rewind RPC ${path} failed: ${response.status}`);
   }
   return (await response.json()) as T;
 }
