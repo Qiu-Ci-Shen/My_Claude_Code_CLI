@@ -38,9 +38,12 @@ function pkgVersion() {
   }
 }
 
+let pendingStatus = { text: '正在启动…', level: 'info' };
+
 function sendStatus(text, level = 'info') {
-  if (win && !win.isDestroyed()) {
-    win.webContents.send('shell-status', { text, level });
+  pendingStatus = { text, level };
+  if (win && !win.isDestroyed() && !win.webContents.isLoading()) {
+    win.webContents.send('shell-status', pendingStatus);
   }
 }
 
@@ -256,6 +259,13 @@ function createWindow() {
     },
   });
   win.loadFile(path.join(__dirname, 'launcher.html'));
+
+  // 启动页脚本就绪前发出的状态会丢，页面每次加载完成后补发最后一条
+  win.webContents.on('did-finish-load', () => {
+    if (pendingStatus && !win.isDestroyed()) {
+      win.webContents.send('shell-status', pendingStatus);
+    }
+  });
 
   // 无菜单栏时补齐基本快捷键：F5/Ctrl+R 刷新；未打包时 F12 开发者工具
   win.webContents.on('before-input-event', (event, input) => {

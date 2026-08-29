@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>正在启动 Claude Code UI…</title>
+<title>正在启动 Qiu_Ai_LZ…</title>
 <style>
     html, body {
         margin: 0; height: 100%; overflow: hidden;
@@ -192,20 +192,14 @@
 <script>
 "use strict";
 
-const UI_URL = "http://localhost:5173";
-const FAIL_AFTER_MS = 90000;
-const MOUNT_BUFFER_MS = 700;
-
+// 启动状态由主进程通过 preload 桥推送（构建/服务/就绪/失败），
+// 进入应用的跳转也由主进程完成——本页面只负责展示与动画。
 const statusEl = document.getElementById("status");
-const fadeEls = ["star", "core", "wordmark", "status"]
-    .map(id => { const el = document.getElementById(id); el.classList.add("fadeout"); return el; });
-let navigated = false;
-const pollStart = performance.now();
 
 // ---- Water ripples: cursor drops expanding rings ----
 // Throttled spawns keep node count bounded; each ring removes itself on
-// animationend, so nothing accumulates. An outer faint ring trails the main
-// one for the double-wave feel of a real water drop.
+// animationend, so nothing accumulates. An outer faint ring trails behind it
+// for the double-wave feel of a real water drop.
 (function waterRipples() {
     const SPAWN_INTERVAL_MS = 90;
     let lastSpawn = 0;
@@ -238,59 +232,26 @@ const pollStart = performance.now();
     });
 })();
 
-function fadeOutAll() {
-    for (const el of fadeEls) el.style.opacity = "0";
-}
-
-// Two-phase: port reachable -> hidden iframe preloads the real UI (bundles
-// execute + cache) -> in-place navigation renders instantly.
-function pollServer() {
-    if (navigated) return;
-    fetch(UI_URL, { mode: "no-cors", cache: "no-store" })
-        .then(() => { navigated = true; preheat(); })
-        .catch(() => {});
-}
-
-function preheat() {
-    statusEl.textContent = "界面就绪中";
-    // Heartbeat: star blooms once as confirmation.
+// Heartbeat: star blooms once as a "ready" confirmation.
+function starBloom() {
     const star = document.getElementById("star");
     star.style.animation = "starSpin 60s linear infinite, starBloom .9s cubic-bezier(.45,0,.55,1) 2 alternate";
     const kf = document.createElement("style");
     kf.textContent = "@keyframes starBloom { from { scale: 1; } to { scale: 1.12; } }";
     document.head.appendChild(kf);
-
-    const frame = document.createElement("iframe");
-    frame.style.cssText =
-        "position:fixed;width:1px;height:1px;left:-10px;top:-10px;opacity:0;border:0;";
-    frame.src = UI_URL;
-    let done = false;
-    frame.addEventListener("load", () => {
-        setTimeout(() => {
-            if (done) return;
-            done = true;
-            statusEl.textContent = "启动完成";
-            fadeOutAll();
-            setTimeout(() => { window.location.href = UI_URL; }, 420);
-        }, MOUNT_BUFFER_MS);
-    });
-    document.body.appendChild(frame);
-    setTimeout(() => {
-        if (!done) {
-            done = true;
-            fadeOutAll();
-            setTimeout(() => { window.location.href = UI_URL; }, 420);
-        }
-    }, 20000);
 }
 
-setInterval(pollServer, 300);
-setInterval(() => {
-    if (!navigated && performance.now() - pollStart > FAIL_AFTER_MS) {
-        statusEl.classList.add("error");
-        statusEl.textContent = "启动超时，请查看 CCUI-Launcher\\logs 日志";
-    }
-}, 1000);
+if (window.qiuDesktopShell) {
+    window.qiuDesktopShell.onStatus(({ text, level }) => {
+        if (text) statusEl.textContent = text;
+        statusEl.classList.toggle("error", level === "failed");
+        if (level === "ready") starBloom();
+    });
+} else {
+    // 直接用浏览器打开本页时没有桥，至少给出说明
+    statusEl.textContent = "请通过 Qiu_Ai_LZ 桌面应用启动";
+    statusEl.classList.add("error");
+}
 </script>
 </body>
 </html>
