@@ -210,7 +210,7 @@ function killServerTree() {
   }
 }
 
-function enterApp() {
+async function enterApp() {
   if (!win || !serverUrl) return;
   const workArea = screen.getPrimaryDisplay().workArea;
   const width = Math.floor(workArea.width * 2 / 3);
@@ -223,7 +223,15 @@ function enterApp() {
     width,
     height,
   });
-  win.loadURL(serverUrl);
+  try {
+    await win.loadURL(serverUrl);
+  } catch {
+    // 页面自身的加载错误由应用内处理；这里只关心导航是否完成
+  }
+  // Windows 后台启动偶发整页黑屏（渲染进程不重绘），导航完成后强制重绘一次
+  win.webContents.invalidate();
+  win.show();
+  win.focus();
 }
 
 function createWindow() {
