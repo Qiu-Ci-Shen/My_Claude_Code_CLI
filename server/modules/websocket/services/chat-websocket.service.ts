@@ -264,7 +264,8 @@ async function handleChatAbort(
 
   const run = chatRunRegistry.getRun(sessionId);
   if (!run || run.status !== 'running') {
-    sendProtocolError(ws, 'NO_ACTIVE_RUN', `Session "${sessionId}" has no active run.`, sessionId);
+    // 打断空闲会话是幂等的无害操作（如编辑重发前的预打断），静默返回，
+    // 不向会话注入错误消息
     return;
   }
 

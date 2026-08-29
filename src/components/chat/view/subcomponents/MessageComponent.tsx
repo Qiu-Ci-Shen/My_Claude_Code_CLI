@@ -1,6 +1,12 @@
-import { memo, useMemo, useRef } from 'react';
+import { memo, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useWebSocket } from '../../../../contexts/WebSocketContext';
+import {
+  currentSessionIdFromPath,
+  rewindExecute,
+  rewindLocate,
+} from '../../../../lib/rewindRpc';
 import LLMProviderLogo from '../../../llm-provider-logo/LLMProviderLogo';
 import type {
   ChatMessage,
@@ -13,6 +19,7 @@ import type { Project } from '../../../../types/app';
 import { ToolRenderer, ToolErrorDisplay, shouldHideToolResult } from '../../tools';
 import { Reasoning, ReasoningTrigger, ReasoningContent } from '../../../../shared/view/ui';
 
+import EditMessageCard from './EditMessageCard';
 import ChatMessageImages from './ChatMessageImages';
 import ChatMessageFiles from './ChatMessageFiles';
 import { Markdown } from './Markdown';
@@ -76,6 +83,49 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
     !isCommandOrFileEditToolResponse &&
     !message.isThinking;
 
+  // ── 编辑重发（截断该消息及其后的对话，用编辑后的文本重新发送）──
+  const { sendMessage } = useWebSocket();
+  const [isEditingMessage, setIsEditingMessage] = useState(false);
+  const [editBusy, setEditBusy] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  const handleEditResend = async (newText: string, restoreFiles: boolean) => {
+    const sessionId = currentSessionIdFromPath();
+    if (!sessionId) {
+      setEditError('当前不在会话页面，无法定位会话');
+      return;
+    }
+    setEditBusy(true);
+    setEditError(null);
+    try {
+      // 若正在生成，先打断（对空闲会话是无害的空操作）
+      sendMessage({ type: 'chat.abort', sessionId });
+      await new Promise((resolve) => setTimeout(resolve, 600));
+
+      const locate = await rewindLocate(
+        sessionId,
+        Number(message.timestamp),
+        userCopyContent.slice(0, 80),
+      );
+      if (!locate.found || !locate.uuid) {
+        throw new Error('未能在会话记录中定位到这条消息');
+      }
+      const result = await rewindExecute(sessionId, locate.uuid, restoreFiles);
+      if (!result.ok) {
+        throw new Error(result.error || '会话回退失败');
+      }
+
+      // 截断成功：暂存编辑文本，刷新后由 composer 消费并自动发送
+      sessionStorage.setItem(
+        'qiu:pending-edit-resend',
+        JSON.stringify({ sessionId, text: newText, at: Date.now() }),
+      );
+      window.location.reload();
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : String(err));
+      setEditBusy(false);
+    }
+  };
 
   const formattedTime = useMemo(() => new Date(message.timestamp).toLocaleTimeString(), [message.timestamp]);
   const shouldHideThinkingMessage = Boolean(message.isThinking && !showThinking);
@@ -103,7 +153,15 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
             {message.files && message.files.length > 0 && (
               <ChatMessageFiles files={message.files} />
             )}
-            {userCopyContent.trim().length > 0 || (!message.images?.length && !message.files?.length) ? (
+            {isEditingMessage ? (
+              <EditMessageCard
+                originalText={userCopyContent}
+                busy={editBusy}
+                error={editError}
+                onResend={handleEditResend}
+                onCancel={() => setIsEditingMessage(false)}
+              />
+            ) : (userCopyContent.trim().length > 0 || (!message.images?.length && !message.files?.length) ? (
               <div className="group max-w-full rounded-2xl rounded-br-md border border-border/60 bg-muted/60 px-3 py-2 text-foreground shadow-sm dark:bg-gray-800/60 sm:px-4">
                 <div dir="auto" className="break-words font-serif text-sm">
                   <Markdown
@@ -115,6 +173,16 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
                 </div>
                 <div className="mt-1 flex items-center justify-end gap-1 text-xs text-muted-foreground">
                   {shouldShowUserCopyControl && (
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingMessage(true)}
+                      className="transition-opacity hover:text-foreground"
+                      title="编辑并重发（会截断此消息之后的对话）"
+                    >
+                      ✎
+                    </button>
+                  )}
+                  {shouldShowUserCopyControl && (
                     <MessageCopyControl content={userCopyContent} messageType="user" />
                   )}
                   <span>{formattedTime}</span>
@@ -125,7 +193,7 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
               <div className="flex items-center justify-end gap-1 text-xs text-muted-foreground">
                 <span>{formattedTime}</span>
               </div>
-            )}
+            ))}
           </div>
           {!isGrouped && (
             <div className="hidden h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm text-white sm:flex">

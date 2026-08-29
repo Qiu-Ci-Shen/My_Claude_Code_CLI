@@ -12,6 +12,7 @@ import type {
 import { useDropzone } from 'react-dropzone';
 
 import { authenticatedFetch } from '../../../utils/api';
+import { PENDING_EDIT_RESEND_KEY } from '../../../lib/rewindRpc';
 import type { MarkSessionProcessing, SessionActivityMap } from '../../../hooks/useSessionProtection';
 import { grantClaudeToolPermission } from '../utils/chatPermissions';
 import {
@@ -1258,6 +1259,36 @@ export function useChatComposerState({
     },
     [onInputFocusChange],
   );
+
+  // ── 编辑重发：截断完成后 MessageComponent 暂存编辑文本并整页刷新，
+  // 这里在页面加载时消费暂存文本，自动填入输入框并提交。即使自动提交
+  // 因 WebSocket 未就绪而失败，文本也已留在输入框，回车即可手动发送。──
+  useEffect(() => {
+    const raw = safeLocalStorage.getItem(PENDING_EDIT_RESEND_KEY);
+    if (!raw) return;
+    safeLocalStorage.removeItem(PENDING_EDIT_RESEND_KEY);
+    let pending: { sessionId?: string | null; text?: string; at?: number };
+    try {
+      pending = JSON.parse(raw);
+    } catch {
+      return;
+    }
+    const pendingText = String(pending.text || '');
+    if (!pendingText || !pending.at || Date.now() - pending.at > 60_000) return;
+
+    // 会话对不上时只填入不自动发送，避免发进错误的会话
+    const sessionMatches =
+      !pending.sessionId || !currentSessionId || pending.sessionId === currentSessionId;
+    setInput(pendingText);
+    inputValueRef.current = pendingText;
+    if (!sessionMatches) return;
+
+    const timer = setTimeout(() => {
+      handleSubmitRef.current?.(createFakeSubmitEvent());
+    }, 1200);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return {
     input,
