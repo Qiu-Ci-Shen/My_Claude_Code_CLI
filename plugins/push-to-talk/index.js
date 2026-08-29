@@ -150,8 +150,9 @@ async function transcribeOnce(blob, ext) {
 }
 
 async function transcribe(blob, ext) {
-  // 429/5xx 基本都是识别服务瞬时过载，静默重试两次再报错
-  const delays = [800, 2000];
+  // 429/5xx 基本都是识别服务瞬时过载（免费模型高峰期成功率可能只有三成），
+  // 静默重试 10 次再报错；等待递增，给上游喘息时间
+  const delays = [500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4000, 5000];
   for (let attempt = 0; attempt <= delays.length; attempt++) {
     if (attempt > 0) {
       show('识别服务繁忙，自动重试 ' + attempt + '/' + delays.length + '…', 'busy');
