@@ -5,7 +5,11 @@ import os from 'os';
 
 import { spawn } from 'cross-spawn';
 
-const PLUGINS_DIR = path.join(os.homedir(), '.claude-code-ui', 'plugins');
+// 插件代码的唯一存放地可用 QIU_PLUGINS_DIR 覆盖（桌面壳/ .env 指向仓库 plugins/ 目录，
+// 实现"源码即安装"）。启用状态 plugins.json 始终在用户目录，不属于插件代码。
+const PLUGINS_DIR = process.env.QIU_PLUGINS_DIR
+  ? path.resolve(process.env.QIU_PLUGINS_DIR)
+  : path.join(os.homedir(), '.claude-code-ui', 'plugins');
 const PLUGINS_CONFIG_PATH = path.join(os.homedir(), '.claude-code-ui', 'plugins.json');
 
 const REQUIRED_MANIFEST_FIELDS = ['name', 'displayName', 'entry'];

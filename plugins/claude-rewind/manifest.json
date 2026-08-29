@@ -1,0 +1,12 @@
+{
+  "name": "claude-rewind",
+  "displayName": "Rewind",
+  "description": "在用户消息旁显示回退按钮：把会话截断回该消息之前，并可选恢复代码文件到当时状态（类似 CLI 的 /rewind）。",
+  "version": "0.1.0",
+  "author": "Qiu",
+  "type": "module",
+  "slot": "tab",
+  "backgroundOnly": true,
+  "entry": "index.js",
+  "server": "server.js"
+}

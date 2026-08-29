@@ -127,8 +127,17 @@ async function buildIsStale() {
 function runBuild() {
   return new Promise((resolve) => {
     sendStatus('检测到源码有更新，正在重新构建（约 1 分钟）…', 'warn');
-    const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-    const build = spawn(npmCmd, ['run', 'build'], { cwd: PROJECT_ROOT, windowsHide: true });
+    let build;
+    try {
+      // Windows 补丁后的 Node 禁止直接 spawn .cmd（EINVAL），必须经 cmd.exe
+      build = process.platform === 'win32'
+        ? spawn('cmd.exe', ['/d', '/s', '/c', 'npm run build'], { cwd: PROJECT_ROOT, windowsHide: true })
+        : spawn('npm', ['run', 'build'], { cwd: PROJECT_ROOT });
+    } catch (error) {
+      console.error('build spawn failed:', error);
+      resolve(false);
+      return;
+    }
     let lastLine = '';
 
     const forward = (chunk) => {
@@ -166,7 +175,13 @@ function startServer(port) {
 
   serverProc = spawn('node', args, {
     cwd: PROJECT_ROOT,
-    env: { ...process.env, PORT: String(port), SERVER_PORT: String(port) },
+    env: {
+      ...process.env,
+      PORT: String(port),
+      SERVER_PORT: String(port),
+      // 插件源码即安装：服务端直接从仓库 plugins/ 目录加载
+      QIU_PLUGINS_DIR: process.env.QIU_PLUGINS_DIR || path.join(PROJECT_ROOT, 'plugins'),
+    },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   serverProc.stdout.on('data', (d) => process.stdout.write(`[server] ${d}`));
