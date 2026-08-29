@@ -35,7 +35,9 @@ export type RewindLocateResult = { found: boolean; uuid?: string };
 
 export function rewindLocate(
   sessionId: string | null,
-  timestamp: number,
+  // 转录里的时间戳原样透传（ISO 字符串/数字均可），由插件归一后做容差匹配；
+  // 这里绝不能 Number() 转换——ISO 字符串会变 NaN→null 导致定位永远失败。
+  timestamp: string | number | Date | null | undefined,
   textPrefix: string,
 ): Promise<RewindLocateResult> {
   return rpc<RewindLocateResult>('/locate', { sessionId, timestamp, textPrefix });

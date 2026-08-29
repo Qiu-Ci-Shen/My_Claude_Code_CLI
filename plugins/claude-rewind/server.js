@@ -81,17 +81,55 @@ function buildParentMap(entries) {
 }
 
 /**
- * 归一化文本用于宽松比对：去掉 markdown 标记符号并折叠空白。
+ * 归一化文本用于宽松比对：去掉标签/markdown 标记符号并折叠空白。
  * 前端气泡 textContent 是 markdown 渲染后的产物（**bold**→bold、`code`→code、
- * 列表符丢失等），与转录原文直接 startsWith 会失配——这是「找不到这条消息」的
- * 根因，故两侧都归一化后再比。
+ * 列表符丢失等），且会剥离 <files> 等包裹标签，与转录原文直接 startsWith 会
+ * 失配——这是「找不到这条消息」的根因，故两侧都归一化后再比。
  */
 export function normalizeForMatch(text) {
   return String(text || '')
+    .replace(/<[^>\n]*>/g, ' ')
     .replace(/[*_`~[\]()#>|-]+/g, '')
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase();
+}
+
+/**
+ * 时间戳归一为毫秒纪元。转录与前端可能是 ISO 字符串、Date 序列化串、
+ * 秒/毫秒纪元数字，老版本前端还传过 NaN→null（必须判无效）。
+ */
+export function toEpochMs(value) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    if (value > 1e12) return value;        // 毫秒纪元
+    if (value > 1e9) return value * 1000;  // 秒纪元
+    return null;
+  }
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Date.parse(value);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+  return null;
+}
+
+function timestampsMatch(a, b) {
+  const ta = toEpochMs(a);
+  const tb = toEpochMs(b);
+  if (ta === null || tb === null) return false;
+  return Math.abs(ta - tb) <= 2000;
+}
+
+/** 提取用户消息纯文本：content 可能是字符串，也可能是 [{type:'text',text}] 数组 */
+function extractUserText(entry) {
+  const content = entry.message?.content;
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => (part && typeof part === 'object' && typeof part.text === 'string' ? part.text : ''))
+      .filter(Boolean)
+      .join('\n');
+  }
+  return '';
 }
 
 /**
@@ -104,22 +142,14 @@ export function normalizeForMatch(text) {
  *   2. 仅时间戳匹配（前端渲染差异过大时兜底；多候选仍按活跃分支挑）
  */
 export function locateTargetMessage(entries, { timestamp, textPrefix }) {
-  const collect = (contentMatcher) => {
-    const found = [];
-    for (const e of entries) {
-      if (e.type !== 'user' || !e.uuid || e.isSidechain === true) continue;
-      if (e.timestamp !== timestamp) continue;
-      const content = typeof e.message?.content === 'string'
-        ? e.message.content
-        : JSON.stringify(e.message?.content || '');
-      if (contentMatcher && !contentMatcher(content)) continue;
-      found.push(e);
-    }
-    return found;
-  };
+  const candidates = [];
+  for (const e of entries) {
+    if (e.type !== 'user' || !e.uuid || e.isSidechain === true) continue;
+    candidates.push(e);
+  }
 
-  const pickMostDescendants = (candidates) => {
-    if (candidates.length === 0) return null;
+  const pickMostDescendants = (candidatesSubset) => {
+    if (candidatesSubset.length === 0) return null;
     const parents = buildParentMap(entries);
     const descendantCount = (uuid) => {
       let count = 0;
@@ -134,20 +164,35 @@ export function locateTargetMessage(entries, { timestamp, textPrefix }) {
       }
       return count;
     };
-    candidates.sort((a, b) => descendantCount(b.uuid) - descendantCount(a.uuid));
-    return candidates[0];
+    candidatesSubset.sort((a, b) => descendantCount(b.uuid) - descendantCount(a.uuid));
+    return candidatesSubset[0];
   };
 
-  // 第一级：时间戳 + 归一化前缀
+  const hasTimestamp = timestamp !== null && timestamp !== undefined && timestamp !== '';
   const prefix = normalizeForMatch(textPrefix).slice(0, 50);
-  if (prefix) {
-    const strict = collect((content) => normalizeForMatch(content).startsWith(prefix));
-    const hit = pickMostDescendants(strict);
+
+  // 第一级：时间戳（±2s 容差）+ 归一化内容前缀
+  if (prefix && hasTimestamp) {
+    const hit = pickMostDescendants(candidates.filter((e) =>
+      timestampsMatch(e.timestamp, timestamp)
+      && normalizeForMatch(extractUserText(e)).startsWith(prefix)));
     if (hit) return hit;
   }
 
-  // 第二级：仅时间戳兜底
-  return pickMostDescendants(collect(null));
+  // 第二级：仅时间戳兜底（前端渲染差异过大时；多候选按活跃分支挑）
+  if (hasTimestamp) {
+    const hit = pickMostDescendants(candidates.filter((e) => timestampsMatch(e.timestamp, timestamp)));
+    if (hit) return hit;
+  }
+
+  // 第三级：仅内容前缀兜底（两侧时间戳都无法解析时；历史消息时间戳应可靠，极少走到）
+  if (prefix) {
+    const hit = pickMostDescendants(candidates.filter((e) =>
+      normalizeForMatch(extractUserText(e)).startsWith(prefix)));
+    if (hit) return hit;
+  }
+
+  return null;
 }
 
 /** 目标的后代集合（含自身）——截断时要丢弃的全部条目 */

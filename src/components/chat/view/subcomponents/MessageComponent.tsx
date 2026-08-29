@@ -104,7 +104,7 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
 
       const locate = await rewindLocate(
         sessionId,
-        Number(message.timestamp),
+        message.timestamp,
         userCopyContent.slice(0, 80),
       );
       if (!locate.found || !locate.uuid) {
