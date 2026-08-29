@@ -29,7 +29,7 @@ const STARTER_PLUGIN_URL = 'https://github.com/cloudcli-ai/cloudcli-plugin-start
 const TERMINAL_PLUGIN_URL = 'https://github.com/cloudcli-ai/cloudcli-plugin-terminal';
 const SCHEDULED_PROMPT_PLUGIN_URL = 'https://github.com/grostim/cloudcli-cron';
 const CLAUDE_WATCH_PLUGIN_URL = 'https://github.com/satsuki19980613/cloudcli-claude-watch';
-const PRISM_CLOUDCLI_PLUGIN_URL = 'https://github.com/jakeefr/cloudcli-plugin-prism';
+const PRISM_PLUGIN_URL = 'https://github.com/jakeefr/cloudcli-plugin-prism';
 const SESSION_MANAGER_PLUGIN_URL = 'https://github.com/strykereye2/cloudcli-plugin-session-manager';
 const TOKEN_COST_CALCULATOR_PLUGIN_URL = 'https://github.com/NightmareAway/cloudcli-plugin-token-cost-calculator';
 const TASK_QUEUE_PLUGIN_URL = 'https://github.com/TadMSTR/cloudcli-plugin-task-queue';
@@ -84,8 +84,8 @@ const UNOFFICIAL_PLUGIN_RECOMMENDATIONS: PluginRecommendation[] = [
   },
   {
     id: 'prism',
-    translationKey: 'prismCloudCLI',
-    repoUrl: PRISM_CLOUDCLI_PLUGIN_URL,
+    translationKey: 'prism',
+    repoUrl: PRISM_PLUGIN_URL,
     installedNames: ['prism'],
     icon: Activity,
     source: 'unofficial',
@@ -676,15 +676,6 @@ export default function PluginSettingsTab() {
           className="inline-flex items-center gap-1 text-xs text-muted-foreground/60 transition-colors hover:text-foreground"
         >
           {t('pluginSettings.starter')} <ExternalLink className="h-2.5 w-2.5" />
-        </a>
-        <span className="text-muted-foreground/20">·</span>
-        <a
-          href="https://cloudcli.ai/docs/plugin-overview"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground/60 transition-colors hover:text-foreground"
-        >
-          {t('pluginSettings.docs')} <ExternalLink className="h-2.5 w-2.5" />
         </a>
       </div>
     </div>

@@ -89,7 +89,7 @@ async function readLastCommit(
 /**
  * Builds the full Worktrees panel payload for the repository containing
  * `projectPath`: every worktree with dirty count, ahead/behind vs the base
- * branch, last commit info, and the linked CloudCLI project (when registered).
+ * branch, last commit info, and the linked Qiu_Ai_LZ project (when registered).
  */
 export async function listWorktrees(
   input: ListWorktreesInput,

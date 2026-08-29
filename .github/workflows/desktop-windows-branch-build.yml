@@ -39,11 +39,11 @@ jobs:
         run: |
           SAFE_REF="$(printf '%s' "${GITHUB_REF_NAME}" | tr -c 'A-Za-z0-9._-' '-')"
           echo "name=CloudCLI-windows-${SAFE_REF}-${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
-          echo "server_bundle_tag=cloudcli-local-server-${SAFE_REF}" >> "$GITHUB_OUTPUT"
+          echo "server_bundle_tag=qiu-ai-lz-local-server-${SAFE_REF}" >> "$GITHUB_OUTPUT"
 
       - name: Configure branch server bundle source
         shell: bash
-        run: printf '{"releaseTag":"%s"}\n' "${{ steps.artifact.outputs.server_bundle_tag }}" > electron/server-bundle-config.json
+        run: printf '{"releaseTag":"%s"}\n' "${{ steps.artifact.outputs.server_bundle_tag }}" > desktop/server-bundle-config.json
 
       - name: Build unsigned Windows artifacts
         run: npm run desktop:dist:win -- --publish never
@@ -57,8 +57,8 @@ jobs:
       - name: Verify branch server runtime artifacts
         shell: bash
         run: |
-          test -n "$(find release/local-server -maxdepth 1 -name 'cloudcli-local-server-*.tar.gz' -print -quit)"
-          test -n "$(find release/local-server -maxdepth 1 -name 'cloudcli-local-server-*.tar.gz.sha256' -print -quit)"
+          test -n "$(find release/local-server -maxdepth 1 -name 'qiu-ai-lz-local-server-*.tar.gz' -print -quit)"
+          test -n "$(find release/local-server -maxdepth 1 -name 'qiu-ai-lz-local-server-*.tar.gz.sha256' -print -quit)"
 
       - name: Publish branch server bundle
         uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0

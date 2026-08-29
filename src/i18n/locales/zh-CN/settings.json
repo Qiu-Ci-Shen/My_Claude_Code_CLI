@@ -533,8 +533,8 @@
       "description": "监控长时间运行的 Claude Code 会话，检测挂起并暴露进程控制。",
       "install": "安装"
     },
-    "prismCloudCLI": {
-      "name": "PRISM CloudCLI",
+    "prism": {
+      "name": "PRISM",
       "badge": "非官方",
       "description": "Qiu_Ai_LZ 内的 Claude Code 会话智能分析。无需离开浏览器即可了解会话为何消耗大量 Token。",
       "install": "安装"

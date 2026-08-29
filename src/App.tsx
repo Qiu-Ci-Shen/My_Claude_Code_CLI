@@ -16,7 +16,7 @@ const DEPLOYMENT_ASSET_DIRECTORIES = new Set(['assets', 'static', 'icons', 'imag
 /**
  * Detect the router basename from explicit runtime config or deployment hints.
  *
- * CloudCLI can be served from a path prefix by a reverse proxy, for example:
+ * Qiu_Ai_LZ can be served from a path prefix by a reverse proxy, for example:
  *   /ai/manifest.json
  *   /ai/assets/index-abc123.js
  *   /ai/icons/icon-192x192.png

@@ -533,8 +533,8 @@
       "description": "Watch long-running Claude Code sessions for hangs and expose process controls.",
       "install": "Install"
     },
-    "prismCloudCLI": {
-      "name": "PRISM CloudCLI",
+    "prism": {
+      "name": "PRISM",
       "badge": "unofficial",
       "description": "Session intelligence for Claude Code, inside Qiu_Ai_LZ. See why your sessions are burning tokens without leaving the browser.",
       "install": "Install"

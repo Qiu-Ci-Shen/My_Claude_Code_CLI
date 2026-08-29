@@ -9,8 +9,8 @@ function createDependencies(
   overrides: Partial<SystemUpdateDependencies> = {},
 ): SystemUpdateDependencies {
   return {
-    appRoot: '/app/cloudcli',
-    homeDirectory: '/home/cloudcli',
+    appRoot: '/app/qiu-ai-lz',
+    homeDirectory: '/home/qiu-ai-lz',
     installMode: 'git',
     isPlatform: false,
     environment: { TEST_ENVIRONMENT: 'true' },
@@ -35,7 +35,7 @@ test('git installations update from the application root', async () => {
 
   assert.deepEqual(calls, [[
     'git checkout main && git pull && npm install',
-    '/app/cloudcli',
+    '/app/qiu-ai-lz',
     dependencies.environment,
   ]]);
   assert.deepEqual(result, {
@@ -59,8 +59,8 @@ test('global npm installations update from the user home directory', async () =>
   const result = await service.updateSystem();
 
   assert.deepEqual(calls, [[
-    'npm install -g @cloudcli-ai/cloudcli@latest',
-    '/home/cloudcli',
+    'npm install -g qiu-ai-lz@latest',
+    '/home/qiu-ai-lz',
     dependencies.environment,
   ]]);
   assert.equal(result.output, 'Update completed successfully');
@@ -82,7 +82,7 @@ test('platform installations use the platform workflow regardless of install mod
 
   assert.deepEqual(calls, [[
     'npm run update:platform',
-    '/app/cloudcli',
+    '/app/qiu-ai-lz',
     dependencies.environment,
   ]]);
 });

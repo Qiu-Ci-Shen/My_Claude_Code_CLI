@@ -109,8 +109,8 @@ function showSandboxHelp(output: CliOutput): void {
 ${terminalTextStyles.bright('Qiu_Ai_LZ Sandbox')} — Run Qiu_Ai_LZ inside Docker Sandboxes
 
 Usage:
-  cloudcli sandbox <workspace>            Create and start a sandbox
-  cloudcli sandbox <subcommand> [name]    Manage sandboxes
+  qiu-ai-lz sandbox <workspace>            Create and start a sandbox
+  qiu-ai-lz sandbox <subcommand> [name]    Manage sandboxes
 
 Subcommands:
   ${terminalTextStyles.bright('(default)')}    Create a sandbox and start the web UI
@@ -129,13 +129,13 @@ Options:
       --port <port>         Host port for the web UI (default: 3001)
 
 Examples:
-  $ cloudcli sandbox ~/my-project
-  $ cloudcli sandbox ~/my-project --agent codex --port 8080
-  $ cloudcli sandbox ~/my-project --env SERVER_PORT=8080 --env HOST=0.0.0.0
-  $ cloudcli sandbox ls
-  $ cloudcli sandbox stop my-project
-  $ cloudcli sandbox start my-project
-  $ cloudcli sandbox rm my-project
+  $ qiu-ai-lz sandbox ~/my-project
+  $ qiu-ai-lz sandbox ~/my-project --agent codex --port 8080
+  $ qiu-ai-lz sandbox ~/my-project --env SERVER_PORT=8080 --env HOST=0.0.0.0
+  $ qiu-ai-lz sandbox ls
+  $ qiu-ai-lz sandbox stop my-project
+  $ qiu-ai-lz sandbox start my-project
+  $ qiu-ai-lz sandbox rm my-project
 
 Prerequisites:
   1. Install sbx CLI: https://docs.docker.com/ai/sandboxes/get-started/
@@ -160,7 +160,7 @@ function requireSandboxName(options: SandboxOptions, output: CliOutput): string 
     return options.name;
   }
 
-  output.error(`\n${terminalTextStyles.error('❌')} Sandbox name required: cloudcli sandbox ${options.subcommand} <name>\n`);
+  output.error(`\n${terminalTextStyles.error('❌')} Sandbox name required: qiu-ai-lz sandbox ${options.subcommand} <name>\n`);
   return null;
 }
 
@@ -298,9 +298,9 @@ export function createSandboxCommandService(
         case 'create': {
           if (!options.workspace) {
             dependencies.output.error(
-              `\n${terminalTextStyles.error('❌')} Workspace path required: cloudcli sandbox <path>\n`,
+              `\n${terminalTextStyles.error('❌')} Workspace path required: qiu-ai-lz sandbox <path>\n`,
             );
-            dependencies.output.log(`   Example: ${terminalTextStyles.bright('cloudcli sandbox ~/my-project')}\n`);
+            dependencies.output.log(`   Example: ${terminalTextStyles.bright('qiu-ai-lz sandbox ~/my-project')}\n`);
             return 1;
           }
 
@@ -400,7 +400,7 @@ export function createSandboxCommandService(
           dependencies.output.log(`  ${terminalTextStyles.dim('$')} sbx stop ${sandboxName}`);
           dependencies.output.log(`  ${terminalTextStyles.dim('$')} sbx start ${sandboxName}`);
           dependencies.output.log(`  ${terminalTextStyles.dim('$')} sbx rm ${sandboxName}`);
-          dependencies.output.log(`\n${terminalTextStyles.dim('  Or install globally:')} npm install -g @cloudcli-ai/cloudcli\n`);
+          dependencies.output.log(`\n${terminalTextStyles.dim('  Or install globally:')} npm install -g qiu-ai-lz\n`);
           return 0;
         }
 

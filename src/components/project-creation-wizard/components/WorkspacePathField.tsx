@@ -8,7 +8,7 @@ import FolderBrowserModal from './FolderBrowserModal';
 
 declare global {
   interface Window {
-    cloudcliDesktopFs?: {
+    qiuDesktopFs?: {
       pickFolder?: () => Promise<string | null>;
     };
   }
@@ -87,7 +87,7 @@ export default function WorkspacePathField({
   );
 
   const handleBrowseClick = useCallback(async () => {
-    const pickFolder = window.cloudcliDesktopFs?.pickFolder;
+    const pickFolder = window.qiuDesktopFs?.pickFolder;
     if (typeof pickFolder === 'function') {
       try {
         const selectedPath = await pickFolder();

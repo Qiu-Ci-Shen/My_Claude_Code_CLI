@@ -33,7 +33,7 @@ export function createSystemUpdateService(dependencies: SystemUpdateDependencies
         ? 'npm run update:platform'
         : dependencies.installMode === 'git'
           ? 'git checkout main && git pull && npm install'
-          : 'npm install -g @cloudcli-ai/cloudcli@latest';
+          : 'npm install -g qiu-ai-lz@latest';
       const workingDirectory = dependencies.isPlatform || dependencies.installMode === 'git'
         ? dependencies.appRoot
         : dependencies.homeDirectory;

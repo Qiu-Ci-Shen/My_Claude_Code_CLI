@@ -17,12 +17,12 @@ function createHarness() {
   let sandboxArguments: string[] = [];
   const service = createCliService({
     applicationRoot: '/application',
-    defaultDatabasePath: '/home/user/.cloudcli/auth.db',
+    defaultDatabasePath: '/home/user/.qiu-ai-lz/auth.db',
     homeDirectory: '/home/user',
     packageMetadata: {
       version: '1.2.3',
-      homepage: 'https://cloudcli.example',
-      bugsUrl: 'https://cloudcli.example/issues',
+      homepage: 'https://qiu-ai-lz.example',
+      bugsUrl: 'https://qiu-ai-lz.example/issues',
     },
     environment,
     fileSystem: {

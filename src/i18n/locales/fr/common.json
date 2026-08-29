@@ -247,7 +247,7 @@
     "viewFullRelease": "Voir les notes de version complètes",
     "updateProgress": "Progression de la mise à jour :",
     "manualUpgrade": "Mise à jour manuelle :",
-    "npmUpgradeCommand": "npm install -g @cloudcli-ai/cloudcli@latest",
+    "npmUpgradeCommand": "npm install -g qiu-ai-lz@latest",
     "manualUpgradeHint": "Ou cliquez sur « Mettre à jour maintenant » pour lancer la mise à jour automatiquement.",
     "updateCompleted": "Mise à jour effectuée avec succès !",
     "restartServer": "Veuillez redémarrer le serveur pour appliquer les modifications.",

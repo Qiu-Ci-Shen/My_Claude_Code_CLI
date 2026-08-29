@@ -16,7 +16,7 @@ type BootstrapResult = {
   runtime: string;
 };
 
-const RESULT_PREFIX = '__CLOUDCLI_BOOTSTRAP_RESULT__';
+const RESULT_PREFIX = '__QIU_BOOTSTRAP_RESULT__';
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const applicationRoot = path.resolve(testDirectory, '..', '..', '..', '..');
 
@@ -25,7 +25,7 @@ function sourceModuleUrl(...segments: string[]): string {
 }
 
 async function runCliBootstrapFixture(isPlatform: boolean): Promise<BootstrapResult> {
-  const fixtureRoot = await mkdtemp(path.join(os.tmpdir(), 'cloudcli-cli-bootstrap-'));
+  const fixtureRoot = await mkdtemp(path.join(os.tmpdir(), 'qiu-ai-lz-cli-bootstrap-'));
   const fixtureServerDirectory = path.join(fixtureRoot, 'server');
   const fixtureCliDirectory = path.join(fixtureServerDirectory, 'modules', 'cli');
   const fixtureDatabasePath = path.join(fixtureRoot, 'auth.db');

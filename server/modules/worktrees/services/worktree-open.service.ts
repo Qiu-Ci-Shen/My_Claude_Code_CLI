@@ -26,7 +26,7 @@ function mapRowToProjectView(row: ProjectRepositoryRow): WorktreeProjectView {
 }
 
 /**
- * Ensures a CloudCLI project exists (and is active) for a worktree directory
+ * Ensures a Qiu_Ai_LZ project exists (and is active) for a worktree directory
  * and returns it, so the caller can switch the UI into that worktree.
  *
  * The path is only accepted when it is a registered worktree of the repository

@@ -532,8 +532,8 @@
       "description": "장시간 실행되는 Claude Code 세션의 멈춤 현상을 감시하고 프로세스 제어 기능을 제공합니다.",
       "install": "설치"
     },
-    "prismCloudCLI": {
-      "name": "PRISM CloudCLI",
+    "prism": {
+      "name": "PRISM",
       "badge": "비공식",
       "description": "Qiu_Ai_LZ 안에서 제공되는 Claude Code용 세션 인텔리전스입니다. 브라우저를 벗어나지 않고도 세션에서 토큰이 왜 소모되는지 확인하세요.",
       "install": "설치"

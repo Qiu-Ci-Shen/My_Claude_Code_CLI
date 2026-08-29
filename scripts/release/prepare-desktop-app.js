@@ -73,7 +73,7 @@ function buildDesktopPackageJson(copiedOptionalDependencies) {
     author: packageJson.author,
     license: packageJson.license,
     type: 'module',
-    main: 'electron/main.js',
+    main: 'desktop/main.js',
     dependencies: {
       ws: packageJson.dependencies.ws,
     },
@@ -88,10 +88,10 @@ function buildDesktopPackageJson(copiedOptionalDependencies) {
         output: '../../release/desktop',
       },
       extraMetadata: {
-        main: 'electron/main.js',
+        main: 'desktop/main.js',
       },
       files: [
-        'electron/**',
+        'desktop/**',
         'public/**',
         'dist/**',
         'dist-server/**',
@@ -109,7 +109,7 @@ function buildDesktopPackageJson(copiedOptionalDependencies) {
 await fs.rm(stageDir, { recursive: true, force: true });
 await fs.mkdir(stageDir, { recursive: true });
 
-await copyRequired('electron');
+await copyRequired('desktop');
 await copyRequired('dist');
 await copyRequired('public');
 

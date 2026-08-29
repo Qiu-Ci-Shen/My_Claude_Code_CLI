@@ -52,10 +52,12 @@ const getServerKey = (server: ProviderMcpServer): string => (
   `${server.provider}:${server.scope}:${server.workspacePath || 'global'}:${server.name}`
 );
 
-// Servers prefixed with `cloudcli-` are written and removed automatically by a
-// CloudCLI feature toggle (e.g. the Browser tab), not added by the user. They are
-// shown read-only so users don't edit/delete them out of sync with the feature.
-const isManagedServer = (server: ProviderMcpServer): boolean => server.name.startsWith('cloudcli-');
+// Servers named `qiu-browser` (or legacy `cloudcli-*` entries) are written and
+// removed automatically by the browser-use feature, not added by the user. They
+// are shown read-only so users don't edit/delete them out of sync with the feature.
+const MANAGED_SERVER_NAMES = ['qiu-browser', 'cloudcli-browser', 'cloudcli-browser-use'];
+const isManagedServer = (server: ProviderMcpServer): boolean =>
+  MANAGED_SERVER_NAMES.includes(server.name);
 
 function ConfigLine({ label, children }: { label: string; children: string }) {
   if (!children) {
@@ -85,15 +87,9 @@ function TeamMcpFeatureCard() {
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
             Share MCP server configurations across your team. Everyone stays in sync automatically.
           </p>
-          <a
-            href="https://cloudcli.ai"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary transition-colors hover:underline"
-          >
+          <span className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary">
             Available with Qiu_Ai_LZ Pro
-            <ExternalLink className="h-3 w-3" />
-          </a>
+          </span>
         </div>
       </div>
     </div>

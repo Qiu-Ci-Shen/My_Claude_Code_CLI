@@ -60,7 +60,7 @@ export interface IProvider {
 /**
  * Model catalog contract for one provider.
  *
- * Implementations supply CloudCLI's curated predefined models and can inspect
+ * Implementations supply Qiu_Ai_LZ's curated predefined models and can inspect
  * provider-native session state. The Providers service merges these immutable
  * source-controlled definitions with user-created SQLite rows at read time.
  */

@@ -532,8 +532,8 @@
       "description": "Vigila sesiones largas de Claude Code por si se cuelgan y expone controles del proceso.",
       "install": "Instalar"
     },
-    "prismCloudCLI": {
-      "name": "PRISM CloudCLI",
+    "prism": {
+      "name": "PRISM",
       "badge": "no oficial",
       "description": "Inteligencia de sesiones para Claude Code, dentro de Qiu_Ai_LZ. Descubre por qué tus sesiones queman tokens sin salir del navegador.",
       "install": "Instalar"

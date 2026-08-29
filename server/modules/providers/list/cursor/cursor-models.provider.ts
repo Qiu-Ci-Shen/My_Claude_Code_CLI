@@ -12,7 +12,7 @@ import {
   sanitizeLeafDirectoryName,
 } from '@/shared/utils.js';
 
-/** Curated Cursor catalog shipped as immutable CloudCLI defaults. */
+/** Curated Cursor catalog shipped as immutable Qiu_Ai_LZ defaults. */
 export const CURSOR_PREDEFINED_MODELS: ProviderModelsDefinition = {
   OPTIONS: [
     { value: 'auto', label: 'Auto', description: 'Let Cursor choose the model.' },

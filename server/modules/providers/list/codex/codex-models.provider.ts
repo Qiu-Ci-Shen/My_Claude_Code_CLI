@@ -15,7 +15,7 @@ import {
   readOptionalString,
 } from '@/shared/utils.js';
 
-/** Curated Codex catalog shipped as immutable CloudCLI defaults. */
+/** Curated Codex catalog shipped as immutable Qiu_Ai_LZ defaults. */
 export const CODEX_PREDEFINED_MODELS: ProviderModelsDefinition = {
   OPTIONS: [
     {

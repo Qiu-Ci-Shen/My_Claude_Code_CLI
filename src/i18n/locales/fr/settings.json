@@ -502,8 +502,8 @@
       "description": "Surveillez les sessions Claude Code longues pour détecter les blocages et exposez les contrôles de processus.",
       "install": "Installer"
     },
-    "prismCloudCLI": {
-      "name": "PRISM CloudCLI",
+    "prism": {
+      "name": "PRISM",
       "badge": "non officiel",
       "description": "Intelligence de session pour Claude Code, dans Qiu_Ai_LZ. Voyez pourquoi vos sessions consomment des tokens sans quitter le navigateur.",
       "install": "Installer"

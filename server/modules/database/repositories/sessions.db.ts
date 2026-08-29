@@ -168,7 +168,7 @@ export const sessionsDb = {
    * `session_id` is the stable app-facing id, while `provider_session_id`
    * stays NULL until the provider runtime announces its own id and
    * `assignProviderSessionId` records the mapping. `customName` is derived
-   * from the first visible CloudCLI message by the sessions service.
+   * from the first visible Qiu_Ai_LZ message by the sessions service.
    */
   createAppSession(
     sessionId: string,

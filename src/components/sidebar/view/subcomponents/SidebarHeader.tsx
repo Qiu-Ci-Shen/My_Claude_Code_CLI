@@ -2,8 +2,7 @@ import { Activity, Archive, Folder, FolderPlus, MessageSquare, Plus, RefreshCw, 
 import type { TFunction } from 'i18next';
 
 import { Button, Input, Tooltip } from '../../../../shared/view/ui';
-import { CLOUDCLI_WORDMARK_FONT_FAMILY } from '../../../../shared/constants';
-import { IS_PLATFORM } from '../../../../shared/utils';
+import { WORDMARK_FONT_FAMILY } from '../../../../shared/constants';
 import { cn } from '../../../../lib/utils';
 import type { SidebarSearchMode } from '../../types/types';
 
@@ -63,7 +62,7 @@ export default function SidebarHeader({
     <div className="flex min-w-0 items-center gap-2.5">
       <h1
         className="truncate text-sm font-bold tracking-tight text-foreground"
-        style={{ fontFamily: CLOUDCLI_WORDMARK_FONT_FAMILY }}
+        style={{ fontFamily: WORDMARK_FONT_FAMILY }}
       >
         {t('app.title')}
       </h1>
@@ -78,17 +77,7 @@ export default function SidebarHeader({
         style={{}}
       >
         <div className="flex items-center justify-between gap-2">
-          {IS_PLATFORM ? (
-            <a
-              href="https://cloudcli.ai/dashboard"
-              className="flex min-w-0 items-center gap-2.5 transition-opacity hover:opacity-80"
-              title={t('tooltips.viewEnvironments')}
-            >
-              <LogoBlock />
-            </a>
-          ) : (
-            <LogoBlock />
-          )}
+          <LogoBlock />
 
           <div className="flex flex-shrink-0 items-center gap-0.5">
             <Button
@@ -238,17 +227,7 @@ export default function SidebarHeader({
         style={isPWA && isMobile ? { paddingTop: '16px' } : {}}
       >
         <div className="flex items-center justify-between">
-          {IS_PLATFORM ? (
-            <a
-              href="https://cloudcli.ai/dashboard"
-              className="flex min-w-0 items-center gap-2.5 transition-opacity active:opacity-70"
-              title={t('tooltips.viewEnvironments')}
-            >
-              <LogoBlock />
-            </a>
-          ) : (
-            <LogoBlock />
-          )}
+          <LogoBlock />
 
           <div className="flex flex-shrink-0 gap-1.5">
             <button

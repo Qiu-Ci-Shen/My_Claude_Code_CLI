@@ -8,7 +8,7 @@ import {
   filterImagesToUploadStore,
 } from '@/modules/websocket/services/chat-websocket.service.js';
 
-const STORE = path.join(os.tmpdir(), 'cloudcli-assets-store');
+const STORE = path.join(os.tmpdir(), 'qiu-ai-lz-assets-store');
 
 test('images inside the upload store pass through', () => {
   const inside = path.join(STORE, 'shot.png');

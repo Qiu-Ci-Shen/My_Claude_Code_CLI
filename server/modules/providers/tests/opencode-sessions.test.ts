@@ -470,14 +470,14 @@ const seedOpenCodeSession = async (
   }
 };
 
-test('OpenCode synchronizer preserves the title assigned when CloudCLI creates a session', { concurrency: false }, async () => {
+test('OpenCode synchronizer preserves the title assigned when Qiu_Ai_LZ creates a session', { concurrency: false }, async () => {
   const tempRoot = await mkdtemp(path.join(os.tmpdir(), 'opencode-session-sync-app-'));
   const workspacePath = path.join(tempRoot, 'workspace');
   await mkdir(workspacePath, { recursive: true });
   const restoreHomeDir = patchHomeDir(tempRoot);
 
   try {
-    // Both provider-owned values differ from the CloudCLI title so either one
+    // Both provider-owned values differ from the Qiu_Ai_LZ title so either one
     // leaking through would change the assertion below.
     await seedOpenCodeSession(tempRoot, workspacePath, {
       sessionId: 'oc-app-1',

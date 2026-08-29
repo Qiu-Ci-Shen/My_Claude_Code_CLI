@@ -63,11 +63,11 @@ type SessionDetails = {
   } | null;
 };
 
-const MAX_CLOUDCLI_SESSION_NAME_WORDS = 4;
+const MAX_SESSION_NAME_WORDS = 4;
 
-function buildCloudCliSessionName(initialMessage: string): string {
+function buildAppSessionName(initialMessage: string): string {
   const words = initialMessage.trim().split(/\s+/).filter(Boolean);
-  return words.slice(0, MAX_CLOUDCLI_SESSION_NAME_WORDS).join(' ') || 'Untitled Session';
+  return words.slice(0, MAX_SESSION_NAME_WORDS).join(' ') || 'Untitled Session';
 }
 
 /**
@@ -208,7 +208,7 @@ export const sessionsService = {
    * chat, navigates to the returned id immediately, and the id never changes
    * for the lifetime of the conversation. The provider-native id is mapped to
    * this row later, when the provider runtime announces it mid-run. Its title
-   * comes directly from the first visible CloudCLI message and is limited to
+   * comes directly from the first visible Qiu_Ai_LZ message and is limited to
    * four whole words before any provider-owned storage exists.
    */
   createAppSession(
@@ -225,7 +225,7 @@ export const sessionsService = {
     }
 
     const sessionId = randomUUID();
-    const sessionName = buildCloudCliSessionName(initialMessage);
+    const sessionName = buildAppSessionName(initialMessage);
     sessionsDb.createAppSession(sessionId, provider, normalizedProjectPath, sessionName);
 
     return {

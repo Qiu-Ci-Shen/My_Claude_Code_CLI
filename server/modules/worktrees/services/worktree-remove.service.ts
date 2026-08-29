@@ -13,7 +13,7 @@ import {
 
 /**
  * Removes a linked worktree (never the main one), optionally deletes its
- * branch, and archives the CloudCLI project registered for the directory so it
+ * branch, and archives the Qiu_Ai_LZ project registered for the directory so it
  * disappears from the sidebar while its chat history stays recoverable.
  */
 export async function removeWorktree(

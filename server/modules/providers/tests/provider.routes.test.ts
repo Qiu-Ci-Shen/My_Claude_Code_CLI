@@ -54,7 +54,7 @@ async function withProviderServer(
   }
 }
 
-test('session creation route names a CloudCLI session from the initial message', async () => {
+test('session creation route names a Qiu_Ai_LZ session from the initial message', async () => {
   await withProviderServer(async (baseUrl, workspacePath) => {
     const response = await fetch(`${baseUrl}/api/providers/sessions`, {
       method: 'POST',
