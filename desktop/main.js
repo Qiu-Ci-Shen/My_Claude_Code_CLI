@@ -212,17 +212,6 @@ function killServerTree() {
 
 async function enterApp() {
   if (!win || !serverUrl) return;
-  const workArea = screen.getPrimaryDisplay().workArea;
-  const width = Math.floor(workArea.width * 2 / 3);
-  const height = Math.floor(workArea.height * 2 / 3);
-  win.setResizable(true);
-  win.setMinimumSize(960, 600);
-  win.setBounds({
-    x: workArea.x + Math.floor((workArea.width - width) / 2),
-    y: workArea.y + Math.floor((workArea.height - height) / 2),
-    width,
-    height,
-  });
   try {
     await win.loadURL(serverUrl);
   } catch {
@@ -240,12 +229,23 @@ function getWindowIconPath() {
     : path.join(PROJECT_ROOT, 'desktop', 'assets', 'logo-windows.ico');
 }
 
+function getWorkAreaBounds() {
+  const workArea = screen.getPrimaryDisplay().workArea;
+  const width = Math.floor(workArea.width * 2 / 3);
+  const height = Math.floor(workArea.height * 2 / 3);
+  return {
+    x: workArea.x + Math.floor((workArea.width - width) / 2),
+    y: workArea.y + Math.floor((workArea.height - height) / 2),
+    width,
+    height,
+  };
+}
+
 function createWindow() {
   win = new BrowserWindow({
-    width: 460,
-    height: 320,
-    resizable: false,
-    autoHideMenuBar: true,
+    ...getWorkAreaBounds(),
+    minWidth: 960,
+    minHeight: 600,
     backgroundColor: '#141414',
     title: APP_NAME,
     icon: getWindowIconPath(),
