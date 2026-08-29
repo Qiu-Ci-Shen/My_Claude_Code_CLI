@@ -19,7 +19,7 @@ import path from 'path';
 
 import { query } from '@anthropic-ai/claude-agent-sdk';
 
-import { sessionsDb } from '@/modules/database';
+import { sessionsDb } from '@/modules/database/index.js';
 import {
   appendFilesInputTag,
   buildClaudeUserContent,
