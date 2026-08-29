@@ -13,12 +13,13 @@
  */
 
 import crypto from 'crypto';
-import { promises as fs } from 'fs';
+import { promises as fs, existsSync, readFileSync } from 'fs';
 import os from 'os';
 import path from 'path';
 
 import { query } from '@anthropic-ai/claude-agent-sdk';
 
+import { sessionsDb } from '@/modules/database';
 import {
   appendFilesInputTag,
   buildClaudeUserContent,
@@ -181,6 +182,32 @@ function matchesToolPermission(entry, toolName, input) {
   }
 
   return false;
+}
+
+/**
+ * Rewind / 编辑重发会把转录截断到第一条消息之前——截空后的转录没有
+ * 任何对话条目，resume 它 CLI 会报 "No conversation found with session ID"。
+ * 检测这种状态，让本次运行降级为全新 CLI 会话（同一个应用会话继续）。
+ * 没有转录文件时（新会话预分配流程）返回 true，保持原有 resume 行为。
+ */
+async function isTranscriptResumable(appSessionId) {
+  try {
+    const row = sessionsDb.getSessionById(appSessionId);
+    if (!row?.jsonl_path || !existsSync(row.jsonl_path)) {
+      return true;
+    }
+    const content = readFileSync(row.jsonl_path, 'utf8');
+    return content.split('\n').some((line) => {
+      try {
+        const entry = JSON.parse(line);
+        return entry && (entry.type === 'user' || entry.type === 'assistant');
+      } catch {
+        return false;
+      }
+    });
+  } catch {
+    return true;
+  }
 }
 
 function mapCliOptionsToSDK(options = {}) {
@@ -692,9 +719,20 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
       console.warn('[Claude SDK] Unable to load provider models for effort validation:', error);
     }
 
+    // Rewind / 编辑重发可能把转录截断到第一条消息之前——清空后的转录没有
+    // 对话条目，resume 它 CLI 会报 "No conversation found"。检测到就放弃
+    // resume，以全新 CLI 会话继续同一个应用会话（新 id 回写数据库映射）。
+    const resumeSkipped =
+      Boolean(providerSessionId) && !(await isTranscriptResumable(sessionId));
+    if (resumeSkipped) {
+      console.warn(
+        `[claude] transcript of ${providerSessionId} has no resumable conversation; starting a fresh conversation for app session ${sessionId}`
+      );
+    }
+
     const sdkOptions = mapCliOptionsToSDK({
       ...options,
-      providerSessionId,
+      providerSessionId: resumeSkipped ? null : providerSessionId,
       model: resolvedModel || options.model,
       effortModels,
     });
@@ -855,6 +893,17 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
         if (!providerSessionId && !sessionCreatedSent) {
           sessionCreatedSent = true;
           ws.send(createNormalizedMessage({ kind: 'session_created', newSessionId: capturedSessionId, sessionId: capturedSessionId, provider: 'claude' }));
+        }
+      } else if (resumeSkipped && message.session_id && message.session_id !== capturedSessionId) {
+        // 全新对话回落：CLI 生成了新的 provider 会话 id，回写应用会话映射
+        capturedSessionId = message.session_id;
+        if (ws.setSessionId && typeof ws.setSessionId === 'function') {
+          ws.setSessionId(capturedSessionId);
+        }
+        try {
+          sessionsDb.assignProviderSessionId(sessionId, capturedSessionId);
+        } catch (mapError) {
+          console.warn('[claude] Failed to re-point app session to the new provider session:', mapError);
         }
       } else {
         // session_id already captured
