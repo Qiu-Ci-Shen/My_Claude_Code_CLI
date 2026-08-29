@@ -769,6 +769,14 @@ function registerIpcHandlers() {
   ipcMain.handle('cloudcli-desktop:switch-tab', async (_event, tabId) => desktopWindow.switchDesktopTab(tabId));
   ipcMain.handle('cloudcli-desktop:close-tab', async (_event, tabId) => desktopWindow.closeDesktopTab(tabId));
   ipcMain.handle('cloudcli-desktop:update-setting', async (_event, key, value) => updateDesktopSetting(key, value));
+  ipcMain.handle('cloudcli-desktop:pick-folder', async () => {
+    const window = desktopWindow?.getMainWindow();
+    const result = await dialog.showOpenDialog(window, {
+      title: '选择工作区文件夹',
+      properties: ['openDirectory', 'createDirectory'],
+    });
+    return result.canceled || result.filePaths.length === 0 ? null : result.filePaths[0];
+  });
 }
 
 function registerAppEvents() {

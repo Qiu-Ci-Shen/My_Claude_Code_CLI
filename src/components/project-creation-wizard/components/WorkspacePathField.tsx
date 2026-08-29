@@ -6,6 +6,14 @@ import { getSuggestionRootPath } from '../utils/pathUtils';
 import type { FolderSuggestion } from '../types';
 import FolderBrowserModal from './FolderBrowserModal';
 
+declare global {
+  interface Window {
+    cloudcliDesktopFs?: {
+      pickFolder?: () => Promise<string | null>;
+    };
+  }
+}
+
 type WorkspacePathFieldProps = {
   value: string;
   disabled?: boolean;
@@ -78,6 +86,22 @@ export default function WorkspacePathField({
     [onAdvanceToConfirm, onChange],
   );
 
+  const handleBrowseClick = useCallback(async () => {
+    const pickFolder = window.cloudcliDesktopFs?.pickFolder;
+    if (typeof pickFolder === 'function') {
+      try {
+        const selectedPath = await pickFolder();
+        if (selectedPath) {
+          handleFolderSelected(selectedPath, false);
+        }
+        return;
+      } catch (error) {
+        console.error('Native folder picker failed, falling back to web browser:', error);
+      }
+    }
+    setShowFolderBrowser(true);
+  }, [handleFolderSelected]);
+
   return (
     <>
       <div className="relative flex gap-2">
@@ -110,7 +134,7 @@ export default function WorkspacePathField({
         <Button
           type="button"
           variant="outline"
-          onClick={() => setShowFolderBrowser(true)}
+          onClick={handleBrowseClick}
           className="px-3"
           title="Browse folders"
           disabled={disabled}

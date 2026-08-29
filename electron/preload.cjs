@@ -26,6 +26,10 @@ if (isCloudCliAppOrigin(window.location)) {
     update: (settings) => ipcRenderer.invoke('cloudcli-desktop:update-desktop-notifications', settings),
     onStateUpdated: onDesktopStateUpdated,
   });
+
+  contextBridge.exposeInMainWorld('cloudcliDesktopFs', {
+    pickFolder: () => ipcRenderer.invoke('cloudcli-desktop:pick-folder'),
+  });
 }
 
 if (window.location.protocol === 'file:') {

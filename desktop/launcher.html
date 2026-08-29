@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'" />
+  <title>Qiu_Ai_LZ</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; }
+    body {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      background: #141414;
+      color: #eeeeee;
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+      user-select: none;
+    }
+    h1 { font-size: 22px; font-weight: 700; letter-spacing: 0.5px; }
+    .status { font-size: 12px; color: #999; min-height: 16px; }
+    .status.ready { color: #4caf7d; }
+    .status.failed { color: #d65252; }
+    .actions { display: flex; gap: 12px; }
+    button {
+      height: 36px;
+      padding: 0 18px;
+      border-radius: 8px;
+      border: 1px solid #2e2e2e;
+      background: #1f1f1f;
+      color: #eee;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    button:hover:not(:disabled) { border-color: #4a4a4a; background: #262626; }
+    button:disabled { opacity: 0.4; cursor: default; }
+    button.primary { background: #3b82f6; border-color: #3b82f6; color: #fff; }
+    button.primary:hover:not(:disabled) { background: #2f6fe0; }
+  </style>
+</head>
+<body>
+  <h1>Qiu_Ai_LZ</h1>
+  <div id="status" class="status">正在启动本地服务…</div>
+  <div class="actions">
+    <button id="btn-app" class="primary" disabled>在应用内打开</button>
+    <button id="btn-edge" disabled>在 Edge 浏览器打开</button>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const btnApp = document.getElementById('btn-app');
+    const btnEdge = document.getElementById('btn-edge');
+
+    btnApp.addEventListener('click', () => window.launcher.openInApp());
+    btnEdge.addEventListener('click', () => window.launcher.openInEdge());
+
+    window.launcher.onStatus((status) => {
+      if (status === 'ready') {
+        statusEl.textContent = '本地服务已就绪';
+        statusEl.className = 'status ready';
+        btnApp.disabled = false;
+        btnEdge.disabled = false;
+      } else if (status === 'failed') {
+        statusEl.textContent = '本地服务启动失败，请查看终端日志';
+        statusEl.className = 'status failed';
+      } else if (status === 'edge-opened') {
+        statusEl.textContent = '已在 Edge 中打开，可关闭本窗口';
+        statusEl.className = 'status ready';
+      }
+    });
+  </script>
+</body>
+</html>
