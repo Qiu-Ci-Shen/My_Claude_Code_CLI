@@ -128,16 +128,26 @@ function isPathInsideDirectory(candidate: string, directory: string): boolean {
   return path.resolve(candidate).startsWith(resolvedRoot);
 }
 
+function canonicalizeDirectory(directory: string): string {
+  // realpathSync 的 JS 实现在 Windows 上会原样保留 8.3 短名组件（如 QIUSHE~1），
+  // 与长路径形式的候选路径做前缀比较必然失配；native 版本返回真实长路径。
+  try {
+    return realpathSync.native(directory);
+  } catch {
+    try {
+      return realpathSync(directory);
+    } catch {
+      return directory;
+    }
+  }
+}
+
 function getDirectoryPathVariants(directory: string): string[] {
   const resolvedDirectory = path.resolve(directory);
-  try {
-    const canonicalDirectory = path.resolve(realpathSync(directory));
-    return canonicalDirectory === resolvedDirectory
-      ? [resolvedDirectory]
-      : [resolvedDirectory, canonicalDirectory];
-  } catch {
-    return [resolvedDirectory];
-  }
+  const canonicalDirectory = path.resolve(canonicalizeDirectory(directory));
+  return canonicalDirectory === resolvedDirectory
+    ? [resolvedDirectory]
+    : [resolvedDirectory, canonicalDirectory];
 }
 
 /**

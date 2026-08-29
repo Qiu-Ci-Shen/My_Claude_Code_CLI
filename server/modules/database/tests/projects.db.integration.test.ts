@@ -36,7 +36,8 @@ test('projectsDb.createProjectPath returns created for fresh paths', async () =>
 
     assert.equal(created.outcome, 'created');
     assert.ok(created.project);
-    assert.equal(created.project?.project_path, '/workspace/new-project');
+    // 归一化后的路径在 Windows 上是反斜杠，比较前统一成正斜杠
+    assert.equal(created.project?.project_path.replace(/\\/g, '/'), '/workspace/new-project');
     assert.equal(created.project?.isArchived, 0);
   });
 });

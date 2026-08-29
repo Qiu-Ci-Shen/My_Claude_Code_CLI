@@ -62,7 +62,11 @@ test('createProject throws conflict when active project path already exists', as
       assert.ok(error instanceof AppError);
       assert.equal(error.code, 'PROJECT_ALREADY_EXISTS');
       assert.equal(error.statusCode, 409);
-      assert.equal(error.details, 'Project path already exists: /workspace/my-project');
+      // 错误详情里的路径在 Windows 上会被归一化成反斜杠，统一成正斜杠再比
+      assert.equal(
+        String(error.details).replace(/\\/g, '/'),
+        'Project path already exists: /workspace/my-project',
+      );
       return true;
     },
   );

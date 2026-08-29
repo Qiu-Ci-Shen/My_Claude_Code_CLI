@@ -29,6 +29,13 @@ function createSessionRow(overrides: Record<string, unknown> = {}) {
 test('token usage lookup requires only the app-facing session id for Claude', async () => {
   const tempDirectory = await mkdtemp(path.join(tmpdir(), 'provider-token-usage-claude-'));
   const sessionFilePath = path.join(tempDirectory, 'provider-session.jsonl');
+  // resolveClaudeContextWindow 会读真实用户目录的 ~/.claude/settings.json，
+  // 覆盖 os.homedir() 的两个来源（Windows=USERPROFILE，POSIX=HOME）做隔离
+  const homeDir = await mkdtemp(path.join(tmpdir(), 'provider-token-usage-home-'));
+  const previousHome = process.env.HOME;
+  const previousUserProfile = process.env.USERPROFILE;
+  process.env.HOME = homeDir;
+  process.env.USERPROFILE = homeDir;
 
   try {
     await writeFile(sessionFilePath, [
@@ -62,7 +69,18 @@ test('token usage lookup requires only the app-facing session id for Claude', as
       breakdown: { input: 125, output: 30 },
     });
   } finally {
+    if (previousHome === undefined) {
+      delete process.env.HOME;
+    } else {
+      process.env.HOME = previousHome;
+    }
+    if (previousUserProfile === undefined) {
+      delete process.env.USERPROFILE;
+    } else {
+      process.env.USERPROFILE = previousUserProfile;
+    }
     await rm(tempDirectory, { recursive: true, force: true });
+    await rm(homeDir, { recursive: true, force: true });
   }
 });
 

@@ -51,8 +51,12 @@ const withEnv = async (
 
 const withTempHome = async (fn: (homeDir: string) => Promise<void>) => {
   const homeDir = await mkdtemp(path.join(os.tmpdir(), 'claude-auth-test-'));
+  // os.homedir() 在 Windows 读 USERPROFILE、在 POSIX 读 HOME，两个都要覆盖，
+  // 否则测试会读到真实用户目录里的凭据
   const originalHome = process.env.HOME;
+  const originalUserProfile = process.env.USERPROFILE;
   process.env.HOME = homeDir;
+  process.env.USERPROFILE = homeDir;
   try {
     await fn(homeDir);
   } finally {
@@ -60,6 +64,11 @@ const withTempHome = async (fn: (homeDir: string) => Promise<void>) => {
       delete process.env.HOME;
     } else {
       process.env.HOME = originalHome;
+    }
+    if (originalUserProfile === undefined) {
+      delete process.env.USERPROFILE;
+    } else {
+      process.env.USERPROFILE = originalUserProfile;
     }
     await rm(homeDir, { recursive: true, force: true });
   }
