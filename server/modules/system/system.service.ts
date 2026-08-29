@@ -8,7 +8,6 @@ type SystemUpdateDependencies = {
   appRoot: string;
   homeDirectory: string;
   installMode: 'git' | 'npm';
-  isPlatform: boolean;
   environment: NodeJS.ProcessEnv;
   runShellCommand(
     command: string,
@@ -29,12 +28,10 @@ export function createSystemUpdateService(dependencies: SystemUpdateDependencies
   return {
     /** Selects and executes the correct update workflow for this installation. */
     async updateSystem() {
-      const updateCommand = dependencies.isPlatform
-        ? 'npm run update:platform'
-        : dependencies.installMode === 'git'
-          ? 'git checkout main && git pull && npm install'
-          : 'npm install -g qiu-ai-lz@latest';
-      const workingDirectory = dependencies.isPlatform || dependencies.installMode === 'git'
+      const updateCommand = dependencies.installMode === 'git'
+        ? 'git checkout main && git pull && npm install'
+        : 'npm install -g qiu-ai-lz@latest';
+      const workingDirectory = dependencies.installMode === 'git'
         ? dependencies.appRoot
         : dependencies.homeDirectory;
 

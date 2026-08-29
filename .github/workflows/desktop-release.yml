@@ -16,7 +16,6 @@ jobs:
       contents: read
     outputs:
       tag: ${{ steps.release.outputs.tag }}
-      server_bundle_tag: ${{ steps.release.outputs.server_bundle_tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
@@ -41,7 +40,6 @@ jobs:
 
           {
             echo "tag=$TAG"
-            echo "server_bundle_tag=qiu-ai-lz-local-server-${TAG}"
           } >> "$GITHUB_OUTPUT"
 
   build-macos:
@@ -69,11 +67,6 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Configure release server bundle source
-        env:
-          SERVER_BUNDLE_TAG: ${{ needs.resolve-release.outputs.server_bundle_tag }}
-        run: printf '{"releaseTag":"%s"}\n' "$SERVER_BUNDLE_TAG" > desktop/server-bundle-config.json
-
       - name: Verify macOS signing secrets are configured
         run: |
           test -n "$CSC_LINK"
@@ -91,39 +84,24 @@ jobs:
       - name: Build signed and notarized macOS artifacts
         run: npm run desktop:dist:mac -- --publish never
         env:
-          CLOUDCLI_SEMANTICS_BUILD_REQUIRED: "1"
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
-      - name: Build macOS local server bundle
-        run: node scripts/release/build-server-bundle.js
-
       - name: Stage macOS release assets
         run: |
-          mkdir -p desktop-release-assets server-release-assets
+          mkdir -p desktop-release-assets
           test -n "$(find release/desktop -maxdepth 1 -name '*.dmg' -print -quit)"
           shasum -a 256 release/desktop/*.dmg > desktop-release-assets/SHASUMS256-macos.txt
           cp release/desktop/*.dmg desktop-release-assets/
-
-          test -n "$(find release/local-server -maxdepth 1 -name 'qiu-ai-lz-local-server-*.tar.gz' -print -quit)"
-          test -n "$(find release/local-server -maxdepth 1 -name 'qiu-ai-lz-local-server-*.tar.gz.sha256' -print -quit)"
-          cp release/local-server/* server-release-assets/
 
       - name: Upload macOS desktop assets
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: desktop-release-macos
           path: desktop-release-assets/*
-          if-no-files-found: error
-
-      - name: Upload macOS server assets
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        with:
-          name: server-release-macos
-          path: server-release-assets/*
           if-no-files-found: error
 
   build-windows:
@@ -153,12 +131,6 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Configure release server bundle source
-        shell: bash
-        env:
-          SERVER_BUNDLE_TAG: ${{ needs.resolve-release.outputs.server_bundle_tag }}
-        run: printf '{"releaseTag":"%s"}\n' "$SERVER_BUNDLE_TAG" > desktop/server-bundle-config.json
-
       - name: Check Windows signing secrets
         id: windows-signing
         shell: bash
@@ -176,7 +148,6 @@ jobs:
         if: steps.windows-signing.outputs.enabled == 'true'
         run: npm run desktop:dist:win -- --publish never
         env:
-          CLOUDCLI_SEMANTICS_BUILD_REQUIRED: "1"
           CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
 
@@ -184,36 +155,21 @@ jobs:
         if: steps.windows-signing.outputs.enabled != 'true'
         run: npm run desktop:dist:win -- --publish never
         env:
-          CLOUDCLI_SEMANTICS_BUILD_REQUIRED: "1"
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
-
-      - name: Build Windows local server bundle
-        run: node scripts/release/build-server-bundle.js
 
       - name: Stage Windows release assets
         shell: bash
         run: |
-          mkdir -p desktop-release-assets server-release-assets
+          mkdir -p desktop-release-assets
           test -n "$(find release/desktop -maxdepth 1 -name '*.exe' -print -quit)"
           sha256sum release/desktop/*.exe > desktop-release-assets/SHASUMS256-windows.txt
           cp release/desktop/*.exe desktop-release-assets/
-
-          test -n "$(find release/local-server -maxdepth 1 -name 'qiu-ai-lz-local-server-*.tar.gz' -print -quit)"
-          test -n "$(find release/local-server -maxdepth 1 -name 'qiu-ai-lz-local-server-*.tar.gz.sha256' -print -quit)"
-          cp release/local-server/* server-release-assets/
 
       - name: Upload Windows desktop assets
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: desktop-release-windows
           path: desktop-release-assets/*
-          if-no-files-found: error
-
-      - name: Upload Windows server assets
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        with:
-          name: server-release-windows
-          path: server-release-assets/*
           if-no-files-found: error
 
   publish:
@@ -233,21 +189,12 @@ jobs:
           path: release/desktop
           merge-multiple: true
 
-      - name: Download server assets
-        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
-        with:
-          pattern: server-release-*
-          path: release/local-server
-          merge-multiple: true
-
       - name: Verify release assets
         run: |
           test -n "$(find release/desktop -maxdepth 1 -name '*.dmg' -print -quit)"
           test -n "$(find release/desktop -maxdepth 1 -name '*.exe' -print -quit)"
           test -f release/desktop/SHASUMS256-macos.txt
           test -f release/desktop/SHASUMS256-windows.txt
-          test -n "$(find release/local-server -maxdepth 1 -name 'qiu-ai-lz-local-server-*.tar.gz' -print -quit)"
-          test -n "$(find release/local-server -maxdepth 1 -name 'qiu-ai-lz-local-server-*.tar.gz.sha256' -print -quit)"
           find release -maxdepth 2 -type f -print | sort
 
       - name: Verify target GitHub release exists
@@ -260,24 +207,6 @@ jobs:
             echo "GitHub release $RELEASE_TAG does not exist. Run the normal Release workflow first, then rerun Desktop Release." >&2
             exit 1
           fi
-
-      - name: Publish local server runtime assets
-        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
-        with:
-          tag_name: ${{ needs.resolve-release.outputs.server_bundle_tag }}
-          target_commitish: ${{ github.sha }}
-          name: CloudCLI Local Server Runtime (${{ needs.resolve-release.outputs.tag }})
-          body: |
-            This prerelease contains the Local mode runtime for CloudCLI Desktop.
-
-            Download CloudCLI Desktop from the main ${{ needs.resolve-release.outputs.tag }} release. When you open Local CloudCLI, the desktop app automatically downloads the matching runtime from this prerelease.
-
-            You do not need to download these runtime files manually.
-          prerelease: true
-          fail_on_unmatched_files: false
-          overwrite_files: true
-          files: |
-            release/local-server/*
 
       - name: Upload desktop assets to existing GitHub release
         env:

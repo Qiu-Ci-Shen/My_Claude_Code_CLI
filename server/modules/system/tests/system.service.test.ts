@@ -12,7 +12,6 @@ function createDependencies(
     appRoot: '/app/qiu-ai-lz',
     homeDirectory: '/home/qiu-ai-lz',
     installMode: 'git',
-    isPlatform: false,
     environment: { TEST_ENVIRONMENT: 'true' },
     runShellCommand: async () => ({ exitCode: 0, output: 'updated', errorOutput: '' }),
     logInfo: () => undefined,
@@ -64,27 +63,6 @@ test('global npm installations update from the user home directory', async () =>
     dependencies.environment,
   ]]);
   assert.equal(result.output, 'Update completed successfully');
-});
-
-test('platform installations use the platform workflow regardless of install mode', async () => {
-  const calls: unknown[][] = [];
-  const dependencies = createDependencies({
-    installMode: 'npm',
-    isPlatform: true,
-    runShellCommand: async (command, workingDirectory, environment) => {
-      calls.push([command, workingDirectory, environment]);
-      return { exitCode: 0, output: 'platform update complete', errorOutput: '' };
-    },
-  });
-  const service = createSystemUpdateService(dependencies);
-
-  await service.updateSystem();
-
-  assert.deepEqual(calls, [[
-    'npm run update:platform',
-    '/app/qiu-ai-lz',
-    dependencies.environment,
-  ]]);
 });
 
 test('failed update commands retain stdout and stderr for the existing API contract', async () => {

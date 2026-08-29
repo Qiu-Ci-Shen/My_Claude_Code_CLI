@@ -73,7 +73,6 @@ const RUNNING_VERSION = (() => {
 const systemRoutes = createSystemModule({
     appRoot: APP_ROOT,
     installMode,
-    isPlatform: IS_PLATFORM,
 });
 console.log('SERVER_PORT from env:', process.env.SERVER_PORT);
 

@@ -38,44 +38,12 @@ jobs:
         shell: bash
         run: |
           SAFE_REF="$(printf '%s' "${GITHUB_REF_NAME}" | tr -c 'A-Za-z0-9._-' '-')"
-          echo "name=CloudCLI-windows-${SAFE_REF}-${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
-          echo "server_bundle_tag=qiu-ai-lz-local-server-${SAFE_REF}" >> "$GITHUB_OUTPUT"
-
-      - name: Configure branch server bundle source
-        shell: bash
-        run: printf '{"releaseTag":"%s"}\n' "${{ steps.artifact.outputs.server_bundle_tag }}" > desktop/server-bundle-config.json
+          echo "name=Qiu_Ai_LZ-windows-${SAFE_REF}-${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
 
       - name: Build unsigned Windows artifacts
         run: npm run desktop:dist:win -- --publish never
         env:
-          CLOUDCLI_SEMANTICS_BUILD_REQUIRED: "1"
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
-
-      - name: Build branch server bundle
-        run: node scripts/release/build-server-bundle.js
-
-      - name: Verify branch server runtime artifacts
-        shell: bash
-        run: |
-          test -n "$(find release/local-server -maxdepth 1 -name 'qiu-ai-lz-local-server-*.tar.gz' -print -quit)"
-          test -n "$(find release/local-server -maxdepth 1 -name 'qiu-ai-lz-local-server-*.tar.gz.sha256' -print -quit)"
-
-      - name: Publish branch server bundle
-        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
-        with:
-          tag_name: ${{ steps.artifact.outputs.server_bundle_tag }}
-          name: CloudCLI Desktop Local Runtime (${{ github.ref_name }})
-          body: |
-            This prerelease is used by CloudCLI Desktop branch builds to run Local mode.
-
-            To test this branch, download the desktop app from this workflow run's artifacts. When you open Local CloudCLI, the desktop app automatically downloads the matching runtime from this prerelease.
-
-            You do not need to download these runtime files manually.
-          prerelease: true
-          fail_on_unmatched_files: false
-          overwrite_files: true
-          files: |
-            release/local-server/*
 
       - name: Verify Windows artifacts
         shell: bash

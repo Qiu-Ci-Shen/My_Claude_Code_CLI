@@ -9,7 +9,6 @@ import { createSystemUpdateService } from './system.service.js';
 type SystemModuleOptions = {
   appRoot: string;
   installMode: 'git' | 'npm';
-  isPlatform: boolean;
 };
 
 function runShellCommand(
