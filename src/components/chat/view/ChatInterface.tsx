@@ -407,22 +407,25 @@ function ChatInterface({
           })}
         />
           <ChatMessageRail containerRef={scrollContainerRef} messages={visibleMessages} />
+          {/* 编辑模式指示：聊天界面顶部居中的浮动胶囊 */}
+          {editTarget && (
+            <div className="pointer-events-none absolute left-1/2 top-2 z-30 -translate-x-1/2">
+              <div className="flex items-center gap-2 rounded-full border border-primary/40 bg-popover px-3 py-1 text-xs text-foreground shadow-md">
+                <span>正在编辑消息，Esc 取消</span>
+                <button
+                  type="button"
+                  onClick={() => setEditTarget(null)}
+                  aria-label="取消编辑"
+                  className="pointer-events-auto rounded px-1 text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="relative flex-shrink-0">
-          {editTarget && (
-            <div className="mb-1.5 flex items-center justify-between gap-2 rounded-lg border border-primary/40 bg-primary/5 px-3 py-1.5 text-xs text-foreground">
-              <span>正在编辑消息 — 回车重发（会截断这条消息之后的对话），Esc 取消</span>
-              <button
-                type="button"
-                onClick={() => setEditTarget(null)}
-                aria-label="取消编辑"
-                className="rounded px-1.5 py-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              >
-                ✕
-              </button>
-            </div>
-          )}
           {isUserScrolledUp && chatMessages.length > 0 && (
             <div className="pointer-events-none absolute -top-11 left-0 right-0 z-20 flex justify-center">
               <button
