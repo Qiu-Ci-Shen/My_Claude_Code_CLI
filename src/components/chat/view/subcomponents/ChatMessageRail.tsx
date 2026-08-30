@@ -148,9 +148,16 @@ function ChatMessageRail({ containerRef, messages }: ChatMessageRailProps) {
     return marks.map((_, i) => RAIL_PADDING_PX + i * gap);
   }, [marks, railHeight]);
 
-  const jumpTo = useCallback((mark: UserMark) => {
+  const jumpTo = useCallback((mark: UserMark, index: number) => {
     const container = containerRef.current;
     if (!container) return;
+    const elements = container.querySelectorAll<HTMLElement>('.chat-message.user');
+    const target = elements[index];
+    if (target) {
+      // 居中显示目标消息；容器不可滚动时浏览器会自动钳制
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
     container.scrollTo({ top: Math.max(0, mark.top - 8), behavior: 'smooth' });
   }, [containerRef]);
 
@@ -177,7 +184,7 @@ function ChatMessageRail({ containerRef, messages }: ChatMessageRailProps) {
           <button
             key={`${mark.top}-${i}`}
             type="button"
-            onClick={() => jumpTo(mark)}
+            onClick={() => jumpTo(mark, i)}
             onMouseEnter={() => setHoverIdx(i)}
             onMouseLeave={() => setHoverIdx(-1)}
             aria-label={mark.timeText ? `跳转到 ${mark.timeText} 的消息` : '跳转到消息'}
