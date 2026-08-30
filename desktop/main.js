@@ -126,7 +126,7 @@ async function buildIsStale() {
 
 function runBuild() {
   return new Promise((resolve) => {
-    sendStatus('检测到源码有更新，正在重新构建（约 1 分钟）…', 'warn');
+    sendStatus('正在启动中…');
     let build;
     try {
       // Windows 补丁后的 Node 禁止直接 spawn .cmd（EINVAL），必须经 cmd.exe
@@ -145,7 +145,8 @@ function runBuild() {
         const text = line.trim();
         if (text) lastLine = text;
       }
-      sendStatus(`构建中… ${lastLine.slice(0, 80)}`, 'warn');
+      // 少爷要求启动画面只显示「正在启动中」，构建日志细节留在进程 stdout 里
+      sendStatus('正在启动中…');
     };
     build.stdout?.on('data', forward);
     build.stderr?.on('data', forward);
@@ -199,13 +200,13 @@ async function ensureServer() {
   const health = await ping(`${defaultUrl}/health`);
   if (health?.status === 'ok' && health.version === pkgVersion()) {
     serverUrl = defaultUrl;
-    sendStatus('检测到本地服务已在运行，直接复用');
+    sendStatus('正在启动中…');
     return;
   }
 
   const port = (await isPortFree(DEFAULT_PORT)) ? DEFAULT_PORT : await freePort();
   serverUrl = `http://${HOST}:${port}`;
-  sendStatus(`正在启动本地服务（端口 ${port}）…`);
+  sendStatus('正在启动中…');
   startServer(port);
 
   const deadline = Date.now() + READY_TIMEOUT_MS;
@@ -355,11 +356,11 @@ if (!gotLock) {
           sendStatus('自动构建失败，尝试用源码模式直接启动…', 'warn');
         }
       } else {
-        sendStatus('构建产物已是最新');
+        sendStatus('正在启动中…');
       }
 
       await ensureServer();
-      sendStatus('已就绪，正在进入应用…', 'ready');
+      sendStatus('正在启动中…', 'ready');
       setTimeout(() => enterApp(), 300);
     } catch (error) {
       console.error(error);
