@@ -13,25 +13,27 @@ type ChatMessageRailProps = {
 type UserMark = {
   /** 消息在滚动内容坐标系里的 y 像素 */
   top: number;
-  /** top / scrollHeight，映射到轨道比例 */
-  ratio: number;
   preview: string;
   timeText: string;
 };
 
-const MIN_GAP_PX = 10;
 const PREVIEW_CHARS = 120;
+/** 均匀分布时的理想间距/最挤间距，对齐 ZCode 的密排细杠观感 */
+const IDEAL_GAP_PX = 13;
+const MIN_GAP_PX = 5;
+const RAIL_PADDING_PX = 8;
 
 /**
- * 聊天区左侧的「提问点」导航轨：每条用户消息一个小横杠，按其在会话中的
- * 实际位置纵向分布（minimap 滚动条）。滚动时当前视口对应的横杠高亮跟随；
- * 悬停浮出该消息的内容预览与时间；点击后平滑跳转并把该消息对齐到视口顶部。
+ * 聊天区左侧的「提问点」导航轨：每条用户消息一根小细杠，按消息序号均匀
+ * 紧凑排列（ZCode 同款密排标尺观感，不随内容长度拉开间距）。滚动时当前
+ * 视口覆盖的区间以高亮色带指示；悬停浮出内容预览与时间；点击平滑跳转并
+ * 把该消息对齐到视口顶部。
  */
 function ChatMessageRail({ containerRef, messages }: ChatMessageRailProps) {
   const [marks, setMarks] = useState<UserMark[]>([]);
   const [scrollable, setScrollable] = useState(false);
   const [railHeight, setRailHeight] = useState(0);
-  const [activeIdx, setActiveIdx] = useState(-1);
+  const [viewRange, setViewRange] = useState<{ first: number; last: number }>({ first: -1, last: -1 });
   const [hoverIdx, setHoverIdx] = useState(-1);
 
   // 回调经 ref 转发，供只挂载一次的 ResizeObserver/scroll 监听使用
@@ -68,12 +70,7 @@ function ChatMessageRail({ containerRef, messages }: ChatMessageRailProps) {
           minute: '2-digit',
         })
         : '';
-      next.push({
-        top,
-        ratio: container.scrollHeight > 0 ? top / container.scrollHeight : 0,
-        preview,
-        timeText,
-      });
+      next.push({ top, preview, timeText });
     });
     setMarks(next);
     setScrollable(container.scrollHeight - container.clientHeight > 80);
@@ -85,21 +82,25 @@ function ChatMessageRail({ containerRef, messages }: ChatMessageRailProps) {
   const updateActive = useCallback(() => {
     const container = containerRef.current;
     if (!container) return;
-    // 视口顶部往下一点的位置算「当前所在」
-    const viewportTop = container.scrollTop + 48;
-    let idx = -1;
+    const viewTop = container.scrollTop;
+    const viewBottom = viewTop + container.clientHeight;
+    let first = -1;
+    let last = -1;
     for (let i = 0; i < marks.length; i++) {
-      if (marks[i].top <= viewportTop) idx = i;
-      else break;
+      // 消息起点稍微进入视口就算覆盖
+      if (marks[i].top + 60 >= viewTop && marks[i].top <= viewBottom) {
+        if (first < 0) first = i;
+        last = i;
+      }
     }
-    setActiveIdx(idx);
+    setViewRange({ first, last });
   }, [containerRef, marks]);
 
   const updateActiveRef = useRef(updateActive);
   updateActiveRef.current = updateActive;
 
   // 只挂载一次的监听：内容高度变化（流式输出/分页加载/图片）→ 重新测量；
-  // 滚动 → 更新高亮横杠
+  // 滚动 → 更新视口区间高亮
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -138,15 +139,13 @@ function ChatMessageRail({ containerRef, messages }: ChatMessageRailProps) {
     updateActive();
   }, [messages, measure, updateActive]);
 
-  // 轨道像素位置：按比例映射 + 最近邻最小间距（长会话密集处不至于重叠）
+  // 轨道像素位置：按消息序号均匀排列；消息多时收缩间距，少时保持密排
   const positions = useMemo(() => {
-    let prev = -Infinity;
-    return marks.map((mark) => {
-      const raw = mark.ratio * railHeight;
-      const pos = Math.min(Math.max(raw, prev + MIN_GAP_PX), Math.max(0, railHeight - 6));
-      prev = pos;
-      return pos;
-    });
+    const n = marks.length;
+    if (n === 0 || railHeight <= 0) return [];
+    const usable = Math.max(0, railHeight - RAIL_PADDING_PX * 2);
+    const gap = n > 1 ? Math.max(MIN_GAP_PX, Math.min(IDEAL_GAP_PX, usable / (n - 1))) : 0;
+    return marks.map((_, i) => RAIL_PADDING_PX + i * gap);
   }, [marks, railHeight]);
 
   const jumpTo = useCallback((mark: UserMark) => {
@@ -159,10 +158,21 @@ function ChatMessageRail({ containerRef, messages }: ChatMessageRailProps) {
     return null;
   }
 
+  const bandVisible = viewRange.first >= 0 && viewRange.last >= 0;
+  const bandTop = bandVisible ? positions[viewRange.first] - 3 : 0;
+  const bandBottom = bandVisible ? positions[viewRange.last] + 3 : 0;
+
   return (
     <div className="pointer-events-none absolute bottom-2 left-1 top-2 z-20 w-5">
+      {bandVisible && (
+        <div
+          className="absolute left-1/2 w-[3px] -translate-x-1/2 rounded-full bg-primary/25 transition-all duration-150"
+          style={{ top: bandTop, height: Math.max(6, bandBottom - bandTop) }}
+        />
+      )}
       {marks.map((mark, i) => {
-        const highlighted = i === activeIdx || i === hoverIdx;
+        const inView = i >= viewRange.first && i <= viewRange.last && viewRange.first >= 0;
+        const highlighted = inView || i === hoverIdx;
         return (
           <button
             key={`${mark.top}-${i}`}
@@ -171,18 +181,22 @@ function ChatMessageRail({ containerRef, messages }: ChatMessageRailProps) {
             onMouseEnter={() => setHoverIdx(i)}
             onMouseLeave={() => setHoverIdx(-1)}
             aria-label={mark.timeText ? `跳转到 ${mark.timeText} 的消息` : '跳转到消息'}
-            className={`pointer-events-auto absolute left-1/2 h-1.5 -translate-x-1/2 cursor-pointer rounded-full transition-all duration-150 ${
-              highlighted
-                ? 'w-3.5 bg-primary'
-                : 'w-2.5 bg-muted-foreground/30 hover:bg-muted-foreground/60'
-            }`}
-            style={{ top: positions[i] - 3 }}
-          />
+            className="pointer-events-auto absolute left-1/2 flex h-3 w-4 -translate-x-1/2 cursor-pointer items-center justify-center"
+            style={{ top: positions[i] - 6 }}
+          >
+            <span
+              className={`block h-[2px] rounded-full transition-all duration-150 ${
+                highlighted
+                  ? 'w-3 bg-primary'
+                  : 'w-2 bg-muted-foreground/30 hover:bg-muted-foreground/60'
+              }`}
+            />
+          </button>
         );
       })}
       {hoverIdx >= 0 && marks[hoverIdx] && (
         <div
-          className="pointer-events-auto absolute left-5 z-30 max-w-xs rounded-lg border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-lg"
+          className="pointer-events-auto absolute left-6 z-30 max-w-xs rounded-lg border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-lg"
           style={{
             top: Math.min(
               Math.max(0, positions[hoverIdx] - 12),

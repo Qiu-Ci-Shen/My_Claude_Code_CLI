@@ -175,7 +175,8 @@ function ChatMessagesPane({
           </div>
         </div>
       )}
-      <div className="mx-auto w-full max-w-[54.25rem] space-y-3 px-4 sm:space-y-4">
+      {/* 左侧留出导航轨的独立区域，聊天内容整体右移 */}
+      <div className="mx-auto w-full max-w-[54.25rem] space-y-3 pl-10 pr-4 sm:space-y-4 sm:pl-12">
       {(isLoadingSessionMessages || isProcessing) && chatMessages.length === 0 ? (
         <div className="mt-8 text-center text-gray-500 dark:text-gray-400">
           <div className="flex items-center justify-center space-x-2">
