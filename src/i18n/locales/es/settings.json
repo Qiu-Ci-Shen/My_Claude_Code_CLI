@@ -499,74 +499,9 @@
     "installFailed": "La instalación falló",
     "uninstallFailed": "La desinstalación falló",
     "toggleFailed": "El cambio de estado falló",
-    "starterPluginLabel": "Plugin de inicio",
-    "starter": "Inicio",
-    "docs": "Docs",
     "sections": {
-      "officialTitle": "Plugins oficiales",
-      "officialDescription": "Mantenidos por el equipo de Qiu_Ai_LZ y listos para instalar directamente.",
       "unofficialTitle": "Otros plugins",
       "unofficialDescription": "Plugins e integraciones no oficiales de otros usuarios. Revisa el código fuente antes de instalar."
-    },
-    "starterPlugin": {
-      "name": "Estadísticas del proyecto",
-      "badge": "inicio",
-      "description": "Recuento de archivos, líneas de código, desglose por tipo de archivo y actividad reciente de tu proyecto.",
-      "install": "Instalar"
-    },
-    "terminalPlugin": {
-      "name": "Terminal",
-      "badge": "oficial",
-      "description": "Terminal integrada con acceso completo a la shell directamente en la interfaz.",
-      "install": "Instalar"
-    },
-    "scheduledPromptPlugin": {
-      "name": "Prompts programados",
-      "badge": "no oficial",
-      "description": "Programa prompts del espacio de trabajo, revisa el historial de ejecuciones y gestiona tareas locales recurrentes.",
-      "install": "Instalar"
-    },
-    "claudeWatchPlugin": {
-      "name": "Claude Watch",
-      "badge": "no oficial",
-      "description": "Vigila sesiones largas de Claude Code por si se cuelgan y expone controles del proceso.",
-      "install": "Instalar"
-    },
-    "prism": {
-      "name": "PRISM",
-      "badge": "no oficial",
-      "description": "Inteligencia de sesiones para Claude Code, dentro de Qiu_Ai_LZ. Descubre por qué tus sesiones queman tokens sin salir del navegador.",
-      "install": "Instalar"
-    },
-    "sessionManagerPlugin": {
-      "name": "Sesiones",
-      "badge": "no oficial",
-      "description": "Ver, gestionar y terminar sesiones activas de Claude Code.",
-      "install": "Instalar"
-    },
-    "tokenCostCalculatorPlugin": {
-      "name": "Calculadora de costes de tokens",
-      "badge": "no oficial",
-      "description": "Calcula costes de API a partir de precios de modelos y uso de tokens, con precios de modelos predefinidos.",
-      "install": "Instalar"
-    },
-    "taskQueuePlugin": {
-      "name": "Cola de tareas",
-      "badge": "no oficial",
-      "description": "Panel de cola de tareas para ver, filtrar y lanzar tareas de agentes.",
-      "install": "Instalar"
-    },
-    "githubIssuesBoardPlugin": {
-      "name": "Tablero de GitHub Issues",
-      "badge": "no oficial",
-      "description": "Tablero Kanban para GitHub Issues con sincronización bidireccional con TaskMaster e instalación automática de la skill CLI /github-task",
-      "install": "Instalar"
-    },
-    "claudeUsagePlugin": {
-      "name": "Uso de Claude",
-      "badge": "no oficial",
-      "description": "Sigue en vivo los límites del plan de Claude Code y explora el historial de tokens y costes de 30 días.",
-      "install": "Instalar"
     },
     "morePlugins": "Más",
     "enable": "Activar",

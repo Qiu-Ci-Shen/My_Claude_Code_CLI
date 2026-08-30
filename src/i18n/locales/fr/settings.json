@@ -469,68 +469,9 @@
     "installFailed": "Échec de l'installation",
     "uninstallFailed": "Échec de la désinstallation",
     "toggleFailed": "Échec du basculement",
-    "starterPluginLabel": "Plugin de démarrage",
-    "starter": "Démarrage",
-    "docs": "Docs",
     "sections": {
-      "officialTitle": "Plugins officiels",
-      "officialDescription": "Maintenus par l'équipe Qiu_Ai_LZ et prêts à être installés directement.",
       "unofficialTitle": "Autres plugins",
       "unofficialDescription": "Plugins non officiels et intégrations d'autres utilisateurs. Examinez le code source avant d'installer."
-    },
-    "starterPlugin": {
-      "name": "Statistiques du projet",
-      "badge": "démarrage",
-      "description": "Nombre de fichiers, lignes de code, répartition par type de fichier et activité récente pour votre projet.",
-      "install": "Installer"
-    },
-    "terminalPlugin": {
-      "name": "Terminal",
-      "badge": "officiel",
-      "description": "Terminal intégré avec accès shell complet directement dans l'interface.",
-      "install": "Installer"
-    },
-    "scheduledPromptPlugin": {
-      "name": "Invites planifiées",
-      "badge": "non officiel",
-      "description": "Planifiez des invites d'espace de travail, consultez l'historique des exécutions et gérez les tâches locales récurrentes.",
-      "install": "Installer"
-    },
-    "claudeWatchPlugin": {
-      "name": "Claude Watch",
-      "badge": "non officiel",
-      "description": "Surveillez les sessions Claude Code longues pour détecter les blocages et exposez les contrôles de processus.",
-      "install": "Installer"
-    },
-    "prism": {
-      "name": "PRISM",
-      "badge": "non officiel",
-      "description": "Intelligence de session pour Claude Code, dans Qiu_Ai_LZ. Voyez pourquoi vos sessions consomment des tokens sans quitter le navigateur.",
-      "install": "Installer"
-    },
-    "sessionManagerPlugin": {
-      "name": "Sessions",
-      "badge": "non officiel",
-      "description": "Visualisez, gérez et terminez les sessions Claude Code actives.",
-      "install": "Installer"
-    },
-    "tokenCostCalculatorPlugin": {
-      "name": "Calculateur de coût en tokens",
-      "badge": "non officiel",
-      "description": "Calculez les coûts API à partir des prix des modèles et de l'utilisation des tokens, avec prise en charge des tarifs préréglés.",
-      "install": "Installer"
-    },
-    "taskQueuePlugin": {
-      "name": "File de tâches",
-      "badge": "non officiel",
-      "description": "Tableau de bord de file de tâches pour visualiser, filtrer et lancer des tâches d'agent.",
-      "install": "Installer"
-    },
-    "githubIssuesBoardPlugin": {
-      "name": "Tableau des issues GitHub",
-      "badge": "non officiel",
-      "description": "Tableau Kanban pour les issues GitHub avec synchronisation bidirectionnelle TaskMaster et installation automatique de la compétence CLI /github-task",
-      "install": "Installer"
     },
     "morePlugins": "Plus",
     "enable": "Activer",

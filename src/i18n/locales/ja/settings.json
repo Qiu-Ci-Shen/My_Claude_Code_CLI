@@ -466,14 +466,6 @@
     "uninstallFailed": "削除に失敗しました",
     "toggleFailed": "切り替えに失敗しました",
     "buildYourOwn": "プラグインを自作する",
-    "starter": "スターター",
-    "docs": "ドキュメント",
-    "starterPlugin": {
-      "name": "プロジェクト統計",
-      "badge": "スターター",
-      "description": "プロジェクトのファイル数、コード行数、ファイルタイプの内訳、最近のアクティビティを表示します。",
-      "install": "インストール"
-    },
     "morePlugins": "詳細",
     "enable": "有効にする",
     "disable": "無効にする",

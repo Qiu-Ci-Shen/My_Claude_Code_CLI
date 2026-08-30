@@ -467,14 +467,6 @@
     "uninstallFailed": "解除安裝失敗",
     "toggleFailed": "切換失敗",
     "buildYourOwn": "建立您自己的外掛",
-    "starter": "入門範本",
-    "docs": "文件",
-    "starterPlugin": {
-      "name": "專案統計",
-      "badge": "入門",
-      "description": "查看專案的檔案數、程式碼行數、檔案類型分佈以及最近活動。",
-      "install": "安裝"
-    },
     "morePlugins": "更多",
     "enable": "啟用",
     "disable": "停用",

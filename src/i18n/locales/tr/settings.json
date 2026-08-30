@@ -466,21 +466,6 @@
     "installFailed": "Yükleme başarısız",
     "uninstallFailed": "Kaldırma başarısız",
     "toggleFailed": "Açıp kapama başarısız",
-    "starterPluginLabel": "Başlangıç Eklentisi",
-    "starter": "Başlangıç",
-    "docs": "Dokümanlar",
-    "starterPlugin": {
-      "name": "Proje İstatistikleri",
-      "badge": "başlangıç",
-      "description": "Projen için dosya sayıları, kod satırları, dosya türü dağılımı ve son etkinlik.",
-      "install": "Yükle"
-    },
-    "terminalPlugin": {
-      "name": "Terminal",
-      "badge": "resmi",
-      "description": "Arayüzün içinde tam shell erişimiyle entegre terminal.",
-      "install": "Yükle"
-    },
     "morePlugins": "Daha Fazla",
     "enable": "Etkinleştir",
     "disable": "Devre Dışı Bırak",

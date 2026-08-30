@@ -465,21 +465,6 @@
     "installFailed": "Installazione fallita",
     "uninstallFailed": "Disinstallazione fallita",
     "toggleFailed": "Attivazione/disattivazione fallita",
-    "starterPluginLabel": "Plugin iniziale",
-    "starter": "Iniziale",
-    "docs": "Documentazione",
-    "starterPlugin": {
-      "name": "Statistiche progetto",
-      "badge": "iniziale",
-      "description": "Conteggio file, righe di codice, ripartizione per tipo di file e attività recente per il tuo progetto.",
-      "install": "Installa"
-    },
-    "terminalPlugin": {
-      "name": "Terminale",
-      "badge": "ufficiale",
-      "description": "Terminale integrato con accesso completo alla shell direttamente nell'interfaccia.",
-      "install": "Installa"
-    },
     "morePlugins": "Altri",
     "enable": "Abilita",
     "disable": "Disabilita",
