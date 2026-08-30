@@ -445,6 +445,19 @@ function extractTokenBudget(sdkMessage) {
     return null;
   }
 
+  // `result` 的 usage 是整个回合所有 API 调用的总和（费用口径），不是当前
+  // 上下文占用。回合结束时用它刷新进度条就会虚高爆满，下一回合第一条
+  // assistant 消息又把数值打回真实值——正是「莫名其妙爆满然后过一会恢复」。
+  if (sdkMessage.type === 'result') {
+    return null;
+  }
+
+  // 子代理（Task sidechain）的 usage 是它自己那条小上下文，混进来会让
+  // 进度条无故回落后又跳回主线程真实值。
+  if (sdkMessage.parent_tool_use_id) {
+    return null;
+  }
+
   const messageUsage = sdkMessage.message?.usage || sdkMessage.usage;
   if (messageUsage && typeof messageUsage === 'object') {
     const directInputTokens = readNumber(messageUsage.input_tokens ?? messageUsage.inputTokens);
