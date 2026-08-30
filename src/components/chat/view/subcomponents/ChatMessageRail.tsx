@@ -173,7 +173,7 @@ function ChatMessageRail({ containerRef, messages }: ChatMessageRailProps) {
       ))}
       {hoverIdx >= 0 && marks[hoverIdx] && (
         <div
-          className="pointer-events-auto absolute left-6 z-30 w-[48rem] max-w-[calc(100vw-6rem)] rounded-lg border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-lg"
+          className="pointer-events-auto absolute left-6 z-30 w-[35rem] max-w-[calc(100vw-6rem)] rounded-lg border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-lg"
           style={{
             top: Math.min(
               Math.max(0, positions[hoverIdx] - 12),
