@@ -376,6 +376,24 @@ export function useChatSessionState({
     container.scrollTop = container.scrollHeight;
   }, []);
 
+  /**
+   * 发送后把刚发出的用户消息对齐到可视区顶部（而不是贴底），回复在它下方
+   * 展开；内容不足一屏时 scrollTop 被浏览器钳制，自然退化为贴底。
+   */
+  const scrollSentMessageToTop = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const userMessages = container.querySelectorAll('.chat-message.user');
+    const last = userMessages[userMessages.length - 1] as HTMLElement | undefined;
+    if (!last) {
+      container.scrollTop = container.scrollHeight;
+      return;
+    }
+    const containerRect = container.getBoundingClientRect();
+    const messageRect = last.getBoundingClientRect();
+    container.scrollTop = Math.max(0, container.scrollTop + messageRect.top - containerRect.top - 8);
+  }, []);
+
   const scrollToBottomAndReset = useCallback(() => {
     scrollToBottom();
     if (allMessagesLoaded) {
@@ -994,6 +1012,7 @@ export function useChatSessionState({
     createDiff,
     scrollContainerRef,
     scrollToBottom,
+    scrollSentMessageToTop,
     scrollToBottomAndReset,
     isNearBottom,
     handleScroll,
