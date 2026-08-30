@@ -74,9 +74,25 @@ function validateCommitRef(commit) {
   return commit;
 }
 
+// 按 git check-ref-format 的常用规则做黑名单校验，允许中文等 Unicode 分支名
+// （原白名单 [a-zA-Z0-9._/-] 会静默拒绝中文分支名，git 本身是支持的）
 function validateBranchName(branch) {
-  if (!/^[a-zA-Z0-9._\/-]+$/.test(branch)) {
-    throw new Error('Invalid branch name');
+  if (
+    !branch
+    || typeof branch !== 'string'
+    || branch.length > 200
+    || /\s/.test(branch)                       // git 禁止空白字符
+    || /^[.-]/.test(branch)                    // 不能以 . 或 - 开头
+    || /[./]$/.test(branch)                    // 不能以 . 或 / 结尾
+    || /\.lock$/i.test(branch)                 // 不能以 .lock 结尾
+    || branch.includes('..')                   // 不能包含 ..
+    || branch.includes('//')                   // 不能包含 //
+    || branch.includes('@{')                   // 不能包含 @{
+    || branch === '@'
+    || /[~^:?*[\]\\]/.test(branch)             // git 保留字符
+    || /[\u0000-\u001f\u007f]/.test(branch)    // 控制字符
+  ) {
+    throw new Error('分支名不合法（不能含空格或 ~ ^ : ? * [ \\ 等字符，不能以 . - 开头）');
   }
   return branch;
 }

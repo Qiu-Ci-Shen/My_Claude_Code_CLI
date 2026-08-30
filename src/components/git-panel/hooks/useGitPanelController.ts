@@ -245,6 +245,7 @@ export function useGitPanelController({
 
         const data = await readJson<GitOperationResponse>(response);
         if (!data.success) {
+          setOperationError(data.error ?? '切换分支失败');
           console.error('Failed to switch branch:', data.error);
           return false;
         }
@@ -253,6 +254,7 @@ export function useGitPanelController({
         void fetchGitStatus();
         return true;
       } catch (error) {
+        setOperationError(error instanceof Error ? error.message : '切换分支失败');
         console.error('Error switching branch:', error);
         return false;
       }
@@ -280,6 +282,7 @@ export function useGitPanelController({
 
         const data = await readJson<GitOperationResponse>(response);
         if (!data.success) {
+          setOperationError(data.error ?? '创建分支失败');
           console.error('Failed to create branch:', data.error);
           return false;
         }
@@ -289,6 +292,7 @@ export function useGitPanelController({
         void fetchGitStatus();
         return true;
       } catch (error) {
+        setOperationError(error instanceof Error ? error.message : '创建分支失败');
         console.error('Error creating branch:', error);
         return false;
       } finally {
