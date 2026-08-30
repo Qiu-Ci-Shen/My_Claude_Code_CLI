@@ -139,25 +139,21 @@ function ChatMessageRail({ containerRef, messages }: ChatMessageRailProps) {
     updateActive();
   }, [messages, measure, updateActive]);
 
-  // 轨道像素位置：按消息序号均匀排列；消息多时收缩间距，少时保持密排
+  // 轨道像素位置：按消息序号均匀排列；消息多时收缩间距，少时保持密排，
+  // 且整排横杠在竖轨里垂直居中（不挤在顶部留一大段空轨）
   const positions = useMemo(() => {
     const n = marks.length;
     if (n === 0 || railHeight <= 0) return [];
     const usable = Math.max(0, railHeight - RAIL_PADDING_PX * 2);
     const gap = n > 1 ? Math.max(MIN_GAP_PX, Math.min(IDEAL_GAP_PX, usable / (n - 1))) : 0;
-    return marks.map((_, i) => RAIL_PADDING_PX + i * gap);
+    const stackHeight = (n - 1) * gap;
+    const start = Math.max(RAIL_PADDING_PX, (railHeight - stackHeight) / 2);
+    return marks.map((_, i) => start + i * gap);
   }, [marks, railHeight]);
 
-  const jumpTo = useCallback((mark: UserMark, index: number) => {
+  const jumpTo = useCallback((mark: UserMark) => {
     const container = containerRef.current;
     if (!container) return;
-    const elements = container.querySelectorAll<HTMLElement>('.chat-message.user');
-    const target = elements[index];
-    if (target) {
-      // 居中显示目标消息；容器不可滚动时浏览器会自动钳制
-      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      return;
-    }
     container.scrollTo({ top: Math.max(0, mark.top - 8), behavior: 'smooth' });
   }, [containerRef]);
 
@@ -184,7 +180,7 @@ function ChatMessageRail({ containerRef, messages }: ChatMessageRailProps) {
           <button
             key={`${mark.top}-${i}`}
             type="button"
-            onClick={() => jumpTo(mark, i)}
+            onClick={() => jumpTo(mark)}
             onMouseEnter={() => setHoverIdx(i)}
             onMouseLeave={() => setHoverIdx(-1)}
             aria-label={mark.timeText ? `跳转到 ${mark.timeText} 的消息` : '跳转到消息'}
