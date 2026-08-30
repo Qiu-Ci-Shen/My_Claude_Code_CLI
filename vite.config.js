@@ -49,6 +49,8 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       outDir: 'dist',
+      // 构建中途退出（关应用/断电）时不留空 dist：旧产物保留，正常完成会整体覆盖
+      emptyOutDir: false,
       chunkSizeWarningLimit: 1000,
       rollupOptions: {
         output: {
