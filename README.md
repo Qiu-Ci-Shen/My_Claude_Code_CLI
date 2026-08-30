@@ -131,7 +131,32 @@ cp .env.example .env
 
 ## 语音
 
-设置 → 语音 中配置 OpenAI 兼容的 STT/TTS 接口（baseUrl + apiKey + 模型名）。不配置则语音功能不可用（插件会提示 HTTP 错误码，通常是识别服务过载或未配置）。
+设置 → 语音 中配置 OpenAI 兼容的 STT/TTS 接口（baseUrl + apiKey + 模型名）。不配置则语音功能不可用。配置好后即可**按住 Alt 说话**，松开自动识别填入输入框。
+
+### 推荐：硅基流动 SiliconFlow（有免费额度）
+
+**1. 获取 API Key（约 2 分钟）**
+
+1. 打开 [https://cloud.siliconflow.cn](https://cloud.siliconflow.cn) 注册/登录（手机号即可，送免费额度）
+2. 左侧菜单 → **API 密钥** → **新建 API 密钥** → 复制（`sk-` 开头，只显示一次）
+
+**2. 填写配置**（设置 → 语音）：
+
+| 配置项 | 值 |
+|---|---|
+| Base URL | `https://api.siliconflow.cn/v1` |
+| API Key | 上一步复制的 `sk-…` |
+
+**3. 选择模型**（同为硅基流动账号，STT/TTS 各填一个）：
+
+| 用途 | 模型名 | 说明 |
+|---|---|---|
+| 语音识别 STT（免费） | `FunAudioLLM/SenseVoiceSmall` | 免费但高峰期拥挤，偶发 503 属服务端过载——本应用已内置最多 10 次自动重试 |
+| 语音识别 STT（付费，更稳） | `XingChenAGI/XingChenASR-V3.2` | 实测响应快、成功率高，按量计费 |
+| 语音回复 TTS | `FunAudioLLM/CosyVoice2-0.5B` | 可选音色，用于朗读 AI 回复（TTS 留空则不朗读） |
+
+更多模型在 [硅基流动模型广场](https://cloud.siliconflow.cn/models)（筛选「音频」分类）查看，任何 OpenAI 兼容的音频接口都可用——不限于硅基流动，其他服务商只要 BaseURL + Key + 模型名三件套齐全即可。
+
 
 ## 插件
 
