@@ -68,6 +68,8 @@ interface ChatMessagesPaneProps {
   showRawParameters?: boolean;
   showThinking?: boolean;
   selectedProject: Project;
+  /** ✎ 编辑消息：上抛给聊天界面进入底部输入框编辑模式 */
+  onEditMessage?: (message: ChatMessage) => void;
 }
 
 function ChatMessagesPane({
@@ -117,6 +119,7 @@ function ChatMessagesPane({
   showRawParameters,
   showThinking,
   selectedProject,
+  onEditMessage,
 }: ChatMessagesPaneProps) {
   const { t } = useTranslation('chat');
   const groupedVisibleMessages = useMemo(
@@ -298,6 +301,7 @@ function ChatMessagesPane({
                   showThinking={showThinking}
                   selectedProject={selectedProject}
                   provider={provider}
+                  onEditMessage={onEditMessage}
                 />
               );
             });

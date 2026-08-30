@@ -14,7 +14,12 @@ import { useDropzone } from 'react-dropzone';
 import { useWebSocket } from '../../../contexts/WebSocketContext';
 
 import { authenticatedFetch } from '../../../utils/api';
-import { PENDING_EDIT_RESEND_KEY } from '../../../lib/rewindRpc';
+import {
+  PENDING_EDIT_RESEND_KEY,
+  rewindExecute,
+  rewindLocate,
+  type EditMessageTarget,
+} from '../../../lib/rewindRpc';
 import type { MarkSessionProcessing, SessionActivityMap } from '../../../hooks/useSessionProtection';
 import { grantClaudeToolPermission } from '../utils/chatPermissions';
 import {
@@ -70,6 +75,9 @@ interface UseChatComposerStateArgs {
   onFileOpen?: (filePath: string, diffInfo?: unknown) => void;
   onShowSettings?: () => void;
   scrollToBottom: () => void;
+  /** 编辑模式目标（✎ 上抛）：非空时输入框进入编辑状态，回车=截断重发 */
+  editTarget?: EditMessageTarget | null;
+  onClearEditTarget?: () => void;
   addMessage: (msg: ChatMessage) => void;
   setIsUserScrolledUp: (isScrolledUp: boolean) => void;
   setPendingPermissionRequests: Dispatch<SetStateAction<PendingPermissionRequest[]>>;
@@ -253,6 +261,8 @@ export function useChatComposerState({
   onFileOpen,
   onShowSettings,
   scrollToBottom,
+  editTarget,
+  onClearEditTarget,
   addMessage,
   setIsUserScrolledUp,
   setPendingPermissionRequests,
@@ -683,6 +693,44 @@ export function useChatComposerState({
         return;
       }
 
+      // ── 编辑模式（ZCode 同款）：提交 = 截断这条消息及其后的对话，再用
+      // 输入框里的新文本重发。流程与旧的 ✎ 内联卡片一致：打断 → rewind 定位
+      // → 截断 → 暂存新文本 → 刷新后自动发送。──
+      if (editTarget) {
+        const sessionId = editTarget.sessionId;
+        if (!sessionId) {
+          onClearEditTarget?.();
+          return;
+        }
+        onClearEditTarget?.();
+        void (async () => {
+          try {
+            sendMessage({ type: 'chat.abort', sessionId });
+            await new Promise((resolve) => setTimeout(resolve, 600));
+            const locate = await rewindLocate(sessionId, editTarget.timestamp, editTarget.content.slice(0, 80));
+            if (!locate.found || !locate.uuid) {
+              throw new Error('未能在会话记录中定位到这条消息');
+            }
+            const result = await rewindExecute(sessionId, locate.uuid, false);
+            if (!result.ok) {
+              throw new Error(result.error || '会话回退失败');
+            }
+            safeLocalStorage.setItem(
+              PENDING_EDIT_RESEND_KEY,
+              JSON.stringify({ sessionId, text: currentInput, at: Date.now() }),
+            );
+            window.location.reload();
+          } catch (err) {
+            addMessage({
+              type: 'error',
+              content: err instanceof Error ? err.message : String(err),
+              timestamp: new Date(),
+            });
+          }
+        })();
+        return;
+      }
+
       // A turn is already in flight: stash this message instead of sending it.
       // Upload attached files now so the queued record contains durable image
       // descriptors that can be sent even if another session is open later.
@@ -947,6 +995,8 @@ export function useChatComposerState({
       provider,
       resetCommandMenuState,
       scrollToBottom,
+      editTarget,
+      onClearEditTarget,
       selectedProject,
       sendMessage,
       sessionKey,
@@ -1269,6 +1319,32 @@ export function useChatComposerState({
     },
     [onInputFocusChange],
   );
+
+  // ── 编辑模式（ZCode 同款）：✎ 上抛目标后，把原文载入输入框并聚焦；
+  // 取消编辑时恢复进入编辑前的草稿。切到别的会话则自动退出编辑。──
+  const draftBeforeEditRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (editTarget) {
+      draftBeforeEditRef.current = input;
+      setInput(editTarget.content);
+      inputValueRef.current = editTarget.content;
+      requestAnimationFrame(() => textareaRef.current?.focus());
+      return;
+    }
+    if (draftBeforeEditRef.current !== null) {
+      const draft = draftBeforeEditRef.current;
+      draftBeforeEditRef.current = null;
+      setInput(draft);
+      inputValueRef.current = draft;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editTarget]);
+
+  useEffect(() => {
+    if (editTarget?.sessionId && currentSessionId && editTarget.sessionId !== currentSessionId) {
+      onClearEditTarget?.();
+    }
+  }, [currentSessionId, editTarget, onClearEditTarget]);
 
   // ── 编辑重发：截断完成后 MessageComponent 暂存编辑文本并整页刷新，
   // 这里在页面加载时消费暂存文本。先立即填入输入框（用户随时能看到），

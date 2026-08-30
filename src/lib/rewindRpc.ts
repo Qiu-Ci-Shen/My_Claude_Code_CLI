@@ -59,3 +59,11 @@ export function rewindExecute(
 
 /** 编辑重发暂存键：截断成功后写入，页面刷新后由 composer 消费并自动发送。 */
 export const PENDING_EDIT_RESEND_KEY = 'qiu:pending-edit-resend';
+
+/** 编辑模式目标：✎ 选中的那条消息（ZCode 同款底部输入框编辑） */
+export type EditMessageTarget = {
+  sessionId: string | null;
+  timestamp: string | number | Date | null | undefined;
+  /** 消息完整原文，载入输入框 */
+  content: string;
+};

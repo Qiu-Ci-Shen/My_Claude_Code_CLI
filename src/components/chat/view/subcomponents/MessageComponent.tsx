@@ -1,14 +1,6 @@
-import { memo, useMemo, useRef, useState } from 'react';
+import { memo, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useWebSocket } from '../../../../contexts/WebSocketContext';
-import {
-  currentSessionIdFromPath,
-  PENDING_EDIT_RESEND_KEY,
-  rewindExecute,
-  rewindLocate,
-} from '../../../../lib/rewindRpc';
-import { safeLocalStorage } from '../../utils/chatStorage';
 import LLMProviderLogo from '../../../llm-provider-logo/LLMProviderLogo';
 import type {
   ChatMessage,
@@ -21,9 +13,7 @@ import type { Project } from '../../../../types/app';
 import { ToolRenderer, ToolErrorDisplay, shouldHideToolResult } from '../../tools';
 import { Reasoning, ReasoningTrigger, ReasoningContent } from '../../../../shared/view/ui';
 
-import EditMessageCard from './EditMessageCard';
-import ChatMessageImages from './ChatMessageImages';
-import ChatMessageFiles from './ChatMessageFiles';
+import ChatMessageImages from './ChatMessageImages';import ChatMessageFiles from './ChatMessageFiles';
 import { Markdown } from './Markdown';
 import MessageCopyControl from './MessageCopyControl';
 import MessageSpeakControl from './MessageSpeakControl';
@@ -45,6 +35,8 @@ type MessageComponentProps = {
   showThinking?: boolean;
   selectedProject?: Project | null;
   provider: Provider | string;
+  /** 点击 ✎ 时上抛：由底部输入框进入编辑模式（ZCode 同款），而非内联卡片 */
+  onEditMessage?: (message: ChatMessage) => void;
 };
 
 type InteractiveOption = {
@@ -55,7 +47,7 @@ type InteractiveOption = {
 
 const COPY_HIDDEN_TOOL_NAMES = new Set(['Bash', 'Edit', 'Write', 'ApplyPatch']);
 
-const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, showRawParameters, showThinking, selectedProject, provider }: MessageComponentProps) => {
+const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, showRawParameters, showThinking, selectedProject, provider, onEditMessage }: MessageComponentProps) => {
   const { t } = useTranslation('chat');
   const isGrouped = prevMessage && prevMessage.type === message.type &&
     ((prevMessage.type === 'assistant') ||
@@ -85,52 +77,6 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
     !isCommandOrFileEditToolResponse &&
     !message.isThinking;
 
-  // ── 编辑重发（截断该消息及其后的对话，用编辑后的文本重新发送）──
-  const { sendMessage } = useWebSocket();
-  const [isEditingMessage, setIsEditingMessage] = useState(false);
-  const [editBusy, setEditBusy] = useState(false);
-  const [editError, setEditError] = useState<string | null>(null);
-
-  const handleEditResend = async (newText: string) => {
-    const sessionId = currentSessionIdFromPath();
-    if (!sessionId) {
-      setEditError('当前不在会话页面，无法定位会话');
-      return;
-    }
-    setEditBusy(true);
-    setEditError(null);
-    try {
-      // 若正在生成，先打断（对空闲会话是无害的空操作）
-      sendMessage({ type: 'chat.abort', sessionId });
-      await new Promise((resolve) => setTimeout(resolve, 600));
-
-      const locate = await rewindLocate(
-        sessionId,
-        message.timestamp,
-        userCopyContent.slice(0, 80),
-      );
-      if (!locate.found || !locate.uuid) {
-        throw new Error('未能在会话记录中定位到这条消息');
-      }
-      // 只截断转录，不恢复代码文件
-      const result = await rewindExecute(sessionId, locate.uuid, false);
-      if (!result.ok) {
-        throw new Error(result.error || '会话回退失败');
-      }
-
-      // 截断成功：暂存编辑文本（与 composer 消费侧同用 safeLocalStorage），
-      // 刷新后由 composer 等连接就绪后自动发送
-      safeLocalStorage.setItem(
-        PENDING_EDIT_RESEND_KEY,
-        JSON.stringify({ sessionId, text: newText, at: Date.now() }),
-      );
-      window.location.reload();
-    } catch (err) {
-      setEditError(err instanceof Error ? err.message : String(err));
-      setEditBusy(false);
-    }
-  };
-
   const formattedTime = useMemo(() => new Date(message.timestamp).toLocaleTimeString(), [message.timestamp]);
   const shouldHideThinkingMessage = Boolean(message.isThinking && !showThinking);
 
@@ -157,15 +103,7 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
             {message.files && message.files.length > 0 && (
               <ChatMessageFiles files={message.files} />
             )}
-            {isEditingMessage ? (
-              <EditMessageCard
-                originalText={userCopyContent}
-                busy={editBusy}
-                error={editError}
-                onResend={handleEditResend}
-                onCancel={() => setIsEditingMessage(false)}
-              />
-            ) : (userCopyContent.trim().length > 0 || (!message.images?.length && !message.files?.length) ? (
+            {(userCopyContent.trim().length > 0 || (!message.images?.length && !message.files?.length)) && (
               <div className="group max-w-full rounded-2xl rounded-br-md border border-border/60 bg-muted/60 px-3 py-2 text-foreground shadow-sm dark:bg-gray-800/60 sm:px-4">
                 <div dir="auto" className="break-words font-serif text-sm">
                   <Markdown
@@ -179,7 +117,7 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
                   {shouldShowUserCopyControl && (
                     <button
                       type="button"
-                      onClick={() => setIsEditingMessage(true)}
+                      onClick={() => onEditMessage?.(message)}
                       className="transition-opacity hover:text-foreground"
                       title="编辑并重发（会截断此消息之后的对话）"
                     >
@@ -192,12 +130,13 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
                   <span>{formattedTime}</span>
                 </div>
               </div>
-            ) : (
+            )}
+            {!userCopyContent.trim().length && (message.images?.length || message.files?.length) ? (
               /* Attachment-only turn: no text bubble, but the timestamp still shows */
               <div className="flex items-center justify-end gap-1 text-xs text-muted-foreground">
                 <span>{formattedTime}</span>
               </div>
-            ))}
+            ) : null}
           </div>
           {!isGrouped && (
             <div className="hidden h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm text-white sm:flex">

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowDownIcon } from 'lucide-react';
 
@@ -14,6 +14,7 @@ import { useSessionStore } from '../../../stores/useSessionStore';
 
 import ChatMessagesPane from './subcomponents/ChatMessagesPane';
 import ChatMessageRail from './subcomponents/ChatMessageRail';
+import type { EditMessageTarget } from '../../../lib/rewindRpc';
 import ChatComposer from './subcomponents/ChatComposer';
 import ContextUsageBar from './subcomponents/ContextUsageBar';
 import CommandResultModal from './subcomponents/CommandResultModal';
@@ -93,6 +94,9 @@ function ChatInterface({
     selectedSession,
     selectedProject,
   });
+
+  // 编辑模式（ZCode 同款）：✎ 选中的消息载入底部输入框，回车=截断重发
+  const [editTarget, setEditTarget] = useState<EditMessageTarget | null>(null);
 
   const {
     chatMessages,
@@ -217,6 +221,8 @@ function ChatInterface({
     onFileOpen,
     onShowSettings,
     scrollToBottom,
+    editTarget,
+    onClearEditTarget: useCallback(() => setEditTarget(null), []),
     addMessage,
     setIsUserScrolledUp,
     setPendingPermissionRequests,
@@ -261,7 +267,7 @@ function ChatInterface({
   });
 
   useEffect(() => {
-    if (!canAbortSession) {
+    if (!canAbortSession && !editTarget) {
       return;
     }
 
@@ -271,14 +277,19 @@ function ChatInterface({
       }
 
       event.preventDefault();
-      handleAbortSession();
+      // 生成中优先打断；空闲时 Esc 退出编辑模式
+      if (canAbortSession) {
+        handleAbortSession();
+      } else {
+        setEditTarget(null);
+      }
     };
 
     document.addEventListener('keydown', handleGlobalEscape, { capture: true });
     return () => {
       document.removeEventListener('keydown', handleGlobalEscape, { capture: true });
     };
-  }, [canAbortSession, handleAbortSession]);
+  }, [canAbortSession, handleAbortSession, editTarget]);
 
   useEffect(() => {
     return () => {
@@ -389,11 +400,29 @@ function ChatInterface({
           showRawParameters={showRawParameters}
           showThinking={showThinking}
           selectedProject={selectedProject}
+          onEditMessage={(message) => setEditTarget({
+            sessionId: currentSessionId || selectedSession?.id || null,
+            timestamp: message.timestamp,
+            content: String(message.content || ''),
+          })}
         />
           <ChatMessageRail containerRef={scrollContainerRef} messages={visibleMessages} />
         </div>
 
         <div className="relative flex-shrink-0">
+          {editTarget && (
+            <div className="mb-1.5 flex items-center justify-between gap-2 rounded-lg border border-primary/40 bg-primary/5 px-3 py-1.5 text-xs text-foreground">
+              <span>正在编辑消息 — 回车重发（会截断这条消息之后的对话），Esc 取消</span>
+              <button
+                type="button"
+                onClick={() => setEditTarget(null)}
+                aria-label="取消编辑"
+                className="rounded px-1.5 py-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                ✕
+              </button>
+            </div>
+          )}
           {isUserScrolledUp && chatMessages.length > 0 && (
             <div className="pointer-events-none absolute -top-11 left-0 right-0 z-20 flex justify-center">
               <button
