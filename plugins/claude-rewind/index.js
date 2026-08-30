@@ -37,14 +37,15 @@ function showToast(msg, isError) {
   bar.style.cssText =
     'position:fixed;z-index:2147483647;left:50%;top:18px;transform:translateX(-50%);' +
     'padding:10px 18px;border-radius:10px;' +
-    `background:${isError ? '#7f1d1d' : '#18181b'};color:#fafafa;` +
+    `background:hsl(var(--destructive));color:hsl(var(--destructive-foreground));` +
     'font:13px/1.4 system-ui,sans-serif;box-shadow:0 6px 18px rgba(0,0,0,.35)';
   bar.textContent = msg;
   document.body.appendChild(bar);
   setTimeout(() => bar.remove(), 4000);
 }
 
-// ---------- 界面内居中确认模态窗（替代浏览器原生 confirm 黑窗口） ----------
+// ---------- 界面内居中确认模态窗 ----------
+// 全部使用应用的主题 token（hsl(var(--…))），自动适配明暗两套主题
 // 返回 Promise<boolean>：确定=true，取消/Esc/点遮罩=false
 function showConfirmDialog(title, lines) {
   return new Promise((resolve) => {
@@ -53,20 +54,21 @@ function showConfirmDialog(title, lines) {
       'position:fixed;inset:0;z-index:2147483646;display:flex;align-items:center;justify-content:center;' +
       'background:rgba(0,0,0,.45);backdrop-filter:blur(2px)';
 
-    // 与应用暗色卡片同风格：深灰底、圆角、细边框、柔和阴影
     const card = document.createElement('div');
     card.style.cssText =
       'width:min(420px,90vw);padding:22px 24px;border-radius:14px;' +
-      'background:#1c1c1f;color:#e4e4e7;border:1px solid #3f3f46;' +
-      'box-shadow:0 12px 40px rgba(0,0,0,.5);font-family:system-ui,sans-serif';
+      'background:hsl(var(--popover));color:hsl(var(--popover-foreground));' +
+      'border:1px solid hsl(var(--border));' +
+      'box-shadow:0 12px 40px rgba(0,0,0,.18);font-family:system-ui,sans-serif';
 
     const heading = document.createElement('div');
     heading.textContent = title;
-    heading.style.cssText = 'font-size:15.5px;font-weight:600;margin-bottom:12px';
+    heading.style.cssText =
+      'font-size:15.5px;font-weight:600;margin-bottom:12px;color:hsl(var(--foreground))';
 
     const list = document.createElement('ul');
     list.style.cssText =
-      'margin:0 0 18px;padding-left:18px;font-size:13px;line-height:1.9;color:#a1a1aa';
+      'margin:0 0 18px;padding-left:18px;font-size:13px;line-height:1.9;color:hsl(var(--muted-foreground))';
     for (const line of lines) {
       const li = document.createElement('li');
       li.textContent = line;
@@ -81,15 +83,17 @@ function showConfirmDialog(title, lines) {
       b.type = 'button';
       b.textContent = label;
       b.style.cssText =
-        'padding:7px 18px;border-radius:8px;font-size:13px;cursor:pointer;border:1px solid #52525b;' +
+        'padding:7px 18px;border-radius:8px;font-size:13px;cursor:pointer;' +
         (primary
-          ? 'background:#2563eb;color:#fff;border-color:#2563eb'
-          : 'background:transparent;color:#a1a1aa');
+          ? 'background:hsl(var(--primary));color:hsl(var(--primary-foreground));border:1px solid transparent'
+          : 'background:transparent;color:hsl(var(--muted-foreground));border:1px solid hsl(var(--border))');
       b.addEventListener('mouseenter', () => {
-        b.style.background = primary ? '#1d4ed8' : '#27272a';
+        b.style.background = primary ? 'hsl(var(--primary) / 0.9)' : 'hsl(var(--accent))';
+        b.style.color = primary ? 'hsl(var(--primary-foreground))' : 'hsl(var(--accent-foreground))';
       });
       b.addEventListener('mouseleave', () => {
-        b.style.background = primary ? '#2563eb' : 'transparent';
+        b.style.background = primary ? 'hsl(var(--primary))' : 'transparent';
+        b.style.color = primary ? 'hsl(var(--primary-foreground))' : 'hsl(var(--muted-foreground))';
       });
       return b;
     };
@@ -198,14 +202,14 @@ function injectButton(messageEl) {
   btn.appendChild(svg);
   btn.style.cssText =
     'margin-left:8px;padding:4px;border:none;border-radius:6px;background:transparent;' +
-    'color:#a1a1aa;line-height:0;cursor:pointer;opacity:0;transition:opacity .15s;';
+    'color:hsl(var(--muted-foreground));line-height:0;cursor:pointer;opacity:0;transition:opacity .15s;';
   btn.addEventListener('mouseenter', () => {
-    btn.style.background = '#3f3f46';
-    btn.style.color = '#e4e4e7';
+    btn.style.background = 'hsl(var(--accent))';
+    btn.style.color = 'hsl(var(--accent-foreground))';
   });
   btn.addEventListener('mouseleave', () => {
     btn.style.background = 'transparent';
-    btn.style.color = '#a1a1aa';
+    btn.style.color = 'hsl(var(--muted-foreground))';
   });
   btn.addEventListener('click', (e) => {
     e.preventDefault();
