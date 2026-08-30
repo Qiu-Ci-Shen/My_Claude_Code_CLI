@@ -3,11 +3,9 @@ import { useTranslation } from 'react-i18next';
 import {
   Activity,
   BarChart3,
-  BookOpen,
   Calculator,
   Clock,
   Download,
-  ExternalLink,
   Github,
   GitBranch,
   Loader2,
@@ -15,7 +13,6 @@ import {
   RefreshCw,
   ServerCrash,
   ShieldAlert,
-  Terminal,
   Trash2,
   type LucideIcon,
 } from 'lucide-react';
@@ -25,8 +22,6 @@ import type { Plugin } from '../../../contexts/PluginsContext';
 
 import PluginIcon from './PluginIcon';
 
-const STARTER_PLUGIN_URL = 'https://github.com/cloudcli-ai/cloudcli-plugin-starter';
-const TERMINAL_PLUGIN_URL = 'https://github.com/cloudcli-ai/cloudcli-plugin-terminal';
 const SCHEDULED_PROMPT_PLUGIN_URL = 'https://github.com/grostim/cloudcli-cron';
 const CLAUDE_WATCH_PLUGIN_URL = 'https://github.com/satsuki19980613/cloudcli-claude-watch';
 const PRISM_PLUGIN_URL = 'https://github.com/jakeefr/cloudcli-plugin-prism';
@@ -45,25 +40,6 @@ type PluginRecommendation = {
   icon: LucideIcon;
   source: 'official' | 'unofficial';
 };
-
-const OFFICIAL_PLUGIN_RECOMMENDATIONS: PluginRecommendation[] = [
-  {
-    id: 'project-stats',
-    translationKey: 'starterPlugin',
-    repoUrl: STARTER_PLUGIN_URL,
-    installedNames: ['project-stats'],
-    icon: BarChart3,
-    source: 'official',
-  },
-  {
-    id: 'web-terminal',
-    translationKey: 'terminalPlugin',
-    repoUrl: TERMINAL_PLUGIN_URL,
-    installedNames: ['web-terminal'],
-    icon: Terminal,
-    source: 'official',
-  },
-];
 
 const UNOFFICIAL_PLUGIN_RECOMMENDATIONS: PluginRecommendation[] = [
   {
@@ -520,22 +496,10 @@ export default function PluginSettingsTab() {
     return plugins.some((plugin) => pluginMatchesRecommendation(plugin, recommendation));
   };
 
-  const isOfficialPlugin = (plugin: Plugin) => {
-    return OFFICIAL_PLUGIN_RECOMMENDATIONS.some((recommendation) => (
-      pluginMatchesRecommendation(plugin, recommendation)
-    ));
-  };
-
-  const officialPlugins = plugins.filter(isOfficialPlugin);
-  const otherPlugins = plugins.filter((plugin) => !isOfficialPlugin(plugin));
-  const officialRecommendations = OFFICIAL_PLUGIN_RECOMMENDATIONS.filter(
-    (recommendation) => !isRecommendationInstalled(recommendation),
-  );
   const unofficialRecommendations = UNOFFICIAL_PLUGIN_RECOMMENDATIONS.filter(
     (recommendation) => !isRecommendationInstalled(recommendation),
   );
-  const hasOfficialSection = officialPlugins.length > 0 || officialRecommendations.length > 0;
-  const hasOtherSection = otherPlugins.length > 0 || unofficialRecommendations.length > 0;
+  const hasPluginSection = plugins.length > 0 || unofficialRecommendations.length > 0;
 
   const renderPluginCard = (plugin: Plugin, index: number) => {
     const handleToggle = async (enabled: boolean) => {
@@ -624,30 +588,12 @@ export default function PluginSettingsTab() {
         </div>
       ) : (
         <div className="space-y-4">
-          {hasOfficialSection && (
-            <RecommendationSection
-              title={t('pluginSettings.sections.officialTitle')}
-              description={t('pluginSettings.sections.officialDescription')}
-            >
-              {officialPlugins.map((plugin, index) => renderPluginCard(plugin, index))}
-              {officialRecommendations.map((recommendation) => (
-                <PluginRecommendationCard
-                  key={recommendation.id}
-                  recommendation={recommendation}
-                  onInstall={() => void handleInstallRecommendation(recommendation)}
-                  disabled={!!installingRecommendation}
-                  installing={installingRecommendation === recommendation.id}
-                />
-              ))}
-            </RecommendationSection>
-          )}
-
-          {hasOtherSection && (
+          {hasPluginSection ? (
             <RecommendationSection
               title={t('pluginSettings.sections.unofficialTitle')}
               description={t('pluginSettings.sections.unofficialDescription')}
             >
-              {otherPlugins.map((plugin, index) => renderPluginCard(plugin, officialPlugins.length + index))}
+              {plugins.map((plugin, index) => renderPluginCard(plugin, index))}
               {unofficialRecommendations.map((recommendation) => (
                 <PluginRecommendationCard
                   key={recommendation.id}
@@ -658,26 +604,9 @@ export default function PluginSettingsTab() {
                 />
               ))}
             </RecommendationSection>
-          )}
+          ) : null}
         </div>
       )}
-
-      {/* Starter plugin */}
-      <div className="flex items-center justify-center gap-3 border-t border-border/50 pt-2">
-        <BookOpen className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/40" />
-        <span className="text-xs text-muted-foreground/60">
-          {t('pluginSettings.starterPluginLabel')}
-        </span>
-        <span className="text-muted-foreground/20">·</span>
-        <a
-          href={STARTER_PLUGIN_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground/60 transition-colors hover:text-foreground"
-        >
-          {t('pluginSettings.starter')} <ExternalLink className="h-2.5 w-2.5" />
-        </a>
-      </div>
     </div>
   );
 }
