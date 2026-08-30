@@ -13,6 +13,7 @@ import { useChatComposerState } from '../hooks/useChatComposerState';
 import { useSessionStore } from '../../../stores/useSessionStore';
 
 import ChatMessagesPane from './subcomponents/ChatMessagesPane';
+import ChatMessageRail from './subcomponents/ChatMessageRail';
 import ChatComposer from './subcomponents/ChatComposer';
 import ContextUsageBar from './subcomponents/ContextUsageBar';
 import CommandResultModal from './subcomponents/CommandResultModal';
@@ -340,7 +341,8 @@ function ChatInterface({
   return (
     <PermissionContext.Provider value={permissionContextValue}>
       <div className="flex h-full min-h-0 flex-col">
-        <ChatMessagesPane
+        <div className="relative flex min-h-0 flex-1 flex-col">
+          <ChatMessagesPane
           scrollContainerRef={scrollContainerRef}
           onWheel={handleScroll}
           onTouchMove={handleScroll}
@@ -388,6 +390,8 @@ function ChatInterface({
           showThinking={showThinking}
           selectedProject={selectedProject}
         />
+          <ChatMessageRail containerRef={scrollContainerRef} messages={visibleMessages} />
+        </div>
 
         <div className="relative flex-shrink-0">
           {isUserScrolledUp && chatMessages.length > 0 && (
