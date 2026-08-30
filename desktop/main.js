@@ -1,7 +1,7 @@
 // Qiu_Ai_LZ 桌面启动器
 // 流程：校验构建新鲜度(过期自动重建) → 复用或拉起本地服务 → 就绪后自动进入应用 → 退出时善后
 // 注意：本应用不创建菜单栏——Windows 下菜单栏会吞掉 Alt 键，push-to-talk 插件依赖按住 Alt 说话。
-import { app, BrowserWindow, Menu, dialog, ipcMain, screen } from 'electron';
+import { app, BrowserWindow, Menu, dialog, ipcMain, screen, shell } from 'electron';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
@@ -274,6 +274,29 @@ function createWindow() {
     },
   });
   win.loadFile(path.join(__dirname, 'launcher.html'));
+
+  // 导航安全（Electron 官方清单项）：聊天内容里的链接不得在应用窗口内打开
+  // ——本机地址（file:// 与 127.0.0.1/localhost 任意端口）放行，外部一律拦截
+  // 并交给系统浏览器，防钓鱼页面替换整个应用界面
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:\/\//i.test(url)) void shell.openExternal(url);
+    return { action: 'deny' };
+  });
+  win.webContents.on('will-navigate', (event, url) => {
+    let parsed;
+    try {
+      parsed = new URL(url);
+    } catch {
+      event.preventDefault();
+      return;
+    }
+    const isLocal = parsed.protocol === 'file:'
+      || parsed.hostname === '127.0.0.1'
+      || parsed.hostname === 'localhost';
+    if (isLocal) return;
+    event.preventDefault();
+    if (/^https?:\/\//i.test(parsed.href)) void shell.openExternal(parsed.href);
+  });
 
   // 启动页脚本就绪前发出的状态会丢，页面每次加载完成后补发最后一条
   win.webContents.on('did-finish-load', () => {
