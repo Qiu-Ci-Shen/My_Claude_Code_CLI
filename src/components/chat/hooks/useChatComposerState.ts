@@ -70,7 +70,6 @@ interface UseChatComposerStateArgs {
   onFileOpen?: (filePath: string, diffInfo?: unknown) => void;
   onShowSettings?: () => void;
   scrollToBottom: () => void;
-  scrollSentMessageToTop: () => void;
   addMessage: (msg: ChatMessage) => void;
   setIsUserScrolledUp: (isScrolledUp: boolean) => void;
   setPendingPermissionRequests: Dispatch<SetStateAction<PendingPermissionRequest[]>>;
@@ -254,7 +253,6 @@ export function useChatComposerState({
   onFileOpen,
   onShowSettings,
   scrollToBottom,
-  scrollSentMessageToTop,
   addMessage,
   setIsUserScrolledUp,
   setPendingPermissionRequests,
@@ -908,8 +906,7 @@ export function useChatComposerState({
       });
 
       setIsUserScrolledUp(false);
-      // 发送后把这条消息顶到可视区顶部（回复在下方展开），而不是贴底被顶出视野
-      setTimeout(() => scrollSentMessageToTop(), 100);
+      setTimeout(() => scrollToBottom(), 100);
 
       // One message shape for every provider. The backend resolves the
       // provider, project path, and provider-native resume id from the
@@ -950,7 +947,6 @@ export function useChatComposerState({
       provider,
       resetCommandMenuState,
       scrollToBottom,
-      scrollSentMessageToTop,
       selectedProject,
       sendMessage,
       sessionKey,
