@@ -57,13 +57,6 @@ npm run app
 - 不创建菜单栏（保证「按住 Alt 说话」等快捷键不被 Windows 菜单拦截）
 - 关闭窗口即退出并清理全部后台进程
 
-打包 Windows 安装包：
-
-```bash
-npm run desktop:pack        # 免安装目录版
-npm run desktop:dist:win    # NSIS 安装包
-```
-
 ## 手机访问
 
 设置 → 手机访问 中开启，扫码或输入地址 + PIN 配对后，手机浏览器即为完整操作界面；同屏通知推送需要 PWA 安装到主屏。局域网直连或隧道模式均可。
@@ -97,8 +90,6 @@ npm run desktop:dist:win    # NSIS 安装包
 | `npm run build` | 全量构建（前端 dist + 后端 dist-server） |
 | `npm run server` | 运行构建产物 |
 | `npm run app` | 桌面壳（自动构建检查 + 服务托管） |
-| `npm run desktop:pack` | 打包桌面应用（免安装目录） |
-| `npm run desktop:dist:win` | 打包 Windows 安装包 |
 | `npm run test` | 服务端测试 |
 | `npm run typecheck` | TypeScript 类型检查 |
 | `node scripts/regenerate-icons.mjs` | 从 `desktop/assets/logo-windows.ico` 重生成全套图标 |

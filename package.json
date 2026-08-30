@@ -33,10 +33,6 @@
     "server:dev-watch": "tsx watch --tsconfig server/tsconfig.json server/index.ts",
     "client": "vite",
     "app": "electron desktop/main.js",
-    "desktop:stage": "node scripts/release/prepare-desktop-app.js",
-    "desktop:pack": "npm run build && npm run desktop:stage && electron-builder --projectDir .desktop-build/desktop-app --dir",
-    "desktop:dist:mac": "npm run build && npm run desktop:stage && electron-builder --projectDir .desktop-build/desktop-app --mac dmg",
-    "desktop:dist:win": "npm run build && npm run desktop:stage && electron-builder --projectDir .desktop-build/desktop-app --win nsis",
     "build": "npm run build:client && npm run build:server",
     "build:client": "vite build",
     "prebuild:server": "node -e \"require('node:fs').rmSync('dist-server.next', { recursive: true, force: true })\"",
@@ -52,50 +48,6 @@
     "prepublishOnly": "npm run build",
     "postinstall": "node scripts/fix-node-pty.js",
     "prepare": "husky"
-  },
-  "build": {
-    "appId": "com.qiuailz.desktop",
-    "productName": "Qiu_Ai_LZ",
-    "asar": false,
-    "artifactName": "qiu-ai-lz-desktop-${version}-${os}-${arch}.${ext}",
-    "directories": {
-      "output": "release/desktop"
-    },
-    "extraMetadata": {
-      "main": "desktop/main.js"
-    },
-    "files": [
-      "desktop/",
-      "public/",
-      "dist/",
-      "dist-server/",
-      "shared/",
-      "server/",
-      "package.json",
-      "!**/node_modules/@anthropic-ai/claude-agent-sdk-{darwin,linux,win32}-*/**"
-    ],
-    "mac": {
-      "category": "public.app-category.developer-tools",
-      "icon": "desktop/assets/logo-macos.icns",
-      "notarize": true,
-      "target": [
-        "dmg"
-      ],
-      "extendInfo": {
-        "CFBundleName": "Qiu_Ai_LZ",
-        "CFBundleDisplayName": "Qiu_Ai_LZ"
-      }
-    },
-    "win": {
-      "icon": "desktop/assets/logo-windows.ico",
-      "target": [
-        "nsis"
-      ]
-    },
-    "nsis": {
-      "installerIcon": "desktop/assets/logo-windows.ico",
-      "uninstallerIcon": "desktop/assets/logo-windows.ico"
-    }
   },
   "keywords": [
     "claude code",
@@ -198,7 +150,6 @@
     "concurrently": "^8.2.2",
     "cross-env": "^10.1.0",
     "electron": "^38.0.0",
-    "electron-builder": "^26.15.3",
     "eslint": "^9.39.3",
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-boundaries": "^6.0.2",
