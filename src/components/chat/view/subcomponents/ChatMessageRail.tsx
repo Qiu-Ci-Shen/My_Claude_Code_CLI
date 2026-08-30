@@ -13,21 +13,26 @@ type ChatMessageRailProps = {
 type UserMark = {
   /** 消息在滚动内容坐标系里的 y 像素 */
   top: number;
-  preview: string;
-  timeText: string;
+  question: string;
+  answer: string;
 };
 
-const PREVIEW_CHARS = 120;
+const QUESTION_CHARS = 120;
+const ANSWER_CHARS = 100;
 /** 均匀分布时的理想间距/最挤间距，对齐 ZCode 的密排细杠观感 */
 const IDEAL_GAP_PX = 13;
 const MIN_GAP_PX = 5;
 const RAIL_PADDING_PX = 8;
 
+function truncate(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max)}…` : text;
+}
+
 /**
  * 聊天区左侧的「提问点」导航轨：每条用户消息一根小细杠，按消息序号均匀
- * 紧凑排列（ZCode 同款密排标尺观感），整排在竖轨内垂直居中。横杠是静态的，
- * 不跟随滚动变化；悬停浮出内容预览与时间；点击平滑跳转并把该消息对齐到
- * 视口顶部。
+ * 紧凑排列（ZCode 同款密排标尺观感），整排在竖轨内垂直居中。横杠是静态的；
+ * 悬停浮出该条提问与其后 AI 回复的摘要；点击平滑跳转并把该消息对齐到视口
+ * 顶部。
  */
 function ChatMessageRail({ containerRef, messages }: ChatMessageRailProps) {
   const [marks, setMarks] = useState<UserMark[]>([]);
@@ -44,32 +49,42 @@ function ChatMessageRail({ containerRef, messages }: ChatMessageRailProps) {
     const container = containerRef.current;
     if (!container) return;
     const elements = container.querySelectorAll<HTMLElement>('.chat-message.user');
-    const userMessages = messagesRef.current.filter((m) => m.type === 'user');
-    // DOM 与消息数组必须一一对应，否则预览文本会张冠李戴
-    if (elements.length !== userMessages.length) {
+    const all = messagesRef.current;
+
+    // 按顺序为每条用户消息收集「问题 + 其后第一条非空 AI 回复」，
+    // qas 的顺序与 DOM 中 .chat-message.user 一一对应
+    const qas: Array<{ question: string; answer: string }> = [];
+    for (const m of all) {
+      if (m.type === 'user') {
+        const text = String(m.content || '').trim();
+        qas.push({
+          question: text || (m.images?.length ? '[图片消息]' : '[文件消息]'),
+          answer: '',
+        });
+      } else if (m.type === 'assistant' && qas.length > 0) {
+        const last = qas[qas.length - 1];
+        if (!last.answer) {
+          const text = String(m.content || m.displayText || '').trim();
+          if (text) last.answer = truncate(text, ANSWER_CHARS);
+        }
+      }
+    }
+
+    // DOM 与消息数组必须一一对应，否则提示文本会张冠李戴
+    if (elements.length !== qas.length) {
       setMarks((prev) => (prev.length === 0 ? prev : []));
       return;
     }
+
     const containerRect = container.getBoundingClientRect();
     const next: UserMark[] = [];
     elements.forEach((el, i) => {
       const rect = el.getBoundingClientRect();
-      const top = rect.top - containerRect.top + container.scrollTop;
-      const message = userMessages[i];
-      const text = String(message?.content || '').trim();
-      const preview = text
-        ? (text.length > PREVIEW_CHARS ? `${text.slice(0, PREVIEW_CHARS)}…` : text)
-        : (message?.images?.length ? '[图片消息]' : '[文件消息]');
-      const ts = message?.timestamp;
-      const timeText = ts
-        ? new Date(ts).toLocaleString(undefined, {
-          month: 'numeric',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-        })
-        : '';
-      next.push({ top, preview, timeText });
+      next.push({
+        top: rect.top - containerRect.top + container.scrollTop,
+        question: truncate(qas[i]?.question || '', QUESTION_CHARS),
+        answer: qas[i]?.answer || '',
+      });
     });
     setMarks(next);
     setScrollable(container.scrollHeight - container.clientHeight > 80);
@@ -143,7 +158,7 @@ function ChatMessageRail({ containerRef, messages }: ChatMessageRailProps) {
           onClick={() => jumpTo(mark)}
           onMouseEnter={() => setHoverIdx(i)}
           onMouseLeave={() => setHoverIdx(-1)}
-          aria-label={mark.timeText ? `跳转到 ${mark.timeText} 的消息` : '跳转到消息'}
+          aria-label={`跳转到第 ${i + 1} 条消息`}
           className="pointer-events-auto absolute left-1/2 flex h-3 w-4 -translate-x-1/2 cursor-pointer items-center justify-center"
           style={{ top: positions[i] - 6 }}
         >
@@ -158,15 +173,14 @@ function ChatMessageRail({ containerRef, messages }: ChatMessageRailProps) {
       ))}
       {hoverIdx >= 0 && marks[hoverIdx] && (
         <div
-          className="pointer-events-auto absolute left-6 z-30 max-w-xs rounded-lg border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-lg"
+          className="pointer-events-auto absolute left-6 z-30 max-w-sm rounded-lg border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-lg"
           style={{
             top: Math.min(
               Math.max(0, positions[hoverIdx] - 12),
-              Math.max(0, railHeight - 90),
+              Math.max(0, railHeight - 150),
             ),
           }}
         >
-          <div className="mb-1 text-[10px] text-muted-foreground">{marks[hoverIdx].timeText}</div>
           <div
             className="break-words whitespace-pre-wrap"
             style={{
@@ -176,8 +190,21 @@ function ChatMessageRail({ containerRef, messages }: ChatMessageRailProps) {
               overflow: 'hidden',
             }}
           >
-            {marks[hoverIdx].preview}
+            {marks[hoverIdx].question}
           </div>
+          {marks[hoverIdx].answer && (
+            <div
+              className="mt-1 break-words whitespace-pre-wrap border-t border-border/40 pt-1 text-muted-foreground"
+              style={{
+                display: '-webkit-box',
+                WebkitLineClamp: 3,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+              }}
+            >
+              {marks[hoverIdx].answer}
+            </div>
+          )}
         </div>
       )}
     </div>
