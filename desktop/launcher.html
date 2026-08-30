@@ -4,253 +4,356 @@
 <meta charset="UTF-8">
 <title>正在启动 Qiu_Ai_LZ…</title>
 <style>
+    :root {
+        --paper: #F7F4EC;        /* 与应用 background 同源：hsl(44 22% 96%) */
+        --ink: #191612;
+        --ink-soft: #6E6A5E;
+        --terracotta: #D97757;   /* Claude 品牌陶土橙 */
+        --line: #E3DFD2;
+        --danger: #B3261E;
+    }
+
     html, body {
         margin: 0; height: 100%; overflow: hidden;
-        /* Vignette baked into the base: warm ember heart fading to near-black edges */
-        background:
-            radial-gradient(120vmax 90vmax at 50% 42%, #211913 0%, #17130f 45%, #0e0b09 100%);
+        background: var(--paper);
         font: 13px/1.6 "Segoe UI", "Microsoft YaHei", sans-serif;
+        color: var(--ink);
     }
 
-    /* ---- Aurora field: drifting colour wash, never static ---- */
-    .aurora { position: fixed; inset: -20%; filter: blur(90px) saturate(1.15); }
-    .blob { position: absolute; border-radius: 50%; will-change: transform, opacity; }
-    .b1 { width: 55vmax; height: 55vmax; left: -10%; top: -15%; opacity: .42;
-          background: radial-gradient(circle, #d77655 0%, rgba(215,118,85,0) 70%);
-          animation: drift1 16s ease-in-out infinite alternate, blobPulse1 11s ease-in-out infinite alternate; }
-    .b2 { width: 45vmax; height: 45vmax; right: -12%; top: 20%; opacity: .38;
-          background: radial-gradient(circle, #a84838 0%, rgba(168,72,56,0) 70%);
-          animation: drift2 19s ease-in-out infinite alternate, blobPulse2 13s ease-in-out infinite alternate; }
-    .b3 { width: 40vmax; height: 40vmax; left: 25%; bottom: -20%; opacity: .34;
-          background: radial-gradient(circle, #8a4a52 0%, rgba(138,74,82,0) 70%);
-          animation: drift3 22s ease-in-out infinite alternate, blobPulse3 15s ease-in-out infinite alternate; }
-    .b4 { width: 26vmax; height: 26vmax; right: 22%; bottom: -8%; opacity: .30;
-          background: radial-gradient(circle, #c98a4b 0%, rgba(201,138,75,0) 70%);
-          animation: drift1 18s ease-in-out infinite alternate-reverse, blobPulse1 12s ease-in-out infinite alternate-reverse; }
-    @keyframes drift1 { to { transform: translate(12vw, 8vh) scale(1.15); } }
-    @keyframes drift2 { to { transform: translate(-10vw, -6vh) scale(0.9); } }
-    @keyframes drift3 { to { transform: translate(6vw, -10vh) scale(1.2); } }
-    /* each blob breathes its own opacity on its own period, so the wash
-       never sits still even between drifts */
-    @keyframes blobPulse1 { from { opacity: .42; } to { opacity: .58; } }
-    @keyframes blobPulse2 { from { opacity: .38; } to { opacity: .22; } }
-    @keyframes blobPulse3 { from { opacity: .34; } to { opacity: .48; } }
-
-    /* ---- Living dark: faint animated undertone so the base is never dead black ---- */
-    .undertone {
-        position: fixed; inset: 0; pointer-events: none;
-        background:
-            radial-gradient(60vmax 60vmax at 20% 30%, rgba(215,118,85,.05), transparent 60%),
-            radial-gradient(50vmax 50vmax at 80% 70%, rgba(184,84,58,.05), transparent 60%);
-        animation: undertoneShift 26s ease-in-out infinite alternate;
+    /* ---- 漂移暖晕：两团极淡的暖色光晕缓慢游走，让纸面有呼吸 ---- */
+    .wash { position: fixed; inset: -20%; pointer-events: none; filter: blur(80px); }
+    .w1 {
+        background: radial-gradient(42vmax 42vmax at 30% 28%, rgba(217,119,87,.10) 0%, rgba(217,119,87,0) 70%);
+        animation: washA 22s ease-in-out infinite alternate;
     }
-    @keyframes undertoneShift {
-        from { background-position: 0% 0%, 100% 100%; filter: brightness(1); }
-        to   { background-position: 4% 6%, 94% 92%;  filter: brightness(1.25); }
+    .w2 {
+        background: radial-gradient(46vmax 46vmax at 72% 74%, rgba(240,214,168,.22) 0%, rgba(240,214,168,0) 70%);
+        animation: washB 27s ease-in-out infinite alternate;
+    }
+    @keyframes washA { to { transform: translate(6vw, 4vh) scale(1.12); opacity: .75; } }
+    @keyframes washB { to { transform: translate(-5vw, -4vh) scale(1.08); opacity: .55; } }
+
+    /* ---- 纸纹颗粒：细噪点叠层，呼应应用的暖纸质感 ---- */
+    .grain {
+        position: fixed; inset: 0; pointer-events: none; opacity: .05; mix-blend-mode: multiply;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
     }
 
-    /* ---- Water ripples: concentric rings bloom from the cursor ----
-       Each mousemove (throttled) drops a ring that expands and dissolves,
-       like touching water. A fainter outer ring trails behind it. */
-    .ripple {
-        position: fixed;
-        border-radius: 50%;
-        pointer-events: none;
-        z-index: 1;
-        transform: translate(-50%,-50%) scale(.15);
-        border: 1.5px solid rgba(242,180,126,.55);
-        box-shadow:
-            0 0 18px rgba(215,118,85,.22),
-            inset 0 0 18px rgba(215,118,85,.12);
-        animation: rippleExpand 1.3s cubic-bezier(.2,.6,.35,1) forwards;
-        will-change: transform, opacity;
-    }
-    .ripple.outer {
-        border-color: rgba(215,118,85,.28);
-        box-shadow: none;
-        animation-duration: 1.9s;
-    }
-    @keyframes rippleExpand {
-        from { transform: translate(-50%,-50%) scale(.15); opacity: .75; }
-        60%  { opacity: .38; }
-        to   { transform: translate(-50%,-50%) scale(1);   opacity: 0; }
-    }
+    /* ---- 浮尘粒子画布（含光标柔光/拖尾/点击迸散，全部由画布绘制）---- */
+    #motes { position: fixed; inset: 0; z-index: 1; pointer-events: none; }
 
-    /* ---- Starburst: slightly thicker rays + pinpoint core ----
-       Still the same auto-rotating 12-ray star (starSpin, JS-driven bloom
-       untouched); rays thickened from the original without going chunky. */
+    /* ---- 星芒：饱满一体，辐条从中心一体长出 ----
+       12 条渐变以正片叠底（multiply）混合：重叠处自然叠成深陶土色，
+       中心浑然一体不发亮；双色交替（陶土橙/暖金）+ 长短错落显手工感 */
     .star {
         position: fixed; left: 50%; top: 40%;
         width: 0; height: 0;
         animation: starSpin 60s linear infinite;
         will-change: transform;
-        opacity: .92;
     }
     @keyframes starSpin { to { transform: rotate(360deg); } }
 
     .star i {
         position: absolute; left: 0; top: 0;
-        width: 168px; height: 8px;
+        width: 178px; height: 7px;
         border-radius: 999px;
         transform-origin: 0 50%;
-        /* tapered: transparent root -> ember body -> warm white tip */
+        transform: var(--r, rotate(0deg));
+        /* 偏橙配色：暖橙渐入，亮橙收笔，纸面上明快饱满 */
         background: linear-gradient(90deg,
-            rgba(215,118,85,0) 0%,
-            rgba(222,128,92,.28) 18%,
-            rgba(230,140,100,.85) 46%,
-            rgba(255,214,190,.95) 82%,
-            rgba(255,236,220,0) 100%);
+            rgba(217,119,87,0) 0%,
+            rgba(221,126,80,.30) 20%,
+            rgba(228,138,86,.65) 50%,
+            rgba(235,148,94,.97) 100%);
+        opacity: .9;
         animation: rayBreathe 4s cubic-bezier(.45,0,.55,1) infinite;
+        will-change: transform, opacity;
     }
-    .star i:nth-child(odd)  { width: 112px; opacity: .7; }
+    /* 长短错落：模拟手绘的不均匀 */
     .star i:nth-child(1)  { --r: rotate(0deg);   }
-    .star i:nth-child(2)  { --r: rotate(30deg);  animation-delay: -.4s; }
-    .star i:nth-child(3)  { --r: rotate(60deg);  animation-delay: -.8s; }
-    .star i:nth-child(4)  { --r: rotate(90deg);  animation-delay: -1.2s; }
-    .star i:nth-child(5)  { --r: rotate(120deg); animation-delay: -1.6s; }
-    .star i:nth-child(6)  { --r: rotate(150deg); animation-delay: -2s; }
-    .star i:nth-child(7)  { --r: rotate(180deg); animation-delay: -2.4s; }
-    .star i:nth-child(8)  { --r: rotate(210deg); animation-delay: -2.8s; }
-    .star i:nth-child(9)  { --r: rotate(240deg); animation-delay: -3.2s; }
-    .star i:nth-child(10) { --r: rotate(270deg); animation-delay: -3.6s; }
-    .star i:nth-child(11) { --r: rotate(300deg); animation-delay: -4s; }
-    .star i:nth-child(12) { --r: rotate(330deg); animation-delay: -4.4s; }
+    .star i:nth-child(2)  { --r: rotate(32deg);  width: 126px; animation-delay: -.33s; }
+    .star i:nth-child(3)  { --r: rotate(62deg);  width: 164px; }
+    .star i:nth-child(4)  { --r: rotate(95deg);  width: 118px; animation-delay: -.66s; }
+    .star i:nth-child(5)  { --r: rotate(126deg); width: 180px; }
+    .star i:nth-child(6)  { --r: rotate(152deg); width: 124px; animation-delay: -.99s; }
+    .star i:nth-child(7)  { --r: rotate(184deg); width: 170px; }
+    .star i:nth-child(8)  { --r: rotate(212deg); width: 114px; animation-delay: -1.32s; }
+    .star i:nth-child(9)  { --r: rotate(244deg); width: 176px; }
+    .star i:nth-child(10) { --r: rotate(276deg); width: 122px; animation-delay: -1.65s; }
+    .star i:nth-child(11) { --r: rotate(305deg); width: 158px; }
+    .star i:nth-child(12) { --r: rotate(334deg); width: 120px; animation-delay: -1.98s; }
     @keyframes rayBreathe {
-        0%, 100% { transform: var(--r, rotate(0deg)) scaleX(1);    opacity: .75; }
-        50%      { transform: var(--r, rotate(0deg)) scaleX(1.14); opacity: 1; }
+        0%, 100% { transform: var(--r, rotate(0deg)) scaleX(1);   opacity: .85; }
+        50%      { transform: var(--r, rotate(0deg)) scaleX(1.08); opacity: 1; }
     }
 
-    /* Pinpoint core: bright heart + soft glow where rays converge */
-    .core {
-        position: fixed; left: 50%; top: 40%;
-        width: 130px; height: 130px; transform: translate(-50%,-50%);
-        border-radius: 50%;
-        background: radial-gradient(circle,
-            rgba(255,240,226,.55) 0%,
-            rgba(255,224,200,.22) 22%,
-            rgba(215,118,85,.10) 48%,
-            rgba(215,118,85,0) 70%);
-        animation: corePulse 4s cubic-bezier(.45,0,.55,1) infinite;
-        filter: blur(5px);
-    }
-    @keyframes corePulse {
-        0%, 100% { transform: translate(-50%,-50%) scale(1); opacity: .85; }
-        50%      { transform: translate(-50%,-50%) scale(1.12); opacity: 1; }
-    }
-
-    /* ---- Wordmark: text untouched, moved clear of the star ---- */
+    /* ---- 字标与进度：避开星芒空域，置于其下 ---- */
     .stage {
         position: fixed; left: 50%; top: 40%;
         transform: translateX(-50%);
-        display: flex; flex-direction: column; align-items: center;
+        display: flex; flex-direction: column; align-items: center; gap: 20px;
         z-index: 5;
-        /* clear the star's airspace: longest ray 168px * breathe 1.14 ≈ 192px */
-        padding-top: 216px;
+        padding-top: 214px; /* 让出星芒空域：最长辐条 168px * 呼吸 1.14 ≈ 192px */
     }
     .wordmark {
-        color: #fff3ea;
-        font-size: 21px; font-weight: 300; letter-spacing: .34em;
-        text-indent: .34em; /* balance tracking */
-        text-shadow:
-            0 2px 24px rgba(0,0,0,.55),
-            0 0 18px rgba(255,214,190,.18);
+        margin: 0;
+        font-family: Georgia, "Times New Roman", "Songti SC", "SimSun", serif;
+        font-size: 22px; font-weight: 400; letter-spacing: .34em; text-indent: .34em;
+        color: var(--ink);
         white-space: nowrap;
+        animation: riseIn .8s cubic-bezier(.2,.7,.3,1) both .1s;
+    }
+    .sub {
+        margin-top: -12px;
+        font-size: 11px; letter-spacing: .42em; text-indent: .42em;
+        color: var(--ink-soft); text-transform: uppercase;
+        animation: riseIn .8s cubic-bezier(.2,.7,.3,1) both .28s;
+    }
+    @keyframes riseIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to   { opacity: 1; transform: translateY(0); }
     }
 
+    /* ---- 细进度条：不定态微光扫过 ---- */
+    .shimmer {
+        width: 148px; height: 2px; border-radius: 999px;
+        background: var(--line); overflow: hidden;
+        animation: riseIn .8s cubic-bezier(.2,.7,.3,1) both .4s;
+    }
+    .shimmer i {
+        display: block; width: 34%; height: 100%; border-radius: 999px;
+        background: linear-gradient(90deg, rgba(217,119,87,0), var(--terracotta), rgba(217,119,87,0));
+        animation: shimmerSweep 1.5s cubic-bezier(.45,0,.55,1) infinite;
+    }
+    @keyframes shimmerSweep {
+        from { transform: translateX(-110%); }
+        to   { transform: translateX(430%); }
+    }
 
+    /* ---- 状态行 ---- */
     .status {
         position: fixed; left: 50%; bottom: 9vh; transform: translateX(-50%);
-        color: rgba(255,236,224,.5); letter-spacing: .12em; font-size: 12.5px;
-        white-space: nowrap; transition: opacity .4s;
+        display: flex; align-items: baseline;
+        color: var(--ink-soft); letter-spacing: .14em; font-size: 12.5px;
+        white-space: nowrap; transition: color .3s;
+        z-index: 5;
     }
-    .status.error { color: #ffb59e; }
+    .status .dot {
+        display: inline-block; width: 3px; height: 3px; margin-left: 3px;
+        border-radius: 50%; background: currentColor; opacity: .35;
+        animation: dotWave 1.4s ease-in-out infinite;
+    }
+    .status .dot:nth-child(2) { animation-delay: .18s; }
+    .status .dot:nth-child(3) { animation-delay: .36s; }
+    @keyframes dotWave {
+        0%, 100% { opacity: .25; transform: translateY(0); }
+        40%      { opacity: .9;  transform: translateY(-2.5px); }
+    }
+    .status.error { color: var(--danger); letter-spacing: .04em; }
+    .status.error .dot { display: none; }
 
-    .fadeout { transition: opacity .45s ease-out; }
+    /* 就绪绽放：星芒加速旋转并放大点亮，随后主进程切入应用 */
+    .bloom .star { animation: starSpin 9s linear infinite, starBloomKF .9s cubic-bezier(.45,0,.55,1) 2 alternate; }
+    @keyframes starBloomKF { from { scale: 1; } to { scale: 1.12; } }
+
+    /* ---- 浮尘粒子画布 ---- */
+    #motes { position: fixed; inset: 0; z-index: 1; pointer-events: none; }
+
+    .fadeout { transition: opacity .5s ease-out; }
+
+    @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { animation-duration: .01s !important; animation-iteration-count: 1 !important; }
+    }
 </style>
 </head>
 <body>
-<div class="aurora">
-    <div class="blob b1"></div>
-    <div class="blob b2"></div>
-    <div class="blob b3"></div>
-    <div class="blob b4"></div>
-</div>
-<div class="undertone"></div>
+<canvas id="motes"></canvas>
+<div class="wash w1"></div>
+<div class="wash w2"></div>
+<div class="grain"></div>
 
 <div class="star" id="star">
     <i></i><i></i><i></i><i></i><i></i><i></i>
     <i></i><i></i><i></i><i></i><i></i><i></i>
 </div>
-<div class="core fadeout" id="core"></div>
 
-<div class="stage">
-    <div class="wordmark fadeout" id="wordmark">CLAUDE CODE UI</div>
-</div>
+<main class="stage">
+    <h1 class="wordmark">CLAUDE CODE UI</h1>
+    <div class="sub">Qiu_Ai_LZ</div>
+    <div class="shimmer"><i></i></div>
+</main>
 
-<div class="status fadeout" id="status">正在启动</div>
+<div class="status" id="status">正在启动中<span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
 
 <script>
 "use strict";
 
-// 启动状态由主进程通过 preload 桥推送（构建/服务/就绪/失败），
-// 进入应用的跳转也由主进程完成——本页面只负责展示与动画。
+// 启动状态由主进程经 preload 桥推送；进入应用的跳转由主进程完成。
+// 视觉：暖纸浅底 + 原版配色的动态星芒；新增浮尘粒子与状态跳动点。
 const statusEl = document.getElementById("status");
 
-// ---- Water ripples: cursor drops expanding rings ----
-// Throttled spawns keep node count bounded; each ring removes itself on
-// animationend, so nothing accumulates. An outer faint ring trails behind it
-// for the double-wave feel of a real water drop.
-(function waterRipples() {
-    const SPAWN_INTERVAL_MS = 90;
-    let lastSpawn = 0;
+// ---- 画布氛围系统：浮尘粒子 + 光标柔光 + 拖尾粒子 + 点击迸散 ----
+(function ambient() {
+    const canvas = document.getElementById("motes");
+    const ctx = canvas.getContext("2d");
+    let w = 0, h = 0;
+    const resize = () => {
+        w = canvas.width = innerWidth;
+        h = canvas.height = innerHeight;
+    };
+    resize();
+    window.addEventListener("resize", resize);
 
-    function spawnRing(x, y, size, outer, delayMs) {
-        setTimeout(() => {
-            const el = document.createElement("div");
-            el.className = outer ? "ripple outer" : "ripple";
-            el.style.left = x + "px";
-            el.style.top = y + "px";
-            el.style.width = size + "px";
-            el.style.height = size + "px";
-            el.addEventListener("animationend", () => el.remove());
-            document.body.appendChild(el);
-        }, delayMs);
+    // 浮尘：暖色微尘缓缓上浮，正弦横摆
+    const motes = [];
+    for (let i = 0; i < 30; i++) {
+        motes.push({
+            x: Math.random() * innerWidth,
+            y: Math.random() * innerHeight,
+            r: 1.2 + Math.random() * 2.6,
+            speed: 0.12 + Math.random() * 0.3,
+            sway: 14 + Math.random() * 26,
+            phase: Math.random() * Math.PI * 2,
+            alpha: 0.06 + Math.random() * 0.11,
+        });
     }
 
-    window.addEventListener("mousemove", e => {
+    // 光标柔光位置（缓动跟随）与粒子池
+    const glow = { x: innerWidth / 2, y: innerHeight / 2, tx: innerWidth / 2, ty: innerHeight / 2 };
+    const sparks = [];
+    const rings = [];
+    let lastMove = 0, lastX = glow.tx, lastY = glow.ty;
+
+    window.addEventListener("mousemove", (e) => {
+        glow.tx = e.clientX;
+        glow.ty = e.clientY;
         const now = performance.now();
-        if (now - lastSpawn < SPAWN_INTERVAL_MS) return;
-        lastSpawn = now;
-        spawnRing(e.clientX, e.clientY, 90, false, 0);
-        spawnRing(e.clientX, e.clientY, 150, true, 110);
+        const dx = e.clientX - lastX, dy = e.clientY - lastY;
+        if (now - lastMove < 24 || dx * dx + dy * dy < 30) return;
+        lastMove = now;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        // 拖尾：两三颗细小余烬，随机飘散
+        for (let i = 0; i < 3; i++) {
+            sparks.push({
+                x: e.clientX + (Math.random() - 0.5) * 14,
+                y: e.clientY + (Math.random() - 0.5) * 14,
+                vx: (Math.random() - 0.5) * 0.9,
+                vy: -0.3 - Math.random() * 0.6,
+                r: 1 + Math.random() * 1.8,
+                life: 1,
+                decay: 0.016 + Math.random() * 0.02,
+                gold: Math.random() < 0.35,
+            });
+        }
     });
 
-    // A bigger splash on click / tap.
-    window.addEventListener("pointerdown", e => {
-        spawnRing(e.clientX, e.clientY, 200, false, 0);
-        spawnRing(e.clientX, e.clientY, 300, true, 130);
+    window.addEventListener("pointerdown", (e) => {
+        glow.tx = e.clientX;
+        glow.ty = e.clientY;
+        // 迸散：一圈粒子向外抛出 + 一道淡扩散环
+        for (let i = 0; i < 24; i++) {
+            const a = Math.random() * Math.PI * 2;
+            const sp = 1.4 + Math.random() * 2.6;
+            sparks.push({
+                x: e.clientX, y: e.clientY,
+                vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+                r: 1.2 + Math.random() * 2,
+                life: 1,
+                decay: 0.02 + Math.random() * 0.018,
+                gold: Math.random() < 0.4,
+            });
+        }
+        rings.push({ x: e.clientX, y: e.clientY, r: 8, v: 3.2, life: 1 });
     });
+
+    let t = 0;
+    (function frame() {
+        t += 0.008;
+        ctx.clearRect(0, 0, w, h);
+
+        // 浮尘
+        for (const d of motes) {
+            d.y -= d.speed;
+            if (d.y < -8) { d.y = h + 8; d.x = Math.random() * w; }
+            const x = d.x + Math.sin(t * 1.4 + d.phase) * d.sway;
+            ctx.beginPath();
+            ctx.fillStyle = `rgba(217,119,87,${d.alpha})`;
+            ctx.arc(x, d.y, d.r, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // 光标柔光：缓动跟随，像纸面上一道暖光
+        glow.x += (glow.tx - glow.x) * 0.1;
+        glow.y += (glow.ty - glow.y) * 0.1;
+        const g = ctx.createRadialGradient(glow.x, glow.y, 0, glow.x, glow.y, 110);
+        g.addColorStop(0, "rgba(217,119,87,.11)");
+        g.addColorStop(1, "rgba(217,119,87,0)");
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(glow.x, glow.y, 110, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 拖尾/迸散粒子
+        for (let i = sparks.length - 1; i >= 0; i--) {
+            const p = sparks[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vx *= 0.985;
+            p.vy *= 0.985;
+            p.life -= p.decay;
+            if (p.life <= 0) { sparks.splice(i, 1); continue; }
+            ctx.beginPath();
+            ctx.fillStyle = p.gold
+                ? `rgba(206,140,70,${p.life * 0.55})`
+                : `rgba(217,119,87,${p.life * 0.5})`;
+            ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // 点击扩散环（极淡）
+        for (let i = rings.length - 1; i >= 0; i--) {
+            const r = rings[i];
+            r.r += r.v;
+            r.v *= 0.97;
+            r.life -= 0.025;
+            if (r.life <= 0) { rings.splice(i, 1); continue; }
+            ctx.beginPath();
+            ctx.strokeStyle = `rgba(217,119,87,${r.life * 0.3})`;
+            ctx.lineWidth = 1.5;
+            ctx.arc(r.x, r.y, r.r, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+
+        requestAnimationFrame(frame);
+    })();
 })();
 
-// Heartbeat: star blooms once as a "ready" confirmation.
+// 就绪确认：星芒绽放一次
 function starBloom() {
     const star = document.getElementById("star");
-    star.style.animation = "starSpin 60s linear infinite, starBloom .9s cubic-bezier(.45,0,.55,1) 2 alternate";
+    star.style.animation = "starSpin 60s linear infinite, starBloomKF .9s cubic-bezier(.45,0,.55,1) 2 alternate";
     const kf = document.createElement("style");
-    kf.textContent = "@keyframes starBloom { from { scale: 1; } to { scale: 1.12; } }";
+    kf.textContent = "@keyframes starBloomKF { from { scale: 1; } to { scale: 1.12; } }";
     document.head.appendChild(kf);
 }
 
+// ---- 状态桥接 ----
 if (window.qiuDesktopShell) {
     window.qiuDesktopShell.onStatus(({ text, level }) => {
-        if (text) statusEl.textContent = text;
-        statusEl.classList.toggle("error", level === "failed");
-        if (level === "ready") starBloom();
+        if (level === "ready") {
+            starBloom();
+            return;
+        }
+        if (level === "failed") {
+            statusEl.classList.add("error");
+            statusEl.textContent = "启动失败：" + (text || "未知错误");
+            return;
+        }
+        // 常规状态一律「正在启动中」+ 跳动点，不覆盖 markup 以保留点动画
     });
 } else {
-    // 直接用浏览器打开本页时没有桥，至少给出说明
-    statusEl.textContent = "请通过 Qiu_Ai_LZ 桌面应用启动";
-    statusEl.classList.add("error");
+    // 浏览器直接打开本页（预览模式）：没有桥也保持动画，便于查看效果
 }
 </script>
 </body>
