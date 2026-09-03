@@ -36,10 +36,11 @@ const CLAUDE_DIR = path.join(os.homedir(), '.claude');
 
 // ---------------------------------------------------------------------------
 // better-sqlite3 从宿主 node_modules 加载（原生模块，插件目录没有自己的
-// node_modules）。宿主安装位置变化时改 resolveHostNodeModules() 即可。
+// node_modules）。本文件位于项目内 plugins/ 下时自动向上两级定位宿主
+// node_modules，任何机器/盘符免改；仅当插件被拷到项目外时才需调整此函数。
 // ---------------------------------------------------------------------------
 function resolveHostNodeModules() {
-  return path.join('D:', 'Claude_Tools', 'claudecodeui', 'node_modules');
+  return path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'node_modules');
 }
 
 function readSessionRow(appSessionId) {

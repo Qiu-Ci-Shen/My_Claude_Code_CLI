@@ -208,6 +208,8 @@ New-Item -ItemType Directory -Force "$env:USERPROFILE\.claude-code-ui\plugins" |
 Copy-Item -Recurse -Force .\plugins\* "$env:USERPROFILE\.claude-code-ui\plugins\"
 ```
 
+**注意**：Claude Rewind 的 Node 后端（`server.js`）依赖宿主 `node_modules`（better-sqlite3），并从插件自身位置自动向上两级定位——插件留在项目 `plugins/` 内（方式一/二）时全自动生效；复制到项目外（本方式）后需把 `server.js` 里 `resolveHostNodeModules()` 改指到本应用安装位置的 `node_modules`。
+
 **验证**：重启后在 **设置 → 插件** 能看到 Push to Talk 与 Claude Rewind 即成功。`git pull` 更新仓库后，方式一/二的插件自动跟随更新，方式三需重新复制。
 
 ## 数据与配置位置
