@@ -8,6 +8,7 @@ import type { MarkSessionIdle, MarkSessionProcessing } from '../../../hooks/useS
 import type { PendingPermissionRequest } from '../types/types';
 import type { ProjectSession, LLMProvider } from '../../../types/app';
 import type { SessionStore, NormalizedMessage } from '../../../stores/useSessionStore';
+
 import { markSessionAborted } from './abort-suppression';
 
 const isActionablePermissionRequest = (request: { toolName?: unknown } | null | undefined): boolean => {

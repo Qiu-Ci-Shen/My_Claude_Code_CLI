@@ -12,10 +12,10 @@ import { useChatRealtimeHandlers } from '../hooks/useChatRealtimeHandlers';
 import { isSessionAbortSuppressed } from '../hooks/abort-suppression';
 import { useChatComposerState } from '../hooks/useChatComposerState';
 import { useSessionStore } from '../../../stores/useSessionStore';
+import type { EditMessageTarget } from '../../../lib/rewindRpc';
 
 import ChatMessagesPane from './subcomponents/ChatMessagesPane';
 import ChatMessageRail from './subcomponents/ChatMessageRail';
-import type { EditMessageTarget } from '../../../lib/rewindRpc';
 import ChatComposer from './subcomponents/ChatComposer';
 import ContextUsageBar from './subcomponents/ContextUsageBar';
 import CommandResultModal from './subcomponents/CommandResultModal';
