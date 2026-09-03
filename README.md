@@ -87,7 +87,7 @@ cp .env.example .env
 | `CLAUDE_CLI_PATH` | `claude` | Claude CLI 不在 PATH 时指定完整路径 |
 | `DATABASE_PATH` | `~/.cloudcli/auth.db` | 账号/会话数据库位置 |
 | `CONTEXT_WINDOW` | `160000` | 上下文窗口兜底值（代理用户建议按实际模型窗口修改） |
-| `QIU_PLUGINS_DIR` | `~/.claude-code-ui/plugins` | 插件代码目录 |
+| `QIU_PLUGINS_DIR` | `~/.claude-code-ui/plugins` | 插件代码目录；指向仓库 `plugins/` 可启用内置插件（见「插件」章节） |
 
 ## 让 Claude CLI 走自定义模型（中转/代理）
 
@@ -166,6 +166,50 @@ cp .env.example .env
 - 插件 = `manifest.json` + 前端入口（可带 Node 后端文件），支持 tab 挂载点和后台模块（`backgroundOnly`，如全局快捷键类）
 - 换图标：替换 `desktop/assets/logo-windows.ico` 后执行 `node scripts/regenerate-icons.mjs`，全套 27 个图标（PWA/favicon/logo/icns）一键重生成
 
+### 内置插件启用
+
+仓库自带两个插件（源码在仓库 `plugins/` 目录）：
+
+- **Push to Talk** — 按住左 Alt 说话，松开自动识别填入输入框（需先在 设置 → 语音 配好 STT，见上文「语音」章节）
+- **Claude Rewind** — 消息级回退
+
+应用只加载 `QIU_PLUGINS_DIR` 指向的目录（默认 `~/.claude-code-ui/plugins`），仓库自带的 `plugins/` 文件夹**不会**被自动扫描，需要用下面任一方式启用：
+
+**方式一：桌面版（零配置，推荐）**
+
+```bash
+npm run app
+```
+
+桌面壳启动时会自动把插件目录指向仓库的 `plugins/`，无需任何设置。
+
+**方式二：.env 指向（推荐浏览器模式）**
+
+```bash
+cp .env.example .env
+```
+
+编辑 `.env`，取消注释并设置（Windows 路径建议用正斜杠写法）：
+
+```bash
+QIU_PLUGINS_DIR=/你的仓库路径/plugins              # Linux/macOS
+QIU_PLUGINS_DIR=D:/你的仓库路径/qiu-ai-lz/plugins   # Windows
+```
+
+相对路径 `./plugins` 也可，以启动命令的执行目录为基准。改完重启服务生效。
+
+**方式三：复制安装**
+
+把仓库 `plugins/` 下的插件文件夹复制到 `~/.claude-code-ui/plugins/`：
+
+```powershell
+# Windows PowerShell
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.claude-code-ui\plugins" | Out-Null
+Copy-Item -Recurse -Force .\plugins\* "$env:USERPROFILE\.claude-code-ui\plugins\"
+```
+
+**验证**：重启后在 **设置 → 插件** 能看到 Push to Talk 与 Claude Rewind 即成功。`git pull` 更新仓库后，方式一/二的插件自动跟随更新，方式三需重新复制。
+
 ## 数据与配置位置
 
 | 路径 | 内容 |
@@ -198,6 +242,7 @@ cp .env.example .env
 | Git 面板报错 | 确认所选文件夹是 git 仓库（不是的话先在面板里点「初始化」） |
 | 桌面壳卡在「构建中」 | 源码有更新时首次启动会自动重建，约 1 分钟；构建不会清空旧产物，完成后自动进入 |
 | Claude Code 会话报错后无法继续 | 界面内对任意消息点回退按钮（↩）即可重建会话，无需手动删转录文件 |
+| 设置→插件 里看不到内置的 Push to Talk / Claude Rewind | 按上文「插件」章节启用：桌面版自动生效；浏览器模式在 `.env` 设 `QIU_PLUGINS_DIR` 指向仓库 `plugins/`，或把插件复制到 `~/.claude-code-ui/plugins/` |
 
 ## 更新
 
