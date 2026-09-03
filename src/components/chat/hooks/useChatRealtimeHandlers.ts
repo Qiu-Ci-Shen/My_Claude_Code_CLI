@@ -8,6 +8,7 @@ import type { MarkSessionIdle, MarkSessionProcessing } from '../../../hooks/useS
 import type { PendingPermissionRequest } from '../types/types';
 import type { ProjectSession, LLMProvider } from '../../../types/app';
 import type { SessionStore, NormalizedMessage } from '../../../stores/useSessionStore';
+import { markSessionAborted } from './abort-suppression';
 
 const isActionablePermissionRequest = (request: { toolName?: unknown } | null | undefined): boolean => {
   return request?.toolName !== 'ExitPlanMode' && request?.toolName !== 'exit_plan_mode';
@@ -251,6 +252,10 @@ export function useChatRealtimeHandlers({
           if (msg.aborted) {
             // Abort was requested — the complete event confirms it. No
             // further UI action is needed beyond clearing the entry above.
+            // The CLI still flushes this turn into its transcript on wind-down;
+            // arm the reload suppression so the watcher-driven refetch it
+            // triggers can't resurrect the full output (see abort-suppression).
+            if (sid) markSessionAborted(sid);
             break;
           }
 

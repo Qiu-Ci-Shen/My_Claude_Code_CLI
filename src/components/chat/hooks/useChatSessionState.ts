@@ -11,6 +11,7 @@ import { createMessageHistoryRefreshCoordinator } from '../utils/messageHistoryR
 import { createCachedDiffCalculator, type DiffCalculator } from '../utils/messageTransforms';
 
 import { normalizedToChatMessages } from './useChatMessages';
+import { isSessionAbortSuppressed } from './abort-suppression';
 
 const INITIAL_VISIBLE_MESSAGES = 100;
 
@@ -718,8 +719,11 @@ export function useChatSessionState({
 
     const reloadExternalMessages = async () => {
       try {
-        // Skip store refresh during active streaming
-        if (!isProcessing) {
+        // Skip store refresh during active streaming. Also skip inside the
+        // post-abort window: the CLI flushes the interrupted turn to its
+        // transcript and the watcher surfaces it here as an "external" update,
+        // which would otherwise resurrect the full output after ESC.
+        if (!isProcessing && !isSessionAbortSuppressed(selectedSession.id)) {
           const shouldStickToBottom = isActiveRef.current && isNearBottom();
           await requestLatestMessages(selectedSession.id);
 

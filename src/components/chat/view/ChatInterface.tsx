@@ -9,6 +9,7 @@ import type { ChatInterfaceProps, PermissionMode, Provider  } from '../types/typ
 import { useChatProviderState } from '../hooks/useChatProviderState';
 import { useChatSessionState } from '../hooks/useChatSessionState';
 import { useChatRealtimeHandlers } from '../hooks/useChatRealtimeHandlers';
+import { isSessionAbortSuppressed } from '../hooks/abort-suppression';
 import { useChatComposerState } from '../hooks/useChatComposerState';
 import { useSessionStore } from '../../../stores/useSessionStore';
 
@@ -235,7 +236,12 @@ function ChatInterface({
   // missed live events, and re-attaches a still-running stream to this socket.
   const handleWebSocketReconnect = useCallback(async () => {
     if (!selectedProject || !selectedSession) return;
-    await requestLatestMessages(selectedSession.id, isActive);
+    // Post-abort suppression: skip the transcript tail sync (the interrupted
+    // turn was flushed to disk in full and must not resurface), but keep
+    // subscribing so live events still flow after the reconnect.
+    if (!isSessionAbortSuppressed(selectedSession.id)) {
+      await requestLatestMessages(selectedSession.id, isActive);
+    }
     statusCheckSentAtRef.current.set(selectedSession.id, Date.now());
     sendMessage({
       type: 'chat.subscribe',
