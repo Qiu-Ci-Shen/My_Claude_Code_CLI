@@ -45,12 +45,20 @@ export function rewindLocate(
   return rpc<RewindLocateResult>('/locate', { sessionId, timestamp, textPrefix });
 }
 
+export type RewindExecuteResult = {
+  ok: boolean;
+  error?: string;
+  targetUuid?: string;
+  truncated?: { backupPath: string; dropped: number; kept: number };
+  files?: { restored: string[]; removed: string[]; errors: string[] };
+};
+
 export function rewindExecute(
   sessionId: string | null,
   targetUuid: string,
   restoreFiles: boolean,
-): Promise<{ ok: boolean; error?: string }> {
-  return rpc<{ ok: boolean; error?: string }>('/execute', {
+): Promise<RewindExecuteResult> {
+  return rpc<RewindExecuteResult>('/execute', {
     sessionId,
     targetUuid,
     restoreFiles,

@@ -930,6 +930,17 @@ export function useSessionStore() {
   }, [notify]);
 
   /**
+   * Drop a session's slot entirely (rewind aftermath): the transcript was
+   * truncated server-side, so cached pages/realtime rows are stale beyond what
+   * a merge can fix. The next read recreates the slot empty and the follow-up
+   * fetch repopulates it from the authoritative transcript.
+   */
+  const resetSlot = useCallback((sessionId: string) => {
+    if (!storeRef.current.delete(sessionId)) return;
+    notify(sessionId);
+  }, [notify]);
+
+  /**
    * Get merged messages for a session (for rendering).
    */
   const getMessages = useCallback((sessionId: string): NormalizedMessage[] => {
@@ -968,6 +979,7 @@ export function useSessionStore() {
     updateStreaming,
     finalizeStreaming,
     clearRealtime,
+    resetSlot,
     setTokenUsage,
     getMessages,
     getSessionSlot,
@@ -975,7 +987,7 @@ export function useSessionStore() {
     getSlot, has, fetchFromServer, fetchMore,
     appendRealtime, appendRealtimeBatch, refreshLatestFromServer,
     setActiveSession, setStatus, isStale, updateStreaming, finalizeStreaming,
-    clearRealtime, setTokenUsage, getMessages, getSessionSlot,
+    clearRealtime, resetSlot, setTokenUsage, getMessages, getSessionSlot,
   ]);
 }
 

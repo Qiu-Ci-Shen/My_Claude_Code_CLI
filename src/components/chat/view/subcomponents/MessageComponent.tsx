@@ -37,6 +37,8 @@ type MessageComponentProps = {
   provider: Provider | string;
   /** 点击 ✎ 时上抛：由底部输入框进入编辑模式（ZCode 同款），而非内联卡片 */
   onEditMessage?: (message: ChatMessage) => void;
+  /** 点击 ⟲ 时上抛：由 ChatInterface 执行回退（截断转录 + 可选恢复文件） */
+  onRewindMessage?: (message: ChatMessage) => void;
 };
 
 type InteractiveOption = {
@@ -47,7 +49,7 @@ type InteractiveOption = {
 
 const COPY_HIDDEN_TOOL_NAMES = new Set(['Bash', 'Edit', 'Write', 'ApplyPatch']);
 
-const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, showRawParameters, showThinking, selectedProject, provider, onEditMessage }: MessageComponentProps) => {
+const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, showRawParameters, showThinking, selectedProject, provider, onEditMessage, onRewindMessage }: MessageComponentProps) => {
   const { t } = useTranslation('chat');
   const isGrouped = prevMessage && prevMessage.type === message.type &&
     ((prevMessage.type === 'assistant') ||
@@ -114,6 +116,19 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
                   </Markdown>
                 </div>
                 <div className="mt-1 flex items-center justify-end gap-1 text-xs text-muted-foreground">
+                  {shouldShowUserCopyControl && (
+                    <button
+                      type="button"
+                      onClick={() => onRewindMessage?.(message)}
+                      className="transition-opacity hover:text-foreground"
+                      title="回退到此消息之前（截断之后的对话，可选恢复文件）"
+                    >
+                      <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M9 14 4 9l5-5" />
+                        <path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11" />
+                      </svg>
+                    </button>
+                  )}
                   {shouldShowUserCopyControl && (
                     <button
                       type="button"

@@ -5,14 +5,14 @@ import { ArrowDownIcon } from 'lucide-react';
 import { useTasksSettings } from '../../../contexts/TasksSettingsContext';
 import { useWebSocket } from '../../../contexts/WebSocketContext';
 import PermissionContext from '../../../contexts/PermissionContext';
-import type { ChatInterfaceProps, PermissionMode, Provider  } from '../types/types';
+import type { ChatInterfaceProps, ChatMessage, PermissionMode, Provider  } from '../types/types';
 import { useChatProviderState } from '../hooks/useChatProviderState';
 import { useChatSessionState } from '../hooks/useChatSessionState';
 import { useChatRealtimeHandlers } from '../hooks/useChatRealtimeHandlers';
 import { isSessionAbortSuppressed } from '../hooks/abort-suppression';
 import { useChatComposerState } from '../hooks/useChatComposerState';
 import { useSessionStore } from '../../../stores/useSessionStore';
-import type { EditMessageTarget } from '../../../lib/rewindRpc';
+import { rewindExecute, rewindLocate, type EditMessageTarget } from '../../../lib/rewindRpc';
 
 import ChatMessagesPane from './subcomponents/ChatMessagesPane';
 import ChatMessageRail from './subcomponents/ChatMessageRail';
@@ -297,6 +297,71 @@ function ChatInterface({
     };
   }, [canAbortSession, handleAbortSession, editTarget]);
 
+  // ── Rewind（⟲ 回退到此消息之前）─────────────────────────────────────
+  const [rewindTarget, setRewindTarget] = useState<ChatMessage | null>(null);
+  const [rewindRunning, setRewindRunning] = useState(false);
+  const [rewindNotice, setRewindNotice] = useState<{ text: string; isError: boolean } | null>(null);
+  const rewindNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showRewindNotice = useCallback((text: string, isError = false) => {
+    setRewindNotice({ text, isError });
+    if (rewindNoticeTimerRef.current) clearTimeout(rewindNoticeTimerRef.current);
+    rewindNoticeTimerRef.current = setTimeout(() => setRewindNotice(null), 4000);
+  }, []);
+  useEffect(() => () => {
+    if (rewindNoticeTimerRef.current) clearTimeout(rewindNoticeTimerRef.current);
+  }, []);
+
+  const handleRewindMessage = useCallback((message: ChatMessage) => {
+    if (!(currentSessionId || selectedSession?.id)) {
+      showRewindNotice('当前是新会话，还没有可回退的历史。', true);
+      return;
+    }
+    setRewindTarget(message);
+  }, [currentSessionId, selectedSession?.id, showRewindNotice]);
+
+  const handleRewindConfirm = useCallback(async () => {
+    const message = rewindTarget;
+    if (!message || rewindRunning) return;
+    const sessionId = currentSessionId || selectedSession?.id || null;
+    if (!sessionId) return;
+
+    setRewindRunning(true);
+    try {
+      showRewindNotice('正在定位消息…');
+      const locate = await rewindLocate(sessionId, message.timestamp, String(message.content || '').trim().slice(0, 50));
+      if (!locate.found || !locate.uuid) throw new Error('转录中找不到这条消息');
+
+      const result = await rewindExecute(sessionId, locate.uuid, true);
+      if (!result.ok) throw new Error(result.error || 'rewind failed');
+
+      const parts = [`已丢弃 ${result.truncated?.dropped ?? 0} 条记录`];
+      if (result.files?.restored.length) parts.push(`恢复 ${result.files.restored.length} 个文件`);
+      if (result.files?.removed.length) parts.push(`移除 ${result.files.removed.length} 个新建文件`);
+      if (result.files?.errors.length) parts.push(`错误 ${result.files.errors.length} 个`);
+      showRewindNotice(`回退完成：${parts.join('，')}`);
+
+      setRewindTarget(null);
+      // 转录已被截断：缓存页与实时行整体作废，清槽后从服务端权威转录重取
+      sessionStore.resetSlot(sessionId);
+      await requestLatestMessages(sessionId);
+    } catch (err) {
+      showRewindNotice(`回退失败：${err instanceof Error ? err.message : String(err)}`, true);
+    } finally {
+      setRewindRunning(false);
+    }
+  }, [rewindTarget, rewindRunning, currentSessionId, selectedSession?.id, sessionStore, requestLatestMessages, showRewindNotice]);
+
+  // Esc 关闭回退确认框（录音/运行中不关）
+  useEffect(() => {
+    if (!rewindTarget) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !rewindRunning) setRewindTarget(null);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [rewindTarget, rewindRunning]);
+
   useEffect(() => {
     return () => {
       resetStreamingState();
@@ -411,6 +476,7 @@ function ChatInterface({
             timestamp: message.timestamp,
             content: String(message.content || ''),
           })}
+          onRewindMessage={handleRewindMessage}
         />
           <ChatMessageRail containerRef={scrollContainerRef} messages={visibleMessages} />
           {/* 编辑模式指示：聊天界面顶部居中的浮动胶囊 */}
@@ -427,6 +493,56 @@ function ChatInterface({
                   ✕
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* ⟲ 回退确认对话框 */}
+          {rewindTarget && (
+            <div
+              className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 backdrop-blur-[2px]"
+              onClick={() => { if (!rewindRunning) setRewindTarget(null); }}
+            >
+              <div
+                className="w-[min(420px,90vw)] rounded-2xl border border-border bg-popover p-6 text-popover-foreground shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="mb-3 text-[15.5px] font-semibold text-foreground">回退到此消息之前？</div>
+                <ul className="mb-5 list-disc space-y-1 pl-5 text-[13px] leading-relaxed text-muted-foreground">
+                  <li>此消息及之后的所有对话将被删除</li>
+                  <li>代码/文件将恢复到该消息执行前的状态（如有快照）</li>
+                </ul>
+                <div className="flex justify-end gap-2.5">
+                  <button
+                    type="button"
+                    disabled={rewindRunning}
+                    onClick={() => setRewindTarget(null)}
+                    className="rounded-lg border border-border px-4 py-1.5 text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
+                  >
+                    取消
+                  </button>
+                  <button
+                    type="button"
+                    disabled={rewindRunning}
+                    onClick={handleRewindConfirm}
+                    className="rounded-lg bg-primary px-4 py-1.5 text-[13px] text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+                  >
+                    {rewindRunning ? '回退中…' : '确定回退'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 回退结果通知 */}
+          {rewindNotice && (
+            <div
+              className={`fixed left-1/2 top-4 z-[101] -translate-x-1/2 rounded-xl px-4 py-2.5 text-[13px] shadow-lg ${
+                rewindNotice.isError
+                  ? 'bg-destructive text-destructive-foreground'
+                  : 'border border-border bg-popover text-popover-foreground'
+              }`}
+            >
+              {rewindNotice.text}
             </div>
           )}
         </div>

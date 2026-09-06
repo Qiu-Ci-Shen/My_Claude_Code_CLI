@@ -70,6 +70,8 @@ interface ChatMessagesPaneProps {
   selectedProject: Project;
   /** ✎ 编辑消息：上抛给聊天界面进入底部输入框编辑模式 */
   onEditMessage?: (message: ChatMessage) => void;
+  /** ⟲ 回退消息：上抛给聊天界面执行回退（确认后截断转录 + 可选恢复文件） */
+  onRewindMessage?: (message: ChatMessage) => void;
 }
 
 function ChatMessagesPane({
@@ -120,6 +122,7 @@ function ChatMessagesPane({
   showThinking,
   selectedProject,
   onEditMessage,
+  onRewindMessage,
 }: ChatMessagesPaneProps) {
   const { t } = useTranslation('chat');
   const groupedVisibleMessages = useMemo(
@@ -302,6 +305,7 @@ function ChatMessagesPane({
                   selectedProject={selectedProject}
                   provider={provider}
                   onEditMessage={onEditMessage}
+                  onRewindMessage={onRewindMessage}
                 />
               );
             });
