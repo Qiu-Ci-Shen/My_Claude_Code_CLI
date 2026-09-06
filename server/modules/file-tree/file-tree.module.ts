@@ -42,7 +42,18 @@ const fileTreeFileSystem: FileTreeFileSystem = {
     yield* await fsPromises.opendir(directoryPath);
   },
   realpath: (candidatePath) => fsPromises.realpath(candidatePath),
-  readTextFile: (filePath) => fsPromises.readFile(filePath, 'utf8'),
+  readTextFile: async (filePath) => {
+    // 编辑器整读整存：不给多 GB 文件把进程堆打爆的机会（经隧道也可达）
+    const MAX_TEXT_FILE_BYTES = 20 * 1024 * 1024;
+    const stat = await fsPromises.stat(filePath);
+    if (stat.size > MAX_TEXT_FILE_BYTES) {
+      const megabytes = Math.round(stat.size / 1024 / 1024);
+      throw Object.assign(new Error(`File too large to open in the editor (${megabytes}MB, limit 20MB)`), {
+        code: 'EFILETOOLARGE',
+      });
+    }
+    return fsPromises.readFile(filePath, 'utf8');
+  },
   writeTextFile: (filePath, content) => fsPromises.writeFile(filePath, content, 'utf8'),
   async makeDirectory(directoryPath, recursive) {
     await fsPromises.mkdir(directoryPath, { recursive });

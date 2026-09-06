@@ -29,6 +29,9 @@ const router = express.Router();
 const COMMIT_DIFF_CHARACTER_LIMIT = 500_000;
 
 function spawnAsync(command, args, options = {}) {
+  // 网络型 git 操作（fetch/pull/push）在凭据管理器 GUI 弹窗或网络挂起时会
+  // 永远不退出——必须带超时；stdin 立即关闭并挂 error 保护（EPIPE）。
+  const timeoutMs = Number(options.timeoutMs) > 0 ? Number(options.timeoutMs) : 120_000;
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       ...options,
@@ -37,6 +40,25 @@ function spawnAsync(command, args, options = {}) {
 
     let stdout = '';
     let stderr = '';
+    let settled = false;
+
+    const settle = (fn, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      fn(value);
+    };
+
+    const timer = setTimeout(() => {
+      const error = new Error(`Command timed out after ${timeoutMs}ms: ${command} ${args.join(' ')}`);
+      error.code = 'GIT_COMMAND_TIMEOUT';
+      try { child.kill(); } catch { /* already gone */ }
+      settle(reject, error);
+    }, timeoutMs);
+    timer.unref?.();
+
+    child.stdin?.on('error', () => { /* EPIPE when the child exits before stdin drains */ });
+    child.stdin?.end();
 
     child.stdout.on('data', (data) => {
       stdout += data.toString();
@@ -47,12 +69,12 @@ function spawnAsync(command, args, options = {}) {
     });
 
     child.on('error', (error) => {
-      reject(error);
+      settle(reject, error);
     });
 
     child.on('close', (code) => {
       if (code === 0) {
-        resolve({ stdout, stderr });
+        settle(resolve, { stdout, stderr });
         return;
       }
 
@@ -60,7 +82,7 @@ function spawnAsync(command, args, options = {}) {
       error.code = code;
       error.stdout = stdout;
       error.stderr = stderr;
-      reject(error);
+      settle(reject, error);
     });
   });
 }

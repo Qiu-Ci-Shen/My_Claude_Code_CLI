@@ -53,7 +53,8 @@ test('register hashes credentials and commits through injected dependencies', as
   const result = await service.register('alice', 'secret12');
 
   assert.equal(result.token, 'signed-token');
-  assert.deepEqual(operations, ['begin', 'hash:secret12', 'create:alice:hash', 'commit', 'login:1']);
+  // 哈希必须在 begin 之前（异步 bcrypt 不允许跨 await 悬挂共享连接上的事务）
+  assert.deepEqual(operations, ['hash:secret12', 'begin', 'create:alice:hash', 'commit', 'login:1']);
 });
 
 test('login rejects an invalid password without issuing a token', async () => {

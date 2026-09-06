@@ -11,7 +11,8 @@ import {
   projectsDb,
   userDb,
 } from '@/modules/database/index.js';
-import { providerModelsService } from '@/modules/providers/index.js';
+import { providerModelsService, providerRuntimeService } from '@/modules/providers/index.js';
+import type { LLMProvider } from '@/shared/types.js';
 import { IS_PLATFORM } from '@/shared/utils.js';
 
 import { createAgentRouter } from './agent.routes.js';
@@ -46,6 +47,7 @@ export function createAgentModule(externalDependencies: AgentExternalDependencie
         projectsDb.createProjectPath(projectPath, customName),
     },
     models: providerModelsService,
+    abortRun: (provider, sessionId) => providerRuntimeService.abort(provider as LLMProvider, sessionId),
     GithubClient: Octokit,
     ...externalDependencies,
   });

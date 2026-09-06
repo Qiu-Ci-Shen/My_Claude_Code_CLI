@@ -65,6 +65,11 @@ export function createAuthService(dependencies: AuthDependencies) {
         );
       }
 
+      // bcrypt 是异步的：哈希必须在事务外完成——否则共享连接上的事务跨
+      // await 悬挂，期间其它请求的写入会被卷进本事务，并发 register 还会
+      // 触发 "cannot start a transaction within a transaction"。
+      const passwordHash = await dependencies.hashPassword(password);
+
       dependencies.transaction.begin();
       try {
         if (dependencies.users.hasUsers()) {
@@ -74,7 +79,6 @@ export function createAuthService(dependencies: AuthDependencies) {
           });
         }
 
-        const passwordHash = await dependencies.hashPassword(password);
         const user = dependencies.users.createUser(username, passwordHash);
         const token = dependencies.generateToken(user);
         dependencies.transaction.commit();

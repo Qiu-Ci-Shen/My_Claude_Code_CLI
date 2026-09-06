@@ -22,6 +22,8 @@ type AgentRouterDependencies = {
   queryCursor: ProviderRunFunction;
   queryCodex: ProviderRunFunction;
   queryOpenCode: ProviderRunFunction;
+  /** 客户端断开时中止运行（providerRuntimeService.abort）；可选依赖 */
+  abortRun?: (provider: string, sessionId: string) => Promise<boolean>;
   GithubClient: typeof import('@octokit/rest').Octokit;
 };
 
@@ -357,25 +359,31 @@ export function createAgentRouter(dependencies: AgentRouterDependencies): expres
         const cloneDir = path.resolve(projectPath);
 
         // Check if directory already exists
+        let dirExists = false;
         try {
           await fs.access(cloneDir);
-          // Directory exists - check if it's a git repo with the same URL
-          try {
-            const existingUrl = await getGitRemoteUrl(cloneDir);
-            const normalizedExisting = normalizeGitHubUrl(existingUrl);
-            const normalizedRequested = normalizeGitHubUrl(cloneUrl);
+          dirExists = true;
+        } catch {
+          dirExists = false; // Directory doesn't exist - proceed with clone
+        }
 
-            if (normalizedExisting === normalizedRequested) {
-              console.log('✅ Repository already exists at path with correct URL');
-              return resolve({ path: cloneDir, created: false });
-            } else {
-              throw new Error(`Directory ${cloneDir} already exists with a different repository (${existingUrl}). Expected: ${githubUrl}`);
-            }
-          } catch (gitError) {
-            throw new Error(`Directory ${cloneDir} already exists but is not a valid git repository or git command failed`);
+        if (dirExists) {
+          // Directory exists - check if it's a git repo with the same URL.
+          // （原先的嵌套 try/catch 会把「同目录不同仓库」的精确报错吞成
+          //   通用文案，再落回 git clone 撞 already exists——此处不再遮蔽）
+          let existingUrl = null;
+          try {
+            existingUrl = await getGitRemoteUrl(cloneDir);
+          } catch {
+            existingUrl = null;
           }
-        } catch (accessError) {
-          // Directory doesn't exist - proceed with clone
+          if (existingUrl && normalizeGitHubUrl(existingUrl) === normalizeGitHubUrl(cloneUrl)) {
+            console.log('✅ Repository already exists at path with correct URL');
+            return resolve({ path: cloneDir, created: false });
+          }
+          throw new Error(existingUrl
+            ? `Directory ${cloneDir} already exists with a different repository (${existingUrl}). Expected: ${githubUrl}`
+            : `Directory ${cloneDir} already exists but is not a valid git repository`);
         }
 
         // Ensure parent directory exists
@@ -910,6 +918,17 @@ export function createAgentRouter(dependencies: AgentRouterDependencies): expres
     let clonedProjectCreated = false;
     let writer = null;
 
+    // SSE 消费者断开（超时/离开）时：中止仍在烧 token 的运行（显式 sessionId
+    // 才有可中止句柄——新会话要等首条消息回填 provider id），并跳过其后的
+    // GitHub branch/PR 工作流。
+    let clientDisconnected = false;
+    req.on('close', () => {
+      clientDisconnected = true;
+      if (sessionId && dependencies.abortRun) {
+        void dependencies.abortRun(provider, sessionId).catch(() => {});
+      }
+    });
+
     try {
       // Determine the final project path
       if (githubUrl) {
@@ -1032,7 +1051,9 @@ export function createAgentRouter(dependencies: AgentRouterDependencies): expres
       let branchInfo = null;
       let prInfo = null;
 
-      if (createBranch || createPR) {
+      if (clientDisconnected) {
+        console.log('Client disconnected after agent run; skipping GitHub branch/PR workflow');
+      } else if (createBranch || createPR) {
         try {
           console.log('🔄 Starting GitHub branch/PR creation workflow...');
 
