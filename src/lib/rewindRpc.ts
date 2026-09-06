@@ -55,18 +55,22 @@ export type RewindExecuteResult = {
 
 export function rewindExecute(
   sessionId: string | null,
-  targetUuid: string,
+  targetUuid: string | undefined,
   restoreFiles: boolean,
+  /** 不传 targetUuid 时，服务端按这些提示在转录内定位目标消息 */
+  hints?: { timestamp?: string | number | Date | null; textPrefix?: string },
 ): Promise<RewindExecuteResult> {
   return rpc<RewindExecuteResult>('/execute', {
     sessionId,
     targetUuid,
     restoreFiles,
+    ...(hints?.timestamp !== undefined && hints.timestamp !== null
+      ? { timestamp: hints.timestamp }
+      : {}),
+    ...(hints?.textPrefix ? { textPrefix: hints.textPrefix } : {}),
   });
 }
 
-/** 编辑重发暂存键：截断成功后写入，页面刷新后由 composer 消费并自动发送。 */
-export const PENDING_EDIT_RESEND_KEY = 'qiu:pending-edit-resend';
 
 /** 编辑模式目标：✎ 选中的那条消息（ZCode 同款底部输入框编辑） */
 export type EditMessageTarget = {

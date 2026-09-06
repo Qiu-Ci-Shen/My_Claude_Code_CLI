@@ -14,12 +14,7 @@ import { useDropzone } from 'react-dropzone';
 import { useWebSocket } from '../../../contexts/WebSocketContext';
 
 import { authenticatedFetch } from '../../../utils/api';
-import {
-  PENDING_EDIT_RESEND_KEY,
-  rewindExecute,
-  rewindLocate,
-  type EditMessageTarget,
-} from '../../../lib/rewindRpc';
+import { rewindExecute, type EditMessageTarget } from '../../../lib/rewindRpc';
 import type { MarkSessionProcessing, SessionActivityMap } from '../../../hooks/useSessionProtection';
 import { grantClaudeToolPermission } from '../utils/chatPermissions';
 import {
@@ -58,6 +53,8 @@ interface UseChatComposerStateArgs {
   currentProviderModel: string;
   currentProviderEffort: string;
   isLoading: boolean;
+  /** 编辑重发截断完成后回调（清槽 + 静默回填更早轮次），由 ChatInterface 提供 */
+  onTruncateCompleted?: (sessionId: string) => void;
   processingSessions?: SessionActivityMap;
   canAbortSession: boolean;
   tokenBudget: Record<string, unknown> | null;
@@ -251,6 +248,7 @@ export function useChatComposerState({
   currentProviderModel,
   currentProviderEffort,
   isLoading,
+  onTruncateCompleted,
   processingSessions,
   canAbortSession,
   tokenBudget,
@@ -294,6 +292,8 @@ export function useChatComposerState({
   const inputHighlightRef = useRef<HTMLDivElement>(null);
   const textareaLineHeightRef = useRef<number | null>(null);
   const lastAutosizedInputRef = useRef<string | null>(null);
+  const isLoadingRef = useRef(isLoading);
+  isLoadingRef.current = isLoading;
   const handleSubmitRef = useRef<
     ((
       event: FormEvent<HTMLFormElement> | MouseEvent | TouchEvent | KeyboardEvent<HTMLTextAreaElement>,
@@ -695,8 +695,8 @@ export function useChatComposerState({
       }
 
       // ── 编辑模式（ZCode 同款）：提交 = 截断这条消息及其后的对话，再用
-      // 输入框里的新文本重发。流程与旧的 ✎ 内联卡片一致：打断 → rewind 定位
-      // → 截断 → 暂存新文本 → 刷新后自动发送。──
+      // 输入框里的新文本立即重发。不整页刷新——截断后清槽重建视图，更早
+      // 轮次从服务端静默回填。──
       if (editTarget) {
         const sessionId = editTarget.sessionId;
         if (!sessionId) {
@@ -704,33 +704,41 @@ export function useChatComposerState({
           return;
         }
         onClearEditTarget?.();
+        const editedText = inputValueRef.current;
         void (async () => {
           try {
             sendMessage({ type: 'chat.abort', sessionId });
-            await new Promise((resolve) => setTimeout(resolve, 600));
-            const locate = await rewindLocate(sessionId, editTarget.timestamp, editTarget.content.slice(0, 80));
-            if (!locate.found || !locate.uuid) {
-              // 转录里没有这条消息：常见于「发送后立刻打断」——CLI 还没来得及
-              // 把消息落盘，此时没有任何可截断的内容，直接把编辑后的文本作为
-              // 新消息正常发送（而非报错拦截）。
-              handleSubmitRef.current?.(createFakeSubmitEvent());
-              return;
+
+            // 等待运行真正退出（abort 的 terminal complete 翻转 isLoading），
+            // 通常一两百毫秒；比固定 sleep 更快也更稳。上限 4s 兜底。
+            const idleDeadline = Date.now() + 4000;
+            while (isLoadingRef.current && Date.now() < idleDeadline) {
+              await new Promise((resolve) => setTimeout(resolve, 80));
             }
-            const result = await rewindExecute(sessionId, locate.uuid, false);
-            if (!result.ok) {
+
+            // 一次请求完成「定位 + 截断」。消息不在转录中（如发送后立刻打断，
+            // CLI 尚未落盘）视为无内容可截断，直接发送新文本。
+            const result = await rewindExecute(sessionId, undefined, false, {
+              timestamp: editTarget.timestamp,
+              textPrefix: editTarget.content.slice(0, 80),
+            });
+            const notFound = !result.ok && /not found/i.test(result.error || '');
+            if (!result.ok && !notFound) {
               throw new Error(result.error || '会话回退失败');
             }
-            safeLocalStorage.setItem(
-              PENDING_EDIT_RESEND_KEY,
-              JSON.stringify({ sessionId, text: currentInput, at: Date.now() }),
-            );
-            window.location.reload();
+
+            // 清槽重建视图（更早轮次静默回填），随即把编辑后的文本作为新消息发出
+            onTruncateCompleted?.(sessionId);
+            if (editedText.trim()) {
+              handleSubmitRef.current?.(createFakeSubmitEvent());
+            }
           } catch (err) {
             addMessage({
               type: 'error',
               content: err instanceof Error ? err.message : String(err),
               timestamp: new Date(),
             });
+            setInput(editedText); // 失败恢复输入，草稿不丢
           }
         })();
         return;
@@ -1002,6 +1010,7 @@ export function useChatComposerState({
       scrollToBottom,
       editTarget,
       onClearEditTarget,
+      onTruncateCompleted,
       selectedProject,
       sendMessage,
       sessionKey,
@@ -1357,54 +1366,7 @@ export function useChatComposerState({
     }
   }, [currentSessionId, editTarget, onClearEditTarget]);
 
-  // ── 编辑重发：截断完成后 MessageComponent 暂存编辑文本并整页刷新，
-  // 这里在页面加载时消费暂存文本。先立即填入输入框（用户随时能看到），
-  // 等 WebSocket 连接就绪后自动提交——刷新后重连需要时间，盲目定时发送
-  // 会把消息发进没连上的 socket 里丢失。最多等 20s，超时则留在输入框，
-  // 回车即可手动发送。──
-  useEffect(() => {
-    const raw = safeLocalStorage.getItem(PENDING_EDIT_RESEND_KEY);
-    if (!raw) return;
-    safeLocalStorage.removeItem(PENDING_EDIT_RESEND_KEY);
-    let pending: { sessionId?: string | null; text?: string; at?: number };
-    try {
-      pending = JSON.parse(raw);
-    } catch {
-      return;
-    }
-    const pendingText = String(pending.text || '');
-    if (!pendingText || !pending.at || Date.now() - pending.at > 60_000) return;
-
-    // 会话对不上时只填入不自动发送，避免发进错误的会话
-    const sessionMatches =
-      !pending.sessionId || !currentSessionId || pending.sessionId === currentSessionId;
-    setInput(pendingText);
-    inputValueRef.current = pendingText;
-    if (!sessionMatches) return;
-
-    const attemptSend = () => {
-      if (!isConnectedRef.current) return false;
-      handleSubmitRef.current?.(createFakeSubmitEvent());
-      return true;
-    };
-
-    let retryTimer: ReturnType<typeof setInterval> | null = null;
-    let attempts = 0;
-    const firstTimer = setTimeout(() => {
-      if (attemptSend()) return;
-      retryTimer = setInterval(() => {
-        attempts++;
-        if (attemptSend() || attempts >= 38) {
-          if (retryTimer) clearInterval(retryTimer);
-        }
-      }, 500);
-    }, 1200);
-    return () => {
-      clearTimeout(firstTimer);
-      if (retryTimer) clearInterval(retryTimer);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // ── 编辑重发：截断完成后立即重发（不再经过暂存+整页刷新）──
 
   return {
     input,

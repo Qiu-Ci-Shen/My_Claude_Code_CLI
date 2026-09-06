@@ -211,6 +211,11 @@ function ChatInterface({
     currentProviderModel,
     currentProviderEffort,
     isLoading: isProcessing,
+    onTruncateCompleted: (sid) => {
+      // 编辑重发截断后：清槽重建视图，更早轮次从服务端静默回填
+      sessionStore.resetSlot(sid);
+      void requestLatestMessages(sid, true);
+    },
     processingSessions,
     canAbortSession,
     tokenBudget,
