@@ -1,16 +1,131 @@
 import type { ChatMessage } from '../types/types';
+import { api } from '../../../utils/api';
 
 export interface ExportOptions {
   includeMeta: boolean;
   format: 'markdown' | 'pdf' | 'docx';
 }
 
+/** 导出用消息体：角色 + 时间 + 已提炼的正文（工具调用折叠为单行说明） */
+type ExportTurn = {
+  role: 'user' | 'assistant' | 'error';
+  timestamp?: string | number | Date;
+  lines: string[];
+};
+
+/**
+ * 从服务端拉取完整转录（分页直到取尽）——聊天界面只加载尾部窗口，
+ * 直接导出已加载窗口会静默丢掉更早的对话。
+ */
+export async function fetchFullSessionMessages(
+  sessionId: string,
+  provider: string,
+): Promise<unknown[]> {
+  const all: unknown[] = [];
+  const pageSize = 200;
+  let offset = 0;
+  let hasMore = true;
+  while (hasMore) {
+    const response = await api.unifiedSessionMessages(sessionId, provider, {
+      limit: pageSize,
+      offset,
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch session history: ${response.status}`);
+    }
+    const payload = await response.json().then((r) => r?.data ?? r);
+    const messages = Array.isArray(payload?.messages) ? payload.messages : [];
+    all.push(...messages);
+    hasMore = Boolean(payload?.hasMore) && messages.length > 0;
+    offset += messages.length;
+  }
+  return all;
+}
+
+/** 工具调用提炼为一行人类可读说明（读/写文件、命令等） */
+function describeToolUse(toolName: unknown, rawInput: unknown): string {
+  const name = String(toolName || 'tool');
+  let input: Record<string, unknown> | null = null;
+  if (typeof rawInput === 'string') {
+    try {
+      const parsed = JSON.parse(rawInput);
+      input = parsed && typeof parsed === 'object' ? parsed : null;
+    } catch {
+      input = null;
+    }
+  } else if (rawInput && typeof rawInput === 'object') {
+    input = rawInput as Record<string, unknown>;
+  }
+
+  const file = input?.file_path ?? input?.notebook_path ?? input?.path;
+  if (file) {
+    const target = String(file);
+    const verb = name === 'Write' ? '写入' : name === 'MultiEdit' ? '多处编辑' : name === 'NotebookEdit' ? '编辑' : '编辑';
+    return `🔧 ${name} → ${target}（${verb}）`;
+  }
+  if (typeof input?.command === 'string') {
+    const command = input.command.length > 120 ? `${input.command.slice(0, 120)}…` : input.command;
+    return `🔧 Bash → \`${command}\``;
+  }
+  if (typeof input?.url === 'string') {
+    return `🔧 ${name} → ${input.url}`;
+  }
+  return `🔧 ${name}`;
+}
+
+/**
+ * 把消息列表提炼为干净的导出回合：用户/AI 正文保留，工具调用折叠为单行，
+ * 跳过工具结果回显与思考内容。
+ */
+export function buildExportTurns(messages: ChatMessage[]): ExportTurn[] {
+  const turns: ExportTurn[] = [];
+  const pushTurn = (role: ExportTurn['role'], timestamp: ExportTurn['timestamp'], line?: string) => {
+    const last = turns[turns.length - 1];
+    if (last && last.role === role && last.timestamp === timestamp) {
+      if (line) last.lines.push(line);
+      return;
+    }
+    const turn: ExportTurn = { role, timestamp, lines: [] };
+    if (line) turn.lines.push(line);
+    turns.push(turn);
+  };
+
+  for (const msg of messages) {
+    const ts = msg.timestamp;
+    if (msg.type === 'user') {
+      const content = typeof msg.content === 'string' ? msg.content : String(msg.content ?? '');
+      if (content.trim()) pushTurn('user', ts, content);
+      continue;
+    }
+    if (msg.type === 'error') {
+      pushTurn('error', ts, String(msg.content ?? ''));
+      continue;
+    }
+    if (msg.isToolUse) {
+      pushTurn('assistant', ts, describeToolUse(msg.toolName, msg.toolInput));
+      continue;
+    }
+    if (msg.type === 'assistant' && msg.isThinking) continue;
+    if (msg.type === 'assistant') {
+      const content = typeof msg.content === 'string' ? msg.content : String(msg.content ?? '');
+      if (content.trim()) pushTurn('assistant', ts, content);
+    }
+  }
+  return turns;
+}
+
+const ROLE_LABEL: Record<ExportTurn['role'], string> = {
+  user: '🧑 用户',
+  assistant: '🤖 Claude',
+  error: '⚠️ 错误',
+};
+
 /**
  * Format a timestamp for display in exports.
  */
 function formatTimestamp(date: Date | string | number): string {
   const d = typeof date === 'string' || typeof date === 'number' ? new Date(date) : date;
-  return new Intl.DateTimeFormat('en-US', {
+  return new Intl.DateTimeFormat('zh-CN', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -38,37 +153,23 @@ export function exportToMarkdown(
   options: Partial<ExportOptions> = {},
 ): string {
   const includeMeta = options.includeMeta ?? true;
+  const turns = buildExportTurns(messages);
 
   let markdown = '';
 
   // Header
   if (includeMeta) {
-    markdown += `# ${sessionTitle || 'Chat Export'}\n\n`;
-    markdown += `**Exported:** ${formatTimestamp(new Date())}\n\n`;
+    markdown += `# ${sessionTitle || '会话导出'}\n\n`;
+    markdown += `> 导出时间：${formatTimestamp(new Date())} · 共 ${turns.length} 个发言回合\n\n`;
     markdown += `---\n\n`;
   }
 
-  // Messages
-  for (const msg of messages) {
-    if (msg.type === 'user') {
-      markdown += '## You\n\n';
-    } else if (msg.type === 'assistant') {
-      markdown += '## Claude\n\n';
-    } else if (msg.type === 'error') {
-      markdown += '## ⚠️ Error\n\n';
-    } else if (msg.type === 'tool') {
-      markdown += '## 🔧 Tool\n\n';
-    } else {
-      continue;
+  for (const turn of turns) {
+    markdown += `## ${ROLE_LABEL[turn.role]}\n\n`;
+    markdown += `${turn.lines.join('\n\n')}\n\n`;
+    if (includeMeta && turn.timestamp) {
+      markdown += `<small>${formatTimestamp(turn.timestamp)}</small>\n\n`;
     }
-
-    const content = typeof msg.content === 'string' ? msg.content : String(msg.content ?? '');
-    markdown += `${content}\n\n`;
-
-    if (includeMeta && msg.timestamp) {
-      markdown += `<small>${formatTimestamp(msg.timestamp)}</small>\n\n`;
-    }
-
     markdown += '---\n\n';
   }
 
@@ -97,19 +198,20 @@ export function exportToHTML(
   options: Partial<ExportOptions> = {},
 ): string {
   const includeMeta = options.includeMeta ?? true;
+  const turns = buildExportTurns(messages);
 
-  const htmlContent = messages
-    .map((msg) => {
-      const type = msg.type === 'user' ? '👤 You' : msg.type === 'assistant' ? '🤖 Claude' : `${msg.type}`;
-      const time = includeMeta && msg.timestamp ? `<p style="font-size: 12px; color: #999; margin-top: 8px;">${formatTimestamp(msg.timestamp)}</p>` : '';
-
-      const contentStr = typeof msg.content === 'string' ? msg.content : String(msg.content ?? '');
-      const contentHTML = escapeHTML(contentStr);
+  const htmlContent = turns
+    .map((turn) => {
+      const time = includeMeta && turn.timestamp ? `<p style="font-size: 12px; color: #999; margin-top: 8px;">${formatTimestamp(turn.timestamp)}</p>` : '';
+      const background = turn.role === 'user' ? '#e3f2fd' : turn.role === 'error' ? '#fdecea' : '#f5f5f5';
+      const body = turn.lines
+        .map((line) => `<p style="margin: 0 0 10px 0; white-space: pre-wrap; word-wrap: break-word; color: #555; font-size: 14px; line-height: 1.6;">${escapeHTML(line)}</p>`)
+        .join('');
 
       return `
-        <div style="margin-bottom: 24px; padding: 16px; border-radius: 8px; background-color: ${msg.type === 'user' ? '#e3f2fd' : '#f5f5f5'};">
-          <h3 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 600; color: #333;">${type}</h3>
-          <p style="margin: 0; white-space: pre-wrap; word-wrap: break-word; color: #555; font-size: 14px; line-height: 1.6;">${contentHTML}</p>
+        <div style="margin-bottom: 24px; padding: 16px; border-radius: 8px; background-color: ${background};">
+          <h3 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 600; color: #333;">${ROLE_LABEL[turn.role]}</h3>
+          ${body}
           ${time}
         </div>
       `;
@@ -122,7 +224,7 @@ export function exportToHTML(
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>${escapeHTML(sessionTitle || 'Chat Export')}</title>
+        <title>${escapeHTML(sessionTitle || '会话导出')}</title>
         <style>
           body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -138,8 +240,8 @@ export function exportToHTML(
         </style>
       </head>
       <body>
-        <h1>${escapeHTML(sessionTitle || 'Chat Export')}</h1>
-        <div class="meta">Exported on ${formatTimestamp(new Date())}</div>
+        <h1>${escapeHTML(sessionTitle || '会话导出')}</h1>
+        <div class="meta">导出时间 ${formatTimestamp(new Date())}</div>
         <div class="divider"></div>
         ${htmlContent}
       </body>

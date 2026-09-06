@@ -218,6 +218,12 @@ export const api = {
     authenticatedFetch(`/api/projects/${encodeURIComponent(projectId)}/taskmaster`),
   // Unified endpoint for persisted session messages.
   // Provider/project metadata are resolved by the backend from sessionId.
+  /**
+   * @param {string} sessionId
+   * @param {string} [_provider]
+   * @param {{ limit?: number | null; offset?: number }} [options]
+   * @returns {Promise<Response>}
+   */
   unifiedSessionMessages: (sessionId, _provider = 'claude', { limit = null, offset = 0 } = {}) => {
     const params = new URLSearchParams();
     if (limit !== null) {
