@@ -13,7 +13,8 @@
  */
 
 import crypto from 'crypto';
-import { promises as fs, existsSync, readFileSync } from 'fs';
+import { promises as fs, existsSync, createReadStream } from 'fs';
+import readline from 'node:readline';
 import os from 'os';
 import path from 'path';
 
@@ -229,15 +230,29 @@ async function isTranscriptResumable(appSessionId) {
     if (!row?.jsonl_path || !existsSync(row.jsonl_path)) {
       return true;
     }
-    const content = readFileSync(row.jsonl_path, 'utf8');
-    return content.split('\n').some((line) => {
-      try {
-        const entry = JSON.parse(line);
-        return entry && (entry.type === 'user' || entry.type === 'assistant');
-      } catch {
-        return false;
-      }
+    // 只需确认「存在至少一条 user/assistant 条目」：流式逐行读、命中即退。
+    // 原实现 readFileSync 全量 + 全行 JSON.parse 是同步阻塞——多 MB 转录时
+    // 每次发消息都把事件循环卡住数百毫秒。
+    const rl = readline.createInterface({
+      input: createReadStream(row.jsonl_path, 'utf8'),
+      crlfDelay: Infinity,
     });
+    try {
+      for await (const line of rl) {
+        if (!line.trim()) continue;
+        try {
+          const entry = JSON.parse(line);
+          if (entry && (entry.type === 'user' || entry.type === 'assistant')) {
+            return true;
+          }
+        } catch {
+          return false;
+        }
+      }
+      return false;
+    } finally {
+      rl.close();
+    }
   } catch {
     return true;
   }

@@ -2,7 +2,6 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import readline from 'node:readline';
-
 import type { IProviderSessions } from '@/shared/interfaces.js';
 import type { AnyRecord, FetchHistoryOptions, FetchHistoryResult, NormalizedMessage } from '@/shared/types.js';
 import { parseFilesInputTag } from '@/shared/image-attachments.js';
@@ -12,6 +11,44 @@ import { sessionsDb } from '@/modules/database/index.js';
 import { filterPostAbortTranscriptEntries, getAbortedTurnTimestamps } from './aborted-turns.js';
 
 const PROVIDER = 'claude';
+
+// 转录解析缓存：历史 API 每次请求都重读+重解析整个 JSONL（多 MB 文件每次几十
+// 毫秒，且激活/刷新/回退后都会触发）。mtime+size 未变化时直接复用解析结果；
+// 条目数超上限按插入序淘汰。缓存为原始解析条目（未按 providerSessionId 过滤）。
+const transcriptParseCache = new Map<string, { mtimeMs: number; size: number; entries: AnyRecord[] }>();
+const TRANSCRIPT_CACHE_MAX_FILES = 30;
+
+async function readTranscriptEntries(jsonlPath: string): Promise<AnyRecord[]> {
+  const stat = await fsp.stat(jsonlPath);
+  const cached = transcriptParseCache.get(jsonlPath);
+  if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) {
+    return cached.entries;
+  }
+
+  const entries: AnyRecord[] = [];
+  const fileStream = fs.createReadStream(jsonlPath);
+  const rl = readline.createInterface({
+    input: fileStream,
+    crlfDelay: Infinity,
+  });
+  for await (const line of rl) {
+    if (!line.trim()) {
+      continue;
+    }
+    try {
+      entries.push(JSON.parse(line) as AnyRecord);
+    } catch {
+      // Skip malformed JSONL lines that can happen during concurrent writes.
+    }
+  }
+
+  transcriptParseCache.set(jsonlPath, { mtimeMs: stat.mtimeMs, size: stat.size, entries });
+  if (transcriptParseCache.size > TRANSCRIPT_CACHE_MAX_FILES) {
+    const oldest = transcriptParseCache.keys().next().value;
+    if (oldest !== undefined) transcriptParseCache.delete(oldest);
+  }
+  return entries;
+}
 
 type ClaudeToolResult = {
   content: unknown;
@@ -126,24 +163,13 @@ async function getSessionMessages(
     const messages: AnyRecord[] = [];
     const agentToolsCache = new Map<string, AnyRecord[]>();
 
-    const fileStream = fs.createReadStream(jsonLPath);
-    const rl = readline.createInterface({
-      input: fileStream,
-      crlfDelay: Infinity,
-    });
+    // 历史 API 每次请求都重读+重解析整个 JSONL（多 MB 转录每次几十毫秒），
+    // 而激活/刷新/回退后都会触发请求。mtime+size 未变化时直接复用解析结果。
+    const allEntries = await readTranscriptEntries(jsonLPath);
 
-    for await (const line of rl) {
-      if (!line.trim()) {
-        continue;
-      }
-
-      try {
-        const entry = JSON.parse(line) as AnyRecord;
-        if (entry.sessionId === providerSessionId) {
-          messages.push(entry);
-        }
-      } catch {
-        // Skip malformed JSONL lines that can happen during concurrent writes.
+    for (const entry of allEntries) {
+      if (entry.sessionId === providerSessionId) {
+        messages.push(entry);
       }
     }
 
