@@ -241,15 +241,21 @@ export async function startCloneProject(
   const gitProcess = dependencies.spawnGitClone(cloneUrl, clonePath);
   let lastError = '';
 
+  // Git echoes the credentialed URL (token as userinfo) in failure output;
+  // live progress goes straight to the client SSE, so redact per chunk — the
+  // close-time sanitize below is too late for already-streamed lines.
+  const redactToken = (text: string): string =>
+    githubToken && githubToken.length > 0 ? text.split(githubToken).join('***') : text;
+
   gitProcess.stdout?.on('data', (data: Buffer | string) => {
-    const message = data.toString().trim();
+    const message = redactToken(data.toString().trim());
     if (message) {
       handlers.onProgress(message);
     }
   });
 
   gitProcess.stderr?.on('data', (data: Buffer | string) => {
-    const message = data.toString().trim();
+    const message = redactToken(data.toString().trim());
     lastError = message;
     if (message) {
       handlers.onProgress(message);

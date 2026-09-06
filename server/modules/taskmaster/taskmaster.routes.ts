@@ -71,8 +71,28 @@ export function createTaskmasterRouter(dependencies: TaskmasterRouterDependencie
         : null;
     const router = express.Router();
 
-    function runTaskmasterProcess(command, args, options, onComplete) {
-        const child = spawn(command, args, options);
+    /**
+     * PRD 文件名白名单：字母数字/空格/点/横线 + .txt|.md，不含任何路径分隔符。
+     * GET /prd、parse-prd、apply-template 三处拼 docs 路径前都必须过这道闸，
+     * 否则 `..%2f` / `..\\..\\` 形式的穿越可读、可写项目目录之外的任意文件。
+     */
+    function isValidPrdFileName(fileName) {
+        return typeof fileName === 'string' && /^[\w\-. ]+\.(txt|md)$/.test(fileName);
+    }
+
+    /**
+     * npx 子进程可能瞬间退出（ENOENT/断网）：stdin 的待写缓冲会抛 EPIPE 'error'，
+     * 没有监听器就是未捕获事件直接崩进程。所有 stdin 读写都走这里。
+     */
+    function writeStdinSafely(child, text) {
+        child.stdin?.on('error', () => { /* child exited before stdin drained */ });
+        if (text !== undefined) {
+            child.stdin?.write(text);
+        }
+        child.stdin?.end();
+    }
+
+    function runTaskmasterProcess(command, args, options, onComplete) {        const child = spawn(command, args, options);
         let stdout = '';
         let stderr = '';
         let settled = false;
@@ -479,6 +499,13 @@ export function createTaskmasterRouter(dependencies: TaskmasterRouterDependencie
         try {
             const { projectId, fileName } = req.params;
 
+            if (!isValidPrdFileName(fileName)) {
+                return res.status(400).json({
+                    error: 'Invalid filename',
+                    message: 'Filename must end with .txt or .md and contain only alphanumeric characters, spaces, dots, and dashes'
+                });
+            }
+
             const projectPath = await resolveProjectPathFromId(projectId);
             if (!projectPath) {
                 return res.status(404).json({
@@ -596,8 +623,7 @@ export function createTaskmasterRouter(dependencies: TaskmasterRouterDependencie
             });
 
             // Send 'yes' responses to automated prompts
-            initProcess.stdin.write('yes\n');
-            initProcess.stdin.end();
+            writeStdinSafely(initProcess, 'yes\n');
 
         } catch (error) {
             console.error('TaskMaster init error:', error);
@@ -686,7 +712,7 @@ export function createTaskmasterRouter(dependencies: TaskmasterRouterDependencie
                 }
             });
 
-            addTaskProcess.stdin.end();
+            writeStdinSafely(addTaskProcess);
 
         } catch (error) {
             console.error('Add task error:', error);
@@ -744,7 +770,7 @@ export function createTaskmasterRouter(dependencies: TaskmasterRouterDependencie
                     }
                 });
 
-                setStatusProcess.stdin.end();
+                writeStdinSafely(setStatusProcess);
             } else {
                 // For other updates, use update-task command with a prompt describing the changes
                 const updates = [];
@@ -783,7 +809,7 @@ export function createTaskmasterRouter(dependencies: TaskmasterRouterDependencie
                     }
                 });
 
-                updateProcess.stdin.end();
+                writeStdinSafely(updateProcess);
             }
 
         } catch (error) {
@@ -803,6 +829,13 @@ export function createTaskmasterRouter(dependencies: TaskmasterRouterDependencie
         try {
             const { projectId } = req.params;
             const { fileName = 'prd.txt', numTasks, append = false } = req.body;
+
+            if (!isValidPrdFileName(fileName)) {
+                return res.status(400).json({
+                    error: 'Invalid filename',
+                    message: 'Filename must end with .txt or .md and contain only alphanumeric characters, spaces, dots, and dashes'
+                });
+            }
 
             const projectPath = await resolveProjectPathFromId(projectId);
             if (!projectPath) {
@@ -869,7 +902,7 @@ export function createTaskmasterRouter(dependencies: TaskmasterRouterDependencie
                 }
             });
 
-            parsePRDProcess.stdin.end();
+            writeStdinSafely(parsePRDProcess);
 
         } catch (error) {
             console.error('Parse PRD error:', error);
@@ -1342,6 +1375,13 @@ Description of the business problem, data sources, and expected insights.
                 });
             }
 
+            if (!isValidPrdFileName(fileName)) {
+                return res.status(400).json({
+                    error: 'Invalid filename',
+                    message: 'Filename must end with .txt or .md and contain only alphanumeric characters, spaces, dots, and dashes'
+                });
+            }
+
             const projectPath = await resolveProjectPathFromId(projectId);
             if (!projectPath) {
                 return res.status(404).json({
@@ -1364,10 +1404,11 @@ Description of the business problem, data sources, and expected insights.
             // Apply customizations to template content
             let content = template.content;
 
-            // Replace placeholders with customizations
+            // Replace placeholders with customizations（字面量替换：不用 RegExp，
+            // 避免 key 里的元字符注入正则/ReDoS，也修掉错误的转义实现）
             for (const [key, value] of Object.entries(customizations)) {
                 const placeholder = `[${key}]`;
-                content = content.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&'), 'g'), value);
+                content = content.split(placeholder).join(String(value ?? ''));
             }
 
             // Ensure .taskmaster/docs directory exists

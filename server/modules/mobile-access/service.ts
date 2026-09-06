@@ -138,8 +138,62 @@ type AttemptRecord = { count: number; resetAt: number; lockUntil: number };
 const attemptByIp = new Map<string, AttemptRecord>();
 const consecutiveFailuresByIp = new Map<string, number>();
 
+// Cap on tracked identities: entries only leave on success, so an attacker
+// rotating spoofed identities would otherwise grow the maps unboundedly.
+const MAX_TRACKED_IPS = 2000;
+
+/**
+ * Drops expired lockout/window records once the maps approach the cap.
+ * Called on the pin-login hot path — cheap size checks, full sweep only when
+ * the cap is approached (an attacker rotating identities faster than expiry).
+ */
+function pruneRateMaps(): void {
+    if (attemptByIp.size < MAX_TRACKED_IPS / 2) return;
+    const now = Date.now();
+    for (const [ip, rec] of attemptByIp) {
+        if (rec.lockUntil <= now && rec.resetAt <= now) {
+            attemptByIp.delete(ip);
+            consecutiveFailuresByIp.delete(ip);
+        }
+    }
+    while (attemptByIp.size >= MAX_TRACKED_IPS) {
+        const oldest = attemptByIp.keys().next().value;
+        if (oldest === undefined) break;
+        attemptByIp.delete(oldest);
+        consecutiveFailuresByIp.delete(oldest);
+    }
+    if (consecutiveFailuresByIp.size > MAX_TRACKED_IPS * 2) {
+        consecutiveFailuresByIp.clear();
+    }
+}
+
+/**
+ * Resolves the rate-limit identity for a PIN login attempt.
+ *
+ * Forwarded headers (cf-connecting-ip / x-forwarded-for) are only trusted when
+ * the TCP connection itself originates from loopback — that is the tunnel
+ * (cloudflared) sourcing back to the local server. A direct LAN client controls
+ * those headers, so trusting them there would let one machine rotate unlimited
+ * fresh buckets and brute-force the 6-digit PIN; direct connections use the
+ * socket address (unspoofable) instead.
+ */
+export function resolvePinRateLimitIdentity(req: {
+    headers: Record<string, unknown>;
+    socket: { remoteAddress?: string | null };
+}): string {
+    const remote = req.socket.remoteAddress ?? 'unknown';
+    const isLoopback = remote === '127.0.0.1' || remote === '::1' || remote === '::ffff:127.0.0.1';
+    if (!isLoopback) {
+        return remote;
+    }
+    const forwarded = (req.headers['cf-connecting-ip'] as string | undefined)
+        ?? (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim();
+    return forwarded || remote;
+}
+
 function checkRateLimit(ip: string): { ok: true } | { ok: false; retryAfterSec: number } {
-  const now = Date.now();
+    pruneRateMaps();
+    const now = Date.now();
   const rec = attemptByIp.get(ip);
   if (rec && rec.lockUntil > now) {
     return { ok: false, retryAfterSec: Math.ceil((rec.lockUntil - now) / 1000) };

@@ -1,7 +1,7 @@
 import express from 'express';
 
 import type { createMobileAccessService, MobileAccessStatus } from './service.js';
-import { regeneratePin, setPin, verifyPinAndIssueToken } from './service.js';
+import { regeneratePin, resolvePinRateLimitIdentity, setPin, verifyPinAndIssueToken } from './service.js';
 
 /** Thin transport handlers around the mobile access service. */
 export function createMobileAccessRouter(
@@ -82,10 +82,9 @@ export function pinLoginHandler(
   next: express.NextFunction,
 ): void {
   try {
-    const ip = (req.headers['cf-connecting-ip'] as string | undefined)
-      ?? (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim()
-      ?? req.socket.remoteAddress
-      ?? 'unknown';
+    // Only trust forwarded headers from loopback (the local tunnel); direct
+    // LAN clients use their socket address — see resolvePinRateLimitIdentity.
+    const ip = resolvePinRateLimitIdentity(req);
     const { token, user } = verifyPinAndIssueToken(ip, req.body?.pin);
     res.json({ success: true, token, user });
   } catch (error) {

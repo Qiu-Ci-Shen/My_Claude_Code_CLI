@@ -244,9 +244,12 @@ export async function validateWorkspacePath(requestedPath: string): Promise<Work
 
     for (const forbiddenPath of FORBIDDEN_WORKSPACE_PATHS) {
       const normalizedForbiddenPath = normalizeProjectPath(forbiddenPath);
+      // NTFS 比较大小写不敏感：C:\WINDOWS 与 C:\Windows 是同一目录。黑名单
+      // 比较必须同步大小写折叠，否则大写变体绕过系统目录封锁。
+      const compare = (value: string) => (process.platform === 'win32' ? value.toLowerCase() : value);
       if (
-        normalizedPath === normalizedForbiddenPath
-        || normalizedPath.startsWith(`${normalizedForbiddenPath}${path.sep}`)
+        compare(normalizedPath) === compare(normalizedForbiddenPath)
+        || compare(normalizedPath).startsWith(`${compare(normalizedForbiddenPath)}${path.sep}`)
       ) {
         // Allow specific user-writable folders under /var.
         if (
