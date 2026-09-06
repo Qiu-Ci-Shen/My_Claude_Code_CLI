@@ -19,6 +19,7 @@ function readSessionRow(rawSessionId: unknown): SessionRow | null {
     session_id: row.session_id,
     provider_session_id: row.provider_session_id ?? null,
     jsonl_path: row.jsonl_path ?? null,
+    provider: row.provider,
   };
 }
 
@@ -28,6 +29,11 @@ function isSessionBusy(sessionId: string): boolean {
     chatRunRegistry.isProcessing(sessionId)
     || providerRuntimeService.hasActiveProcess('claude', sessionId)
   );
+}
+
+/** rewind 的转录解析与文件恢复都依赖 claude 专属格式（uuid/parentUuid 链 + file-history）。 */
+function isClaudeSession(row: SessionRow): boolean {
+  return Boolean(row.provider_session_id) && (!row.provider || row.provider === 'claude');
 }
 
 /**
@@ -43,7 +49,7 @@ export function createRewindRouter(): express.Router {
   router.post('/locate', async (req, res) => {
     try {
       const row = readSessionRow(req.body?.sessionId);
-      if (!row) {
+      if (!row || !isClaudeSession(row)) {
         res.json({ found: false, error: 'session not found' });
         return;
       }
@@ -66,7 +72,7 @@ export function createRewindRouter(): express.Router {
         return;
       }
       const row = readSessionRow(sessionId);
-      if (!row) {
+      if (!row || !isClaudeSession(row)) {
         res.json({ ok: false, error: 'session not found in DB' });
         return;
       }

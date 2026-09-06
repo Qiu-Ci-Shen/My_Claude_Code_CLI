@@ -74,6 +74,7 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
     message.isToolUse && COPY_HIDDEN_TOOL_NAMES.has(String(message.toolName || ''))
   );
   const shouldShowUserCopyControl = message.type === 'user' && userCopyContent.trim().length > 0;
+  const isClaudeTranscript = provider === 'claude';
   const shouldShowAssistantCopyControl = message.type === 'assistant' &&
     assistantCopyContent.trim().length > 0 &&
     !isCommandOrFileEditToolResponse &&
@@ -116,7 +117,8 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
                   </Markdown>
                 </div>
                 <div className="mt-1 flex items-center justify-end gap-1 text-xs text-muted-foreground">
-                  {shouldShowUserCopyControl && (
+                  {/* 回退/编辑都依赖 claude 转录格式（uuid 链 + file-history），仅 claude 会话提供 */}
+                  {shouldShowUserCopyControl && isClaudeTranscript && (
                     <button
                       type="button"
                       onClick={() => onRewindMessage?.(message)}
@@ -129,7 +131,7 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
                       </svg>
                     </button>
                   )}
-                  {shouldShowUserCopyControl && (
+                  {shouldShowUserCopyControl && isClaudeTranscript && (
                     <button
                       type="button"
                       onClick={() => onEditMessage?.(message)}

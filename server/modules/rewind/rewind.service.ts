@@ -39,6 +39,8 @@ export type SessionRow = {
   session_id: string;
   provider_session_id: string | null;
   jsonl_path: string | null;
+  /** 转录格式按 provider 区分；rewind 只支持 claude 格式（uuid/parentUuid 链 + file-history） */
+  provider?: string;
 };
 
 export type LocateParams = { timestamp?: unknown; textPrefix?: unknown };

@@ -157,6 +157,10 @@ export function usePushToTalk({
     window.addEventListener('keydown', onEscKeyDown, true);
     window.addEventListener('blur', onBlurWindow);
     return () => {
+      // 设置切换/组件卸载时放弃进行中的录音，避免麦克风静默常开
+      if (stateRef.current === 'recording') {
+        callbacksRef.current.onHoldCancel();
+      }
       clearPressTimer();
       holdingRef.current = false;
       window.removeEventListener('keydown', onKeyDown, true);
