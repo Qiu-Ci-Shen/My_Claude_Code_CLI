@@ -716,14 +716,13 @@ export function useChatComposerState({
               await new Promise((resolve) => setTimeout(resolve, 80));
             }
 
-            // 一次请求完成「定位 + 截断」。消息不在转录中（如发送后立刻打断，
-            // CLI 尚未落盘）视为无内容可截断，直接发送新文本。
+            // 一次请求完成「定位（含时间戳兜底：消息未落盘时按时刻清残留）+
+            // 截断」，随后把编辑后的文本作为新消息发出
             const result = await rewindExecute(sessionId, undefined, false, {
               timestamp: editTarget.timestamp,
               textPrefix: editTarget.content.slice(0, 80),
             });
-            const notFound = !result.ok && /not found/i.test(result.error || '');
-            if (!result.ok && !notFound) {
+            if (!result.ok) {
               throw new Error(result.error || '会话回退失败');
             }
 

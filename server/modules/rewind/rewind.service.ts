@@ -404,7 +404,30 @@ export async function rewindSession(
   const target = body.targetUuid
     ? entries.find((e) => e.uuid === body.targetUuid)
     : locateTargetMessage(entries, body);
-  if (!target || !target.uuid) return { ok: false, error: 'target message not found in transcript' };
+
+  // 定位失败的兜底：目标消息不在转录里——典型场景是「发送后立刻打断」，CLI
+  // 还没来得及把消息落盘。此时按时间戳截断：把该时刻（留 1.5s 时钟容差）及
+  // 之后的残留内容全部清掉，效果等同「回到这条消息之前」。
+  let fallbackFrom = -1;
+  if (!target) {
+    const targetMs = toEpochMs(body.timestamp);
+    if (targetMs === null) {
+      return { ok: false, error: 'target message not found in transcript' };
+    }
+    fallbackFrom = entries.findIndex((e) => {
+      const t = toEpochMs(e.timestamp);
+      return t !== null && t >= targetMs - 1500;
+    });
+    if (fallbackFrom < 0) {
+      // 转录中该时刻之前就已结束：无需截断
+      return {
+        ok: true,
+        targetUuid: undefined,
+        truncated: { backupPath: '', dropped: 0, kept: entries.length },
+        files: { restored: [], removed: [], errors: [] },
+      };
+    }
+  }
 
   // 会话工作目录：优先客户端传入，否则取转录里该会话条目的 cwd 字段
   let cwd = body.cwd || null;
@@ -417,12 +440,21 @@ export async function rewindSession(
     }
   }
 
-  // 1. 截断
-  const truncation = await truncateTranscript(row.jsonl_path, entries, target.uuid);
+  let truncation: { backupPath: string; dropped: number; kept: number };
+  if (target?.uuid) {
+    truncation = await truncateTranscript(row.jsonl_path, entries, target.uuid);
+  } else {
+    // 时间戳兜底截断：保留目标时刻之前的条目，其后的全部丢弃
+    const backupPath = `${row.jsonl_path}.bak-rewind-${Date.now()}`;
+    const keptLines = entries.slice(0, fallbackFrom).map((e) => JSON.stringify(e));
+    await fsp.copyFile(row.jsonl_path, backupPath);
+    await fsp.writeFile(row.jsonl_path, keptLines.join('\n') + '\n', 'utf8');
+    truncation = { backupPath, dropped: entries.length - fallbackFrom, kept: keptLines.length };
+  }
 
-  // 2. 文件恢复（可选）
+  // 文件恢复（可选）——时间戳兜底路径没有目标 uuid 可重建快照计划，跳过
   let files = { restored: [] as string[], removed: [] as string[], errors: [] as string[] };
-  if (body.restoreFiles !== false) {
+  if (target?.uuid && body.restoreFiles !== false) {
     const checkpointDir = checkpointDirFor(row);
     if (fs.existsSync(checkpointDir)) {
       const plan = buildRestorePlan(entries, target.uuid, checkpointDir, { cwd: cwd || undefined });
@@ -432,7 +464,7 @@ export async function rewindSession(
 
   return {
     ok: true,
-    targetUuid: target.uuid,
+    targetUuid: target?.uuid ?? undefined,
     truncated: truncation,
     files,
   };

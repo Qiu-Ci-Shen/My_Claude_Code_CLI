@@ -12,7 +12,7 @@ import { useChatRealtimeHandlers } from '../hooks/useChatRealtimeHandlers';
 import { isSessionAbortSuppressed } from '../hooks/abort-suppression';
 import { useChatComposerState } from '../hooks/useChatComposerState';
 import { useSessionStore } from '../../../stores/useSessionStore';
-import { rewindExecute, rewindLocate, type EditMessageTarget } from '../../../lib/rewindRpc';
+import { rewindExecute, type EditMessageTarget } from '../../../lib/rewindRpc';
 
 import ChatMessagesPane from './subcomponents/ChatMessagesPane';
 import ChatMessageRail from './subcomponents/ChatMessageRail';
@@ -333,11 +333,12 @@ function ChatInterface({
 
     setRewindRunning(true);
     try {
-      showRewindNotice('正在定位消息…');
-      const locate = await rewindLocate(sessionId, message.timestamp, String(message.content || '').trim().slice(0, 50));
-      if (!locate.found || !locate.uuid) throw new Error('转录中找不到这条消息');
-
-      const result = await rewindExecute(sessionId, locate.uuid, true);
+      showRewindNotice('正在回退…');
+      // 单次请求完成「定位（含时间戳兜底：消息未落盘时按时刻清残留）+ 回退」
+      const result = await rewindExecute(sessionId, undefined, true, {
+        timestamp: message.timestamp,
+        textPrefix: String(message.content || '').trim().slice(0, 50),
+      });
       if (!result.ok) throw new Error(result.error || 'rewind failed');
 
       const parts = [`已丢弃 ${result.truncated?.dropped ?? 0} 条记录`];
