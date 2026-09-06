@@ -710,7 +710,11 @@ export function useChatComposerState({
             await new Promise((resolve) => setTimeout(resolve, 600));
             const locate = await rewindLocate(sessionId, editTarget.timestamp, editTarget.content.slice(0, 80));
             if (!locate.found || !locate.uuid) {
-              throw new Error('未能在会话记录中定位到这条消息');
+              // 转录里没有这条消息：常见于「发送后立刻打断」——CLI 还没来得及
+              // 把消息落盘，此时没有任何可截断的内容，直接把编辑后的文本作为
+              // 新消息正常发送（而非报错拦截）。
+              handleSubmitRef.current?.(createFakeSubmitEvent());
+              return;
             }
             const result = await rewindExecute(sessionId, locate.uuid, false);
             if (!result.ok) {
