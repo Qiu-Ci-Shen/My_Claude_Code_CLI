@@ -736,13 +736,16 @@ export function useChatComposerState({
             // 立即把编辑后的文本作为新消息发出（直连 chat.send，不依赖输入框
             // 状态——截断清槽后伪造提交不可靠）。options 必须带上当前权限
             // 模式/模型等——漏掉 permissionMode 会让这一轮退回默认模式弹权限
+            // 清槽会连乐观气泡一起清掉：先回填更早轮次，再补回编辑后的消息
+            // 气泡并立即发送（气泡内容与 CLI 回显一致，合并去重收敛为一条）
+            onTruncateCompleted?.(sessionId);
+            addMessage({ type: 'user', content: editedText, timestamp: new Date() });
             sendMessage({
               type: 'chat.send',
               sessionId,
               content: editedText,
               options: buildSendOptions(editedText),
             });
-            onTruncateCompleted?.(sessionId);
           } catch (err) {
             addMessage({
               type: 'error',
