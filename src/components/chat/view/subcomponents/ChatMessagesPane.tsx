@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { memo, useCallback, useMemo } from 'react';
+import { Fragment, memo, useCallback, useMemo } from 'react';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 
 import type { ChatMessage } from '../../types/types';
@@ -12,10 +12,12 @@ import type {
 } from '../../../../types/app';
 import { getIntrinsicMessageKey } from '../../utils/messageKeys';
 import { groupConsecutiveTools, isToolGroupItem } from '../../utils/toolGrouping';
+import { collectTurnFileChanges } from '../../utils/turnFileChanges';
 
 import MessageComponent from './MessageComponent';
 import ProviderSelectionEmptyState from './ProviderSelectionEmptyState';
 import ToolGroupContainer from './ToolGroupContainer';
+import TurnFileChangesBar from './TurnFileChangesBar';
 import LoadAllMessagesOverlay from './LoadAllMessagesOverlay';
 import ChatExportMenu from './ChatExportMenu';
 
@@ -165,6 +167,14 @@ function ChatMessagesPane({
     [messageKeyMap],
   );
 
+  // 每回合的文件更改聚合（「N 个文件已更改」折叠条数据源）。
+  // 键为回合最后一条消息对象——grouping/分页保持消息引用一致，渲染循环按
+  // 对象命中；回合边界 = 下一条 user 消息或列表末尾。
+  const turnFileChanges = useMemo(
+    () => collectTurnFileChanges(chatMessages),
+    [chatMessages],
+  );
+
   return (
     <div
       ref={scrollContainerRef}
@@ -265,26 +275,41 @@ function ChatMessagesPane({
           {(() => {
             let prevMessage: ChatMessage | null = null;
 
-            return groupedVisibleMessages.map((item) => {
+            return groupedVisibleMessages.map((item, index) => {
+              // 回合结束 = 本元素之后没有元素，或下一个元素是用户消息。
+              // 命中时在该回合最后一条消息之后挂「N 个文件已更改」折叠条。
+              const next = groupedVisibleMessages[index + 1];
+              const nextType = next
+                ? (isToolGroupItem(next) ? next.messages[next.messages.length - 1]?.type : next.type)
+                : null;
+              const isTurnEnd = !next || nextType === 'user';
+              const turnChanges = isTurnEnd
+                ? turnFileChanges.get(isToolGroupItem(item) ? item.messages[item.messages.length - 1] : item)
+                : undefined;
+
               if (isToolGroupItem(item)) {
                 const groupPrevMessage = prevMessage;
                 prevMessage = item.messages[item.messages.length - 1] || prevMessage;
 
                 return (
-                  <ToolGroupContainer
-                    key={`tool-group-${getMessageKey(item.messages[0])}`}
-                    group={item}
-                    prevMessage={groupPrevMessage}
-                    createDiff={createDiff}
-                    getMessageKey={getMessageKey}
-                    onFileOpen={onFileOpen}
-                    onShowSettings={onShowSettings}
-                    onGrantToolPermission={onGrantToolPermission}
-                    showRawParameters={showRawParameters}
-                    showThinking={showThinking}
-                    selectedProject={selectedProject}
-                    provider={provider}
-                  />
+                  <Fragment key={`tool-group-${getMessageKey(item.messages[0])}`}>
+                    <ToolGroupContainer
+                      group={item}
+                      prevMessage={groupPrevMessage}
+                      createDiff={createDiff}
+                      getMessageKey={getMessageKey}
+                      onFileOpen={onFileOpen}
+                      onShowSettings={onShowSettings}
+                      onGrantToolPermission={onGrantToolPermission}
+                      showRawParameters={showRawParameters}
+                      showThinking={showThinking}
+                      selectedProject={selectedProject}
+                      provider={provider}
+                    />
+                    {turnChanges && (
+                      <TurnFileChangesBar changes={turnChanges} onFileOpen={onFileOpen} />
+                    )}
+                  </Fragment>
                 );
               }
 
@@ -292,21 +317,25 @@ function ChatMessagesPane({
               prevMessage = item;
 
               return (
-                <MessageComponent
-                  key={getMessageKey(item)}
-                  message={item}
-                  prevMessage={messagePrevMessage}
-                  createDiff={createDiff}
-                  onFileOpen={onFileOpen}
-                  onShowSettings={onShowSettings}
-                  onGrantToolPermission={onGrantToolPermission}
-                  showRawParameters={showRawParameters}
-                  showThinking={showThinking}
-                  selectedProject={selectedProject}
-                  provider={provider}
-                  onEditMessage={onEditMessage}
-                  onRewindMessage={onRewindMessage}
-                />
+                <Fragment key={getMessageKey(item)}>
+                  <MessageComponent
+                    message={item}
+                    prevMessage={messagePrevMessage}
+                    createDiff={createDiff}
+                    onFileOpen={onFileOpen}
+                    onShowSettings={onShowSettings}
+                    onGrantToolPermission={onGrantToolPermission}
+                    showRawParameters={showRawParameters}
+                    showThinking={showThinking}
+                    selectedProject={selectedProject}
+                    provider={provider}
+                    onEditMessage={onEditMessage}
+                    onRewindMessage={onRewindMessage}
+                  />
+                  {turnChanges && (
+                    <TurnFileChangesBar changes={turnChanges} onFileOpen={onFileOpen} />
+                  )}
+                </Fragment>
               );
             });
           })()}
