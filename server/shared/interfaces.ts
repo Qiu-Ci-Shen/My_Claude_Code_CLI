@@ -35,6 +35,13 @@ export interface IProviderRuntime {
     context: ProviderRuntimeContext,
   ): Promise<unknown>;
   abort(sessionId: string): boolean | Promise<boolean>;
+  /**
+   * True while the provider still holds a live process for the session even
+   * though the run may already be marked completed (e.g. the Claude post-turn
+   * background-work hold). Guards like the rewind RPC check this so a
+   * transcript rewrite cannot race a CLI that is still appending.
+   */
+  hasActiveProcess?(sessionId: string): boolean;
   permissions?: ProviderRuntimePermissionGateway;
 }
 

@@ -12,6 +12,24 @@ import { createCompleteMessage, createNormalizedMessage, flattenPromptForWindows
 // child_process.spawn everywhere else.
 const spawnFunction = crossSpawn;
 
+// .cmd shims run through cmd.exe: child.kill() terminates only the shim and
+// orphans the real CLI, which keeps the inherited stdio pipes open so the
+// run's close event never fires and the promise never settles. Kill the whole
+// process tree on Windows instead.
+function killProcessTree(child) {
+  if (!child) {
+    return;
+  }
+  if (process.platform === 'win32' && child.pid) {
+    crossSpawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], { windowsHide: true })
+      .on('error', () => {
+        child.kill('SIGTERM');
+      });
+    return;
+  }
+  child.kill('SIGTERM');
+}
+
 let activeCursorProcesses = new Map(); // Track active processes by session ID
 
 const WORKSPACE_TRUST_PATTERNS = [
@@ -30,7 +48,11 @@ function isWorkspaceTrustPrompt(text = '') {
 }
 
 async function spawnCursor(command, options = {}, ws, context) {
-  return new Promise(async (resolve, reject) => {
+  // The executor must never be an async function passed straight to `new
+  // Promise`: a throw before the first resolve/reject would reject a promise
+  // nobody holds (unhandledRejection) while the outer promise never settles —
+  // leaving the registry run stuck `running` and the session un-sendable.
+  const run = async (resolve, reject) => {
     const {
       sessionId,
       projectPath,
@@ -347,6 +369,9 @@ async function spawnCursor(command, options = {}, ws, context) {
     };
 
     runCursorProcess(baseArgs, 'initial');
+  };
+  return new Promise((resolve, reject) => {
+    run(resolve, reject).catch(reject);
   });
 }
 
@@ -357,7 +382,7 @@ function abortCursorSession(sessionId) {
     // The abort handler sends the terminal complete (aborted: true); flag the
     // process so its close handler does not emit a second one.
     process.aborted = true;
-    process.kill('SIGTERM');
+    killProcessTree(process);
     activeCursorProcesses.delete(sessionId);
     return true;
   }

@@ -9,6 +9,8 @@ import { parseFilesInputTag } from '@/shared/image-attachments.js';
 import { createNormalizedMessage, generateMessageId, readObjectRecord, sliceTailPage } from '@/shared/utils.js';
 import { sessionsDb } from '@/modules/database/index.js';
 
+import { filterPostAbortTranscriptEntries, getAbortedTurnTimestamps } from './aborted-turns.js';
+
 const PROVIDER = 'claude';
 
 type ClaudeToolResult = {
@@ -624,8 +626,17 @@ export class ClaudeSessionsProvider implements IProviderSessions {
 
     const rawMessages = Array.isArray(result) ? result : (result.messages || []);
 
+    // Aborted runs wind down gracefully and flush their nearly complete turn
+    // into the transcript AFTER the abort. Prune that post-abort window so the
+    // interrupted output cannot resurface on the next refresh (see
+    // aborted-turns.ts). No-op for sessions without recorded aborts.
+    const servedMessages = filterPostAbortTranscriptEntries(
+      rawMessages,
+      getAbortedTurnTimestamps(sessionId),
+    );
+
     const toolResultMap = new Map<string, ClaudeToolResult>();
-    for (const raw of rawMessages) {
+    for (const raw of servedMessages) {
       if (raw.message?.role === 'user' && Array.isArray(raw.message?.content)) {
         for (const part of raw.message.content) {
           if (part.type === 'tool_result' && part.tool_use_id) {
@@ -641,7 +652,7 @@ export class ClaudeSessionsProvider implements IProviderSessions {
     }
 
     const normalized: NormalizedMessage[] = [];
-    for (const raw of rawMessages) {
+    for (const raw of servedMessages) {
       normalized.push(...this.normalizeMessage(raw, sessionId));
     }
 

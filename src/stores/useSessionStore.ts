@@ -587,6 +587,39 @@ const STALE_THRESHOLD_MS = 30_000;
 
 const MAX_REALTIME_MESSAGES = 500;
 
+// Long-lived desktop windows accumulate one slot per session ever opened; each
+// retains its last history page, a merged copy, and realtime rows (which only
+// the viewed session ever clears). Evict the coldest slots beyond a cap —
+// revisiting a session simply refetches, since slots refetch whenever they are
+// empty or stale. Active, loading, and recently-streamed slots are never
+// touched; a mid-stream realtime buffer older than the idle window belongs to
+// an abandoned hidden session and its content is already in the transcript.
+const MAX_SLOTS = 40;
+const SLOT_IDLE_EVICT_MS = 30 * 60_000;
+
+function evictColdSlots(store: Map<string, SessionSlot>, activeSessionId: string | null): void {
+  if (store.size <= MAX_SLOTS) {
+    return;
+  }
+
+  const evictable = [...store.entries()]
+    .filter(([id, slot]) =>
+      id !== activeSessionId
+      && slot.status !== 'loading'
+      && (
+        slot.realtimeMessages.length === 0
+        || Date.now() - slot.fetchedAt > SLOT_IDLE_EVICT_MS
+      ))
+    .sort((a, b) => (a[1].fetchedAt ?? 0) - (b[1].fetchedAt ?? 0));
+
+  for (const [id] of evictable) {
+    store.delete(id);
+    if (store.size <= MAX_SLOTS) {
+      return;
+    }
+  }
+}
+
 // ─── Hook ────────────────────────────────────────────────────────────────────
 
 export function useSessionStore() {
@@ -605,6 +638,7 @@ export function useSessionStore() {
 
   const setActiveSession = useCallback((sessionId: string | null) => {
     activeSessionIdRef.current = sessionId;
+    evictColdSlots(storeRef.current, sessionId);
   }, []);
 
   const getSlot = useCallback((sessionId: string): SessionSlot => {

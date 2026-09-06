@@ -15,6 +15,24 @@ import { createCompleteMessage, createNormalizedMessage, flattenPromptForWindows
 // child_process.spawn everywhere else.
 const spawnFunction = crossSpawn;
 
+// .cmd shims run through cmd.exe: child.kill() terminates only the shim and
+// orphans the real CLI, which keeps the inherited stdio pipes open so the
+// run's close event never fires and the promise never settles. Kill the whole
+// process tree on Windows instead.
+function killProcessTree(child) {
+  if (!child) {
+    return;
+  }
+  if (process.platform === 'win32' && child.pid) {
+    crossSpawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], { windowsHide: true })
+      .on('error', () => {
+        child.kill('SIGTERM');
+      });
+    return;
+  }
+  child.kill('SIGTERM');
+}
+
 const activeOpenCodeProcesses = new Map();
 
 /**
@@ -408,7 +426,7 @@ function abortOpenCodeSession(sessionId) {
   // The abort handler sends the terminal complete (aborted: true); flag the
   // process so its close handler does not emit a second one.
   process.aborted = true;
-  process.kill('SIGTERM');
+  killProcessTree(process);
   activeOpenCodeProcesses.delete(sessionId);
   return true;
 }

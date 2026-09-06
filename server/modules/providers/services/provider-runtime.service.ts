@@ -91,6 +91,16 @@ export function createProviderRuntimeService(
       return Boolean(await dependencies.resolveProvider(providerName).runtime.abort(sessionId));
     },
 
+    hasActiveProcess(providerName: LLMProvider, sessionId: string): boolean {
+      try {
+        return Boolean(
+          dependencies.resolveProvider(providerName).runtime.hasActiveProcess?.(sessionId),
+        );
+      } catch {
+        return false;
+      }
+    },
+
     resolveToolApproval(requestId: string, decision: ProviderPermissionDecision): void {
       for (const provider of dependencies.listProviders()) {
         provider.runtime.permissions?.resolve(requestId, decision);

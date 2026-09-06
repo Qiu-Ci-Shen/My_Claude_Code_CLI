@@ -264,8 +264,18 @@ async function handleChatAbort(
 
   const run = chatRunRegistry.getRun(sessionId);
   if (!run) {
-    // 打断空闲会话是幂等的无害操作（如编辑重发前的预打断），静默返回，
-    // 不向会话注入错误消息
+    // Registry empty: completed runs are evicted after 5 minutes while the
+    // Claude runtime may still hold the CLI open for background work (up to
+    // the 30-min silence ceiling). Abort via the session row's provider so
+    // the stop button still kills that live process. No run also covers the
+    // idempotent "abort an idle session" case (e.g. pre-abort before an edit
+    // resend) — silent return, no error injected into the conversation.
+    const session = sessionsDb.getSessionById(sessionId);
+    const provider = session?.provider as LLMProvider | undefined;
+    if (!provider) {
+      return;
+    }
+    await dependencies.runtime.abort(provider, sessionId).catch(() => false);
     return;
   }
 

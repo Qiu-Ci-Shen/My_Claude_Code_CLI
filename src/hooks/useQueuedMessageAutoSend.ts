@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 
+import { isSessionAbortSuppressed } from '../components/chat/hooks/abort-suppression';
 import { clearQueuedMessage, readQueuedMessage } from '../components/chat/utils/chatStorage';
 
 import type { MarkSessionProcessing, SessionActivityMap } from './useSessionProtection';
@@ -48,6 +49,15 @@ export function useQueuedMessageAutoSend({
 
       const queued = readQueuedMessage(sessionId);
       if (!queued) {
+        continue;
+      }
+
+      // The run just ended because the user aborted it (a complete with
+      // aborted:true arms the suppression window). Auto-sending now would
+      // immediately re-ask the very question the user just stopped. Keep the
+      // draft queued; a later non-aborted completion or the composer can
+      // still flush it.
+      if (isSessionAbortSuppressed(sessionId)) {
         continue;
       }
 

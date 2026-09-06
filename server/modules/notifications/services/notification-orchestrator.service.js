@@ -227,23 +227,31 @@ function notifyUserIfEnabled({ userId, event }) {
     return;
   }
 
-  const normalizedEvent = normalizeNotificationSession(event);
-  const preferences = notificationPreferencesDb.getPreferences(userId);
-  if (!isNotificationEventEnabled(preferences, normalizedEvent)) {
-    return;
-  }
-  if (isDuplicate(normalizedEvent)) {
-    return;
-  }
-
-  const payload = buildNotificationPayload(normalizedEvent);
-  for (const channel of notificationChannels) {
-    if (!channel.isEnabled(preferences)) {
-      continue;
+  // This runs inside the provider run hot path (message loop, canUseTool).
+  // The session/preference DB reads below can throw on a locked or corrupt
+  // database — left unguarded they would turn a healthy turn into a spurious
+  // run failure. Notifications are best-effort: drop and log instead.
+  try {
+    const normalizedEvent = normalizeNotificationSession(event);
+    const preferences = notificationPreferencesDb.getPreferences(userId);
+    if (!isNotificationEventEnabled(preferences, normalizedEvent)) {
+      return;
     }
-    Promise.resolve(channel.send({ userId, event: normalizedEvent, payload })).catch((err) => {
-      console.error(`Notification channel "${channel.id}" send error:`, err);
-    });
+    if (isDuplicate(normalizedEvent)) {
+      return;
+    }
+
+    const payload = buildNotificationPayload(normalizedEvent);
+    for (const channel of notificationChannels) {
+      if (!channel.isEnabled(preferences)) {
+        continue;
+      }
+      Promise.resolve(channel.send({ userId, event: normalizedEvent, payload })).catch((err) => {
+        console.error(`Notification channel "${channel.id}" send error:`, err);
+      });
+    }
+  } catch (error) {
+    console.error('Notification dispatch failed (best-effort, run continues):', error);
   }
 }
 

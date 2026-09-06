@@ -26,6 +26,7 @@ import {
   normalizeImageDescriptors
 } from '@/shared/image-attachments.js';
 import { CLAUDE_PREDEFINED_MODELS } from '@/modules/providers/list/claude/claude-models.provider.js';
+import { markAbortedTurn } from '@/modules/providers/list/claude/aborted-turns.js';
 import { readClaudeSettingsContextWindow } from '@/shared/claude-context-window.js';
 import { resolveClaudeCodeExecutablePath } from '@/shared/claude-cli-path.js';
 import {
@@ -55,6 +56,12 @@ const supersededInstances = new WeakSet();
 const abortedInstances = new WeakSet();
 
 const TOOL_APPROVAL_TIMEOUT_MS = parseInt(process.env.CLAUDE_TOOL_APPROVAL_TIMEOUT_MS, 10) || 55000;
+
+// interrupt() is a cooperative control request that can never settle when the
+// CLI is wedged mid-API-call (agent-sdk-typescript #425); waiting forever on
+// it would leave the abort handler hanging and the run generating. After this
+// long the run is hard-killed via its AbortController instead.
+const INTERRUPT_SETTLE_TIMEOUT_MS = 4000;
 
 // How long background work is allowed to keep running after a turn ends. This drives
 // two halves of the same behaviour:
@@ -156,6 +163,22 @@ function resolveToolApproval(requestId, decision) {
   }
 }
 
+// Cancels every still-pending tool approval owned by a session. Used when the
+// run is aborted or winds down: an unanswered approval would otherwise park
+// the SDK's canUseTool callback forever — holding the CLI process open,
+// keeping the registry run alive, and serving ghost prompts to every
+// reconnecting client via getPendingApprovalsForSession.
+function cancelPendingApprovalsForSession(sessionId) {
+  if (!sessionId) {
+    return;
+  }
+  for (const [requestId, resolver] of pendingToolApprovals.entries()) {
+    if (resolver._sessionId === sessionId) {
+      resolver({ cancelled: true });
+    }
+  }
+}
+
 // Match stored permission entries against a tool + input combo.
 // This only supports exact tool names and the Bash(command:*) shorthand
 // used by the UI; it intentionally does not implement full glob semantics,
@@ -184,7 +207,11 @@ function matchesToolPermission(entry, toolName, input) {
       return false;
     }
 
-    return command.startsWith(allowedPrefix);
+    // Token-boundary check: `Bash(ls:*)` must match bare `ls` and `ls -la`,
+    // but not `lsblk` — a raw prefix match would let lookalike commands slip
+    // through allow rules (and dodge deny rules) with no whitespace between.
+    return command === allowedPrefix
+      || (command.startsWith(allowedPrefix) && /\s/.test(command.charAt(allowedPrefix.length)));
   }
 
   return false;
@@ -303,8 +330,9 @@ function mapCliOptionsToSDK(options = {}) {
  * @param {Object} queryInstance - SDK query instance
  * @param {Object} writer - WebSocket writer for reconnect support
  * @param {Function} releaseInput - Closes the held stdin stream so the CLI can exit
+ * @param {AbortController} abortController - Caller-owned hard-kill lever for this run
  */
-function addSession(sessionId, queryInstance, writer = null, releaseInput = null) {
+function addSession(sessionId, queryInstance, writer = null, releaseInput = null, abortController = null) {
   const existing = activeSessions.get(sessionId);
   // A different live instance under the same key means an earlier run was
   // superseded without being stopped (e.g. an abort that raced run setup and
@@ -323,6 +351,7 @@ function addSession(sessionId, queryInstance, writer = null, releaseInput = null
       .catch((error) => {
         console.error(`Error interrupting superseded run for session ${sessionId}:`, error?.message || error);
       });
+    existing.abortController?.abort();
     existing.releaseInput?.();
   }
   const carried = superseding ? null : existing;
@@ -332,7 +361,8 @@ function addSession(sessionId, queryInstance, writer = null, releaseInput = null
     status: 'active',
     writer,
     // Re-registered mid-run once the provider session id lands; keep the closer.
-    releaseInput: releaseInput || carried?.releaseInput || null
+    releaseInput: releaseInput || carried?.releaseInput || null,
+    abortController: abortController || carried?.abortController || null
   });
 }
 
@@ -728,6 +758,9 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
   // Hoisted above the try so the catch's cleanup can tell whether this run
   // still owns the activeSessions entry (or was superseded by a newer run).
   let queryInstance = null;
+  // Hoisted so the catch can hard-kill the subprocess on unexpected throws:
+  // a wedged CLI may ignore stdin close and outlive the run indefinitely.
+  let runAbortController = null;
 
   try {
     const resolvedModel = await context.resolveResumeModel(sessionId, options.model);
@@ -760,6 +793,12 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
     if (mcpServers) {
       sdkOptions.mcpServers = mcpServers;
     }
+
+    // Hard-kill lever for aborts. The SDK's internally-forwarded transport
+    // signal only fires after its graceful-close path; the caller-owned
+    // controller aborts immediately and tears the subprocess down for good.
+    runAbortController = new AbortController();
+    sdkOptions.abortController = runAbortController;
 
     // Every turn uses streaming input so stdin stays open past the turn's
     // `result`. The message list is reusable, but each query attempt needs its
@@ -891,7 +930,7 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
 
     // Track the query instance for abort capability
     if (sessionKey()) {
-      addSession(sessionKey(), queryInstance, ws, releasePromptStream);
+      addSession(sessionKey(), queryInstance, ws, releasePromptStream, runAbortController);
     }
 
     // Process streaming messages
@@ -901,7 +940,7 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
       if (message.session_id && !capturedSessionId) {
 
         capturedSessionId = message.session_id;
-        addSession(sessionKey(), queryInstance, ws, releasePromptStream);
+        addSession(sessionKey(), queryInstance, ws, releasePromptStream, runAbortController);
 
         // Set session ID on writer
         if (ws.setSessionId && typeof ws.setSessionId === 'function') {
@@ -928,9 +967,10 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
         // session_id already captured
       }
 
-      // 已打断的实例：生成器可能还在吐出打断前已生成的内容，全部吞掉
-      // （终止 complete 已由打断流程发出，这里不得再向客户端转发任何事件）
-      if (abortedInstances.has(queryInstance)) {
+      // 已打断或被顶替的实例：生成器可能还在吐出旧运行已生成的内容，全部
+      // 吞掉（打断的终止 complete 已由打断流程发出；被顶替运行的一切客户端
+      // 事件归新运行所有），这里不得再向客户端转发任何事件
+      if (abortedInstances.has(queryInstance) || supersededInstances.has(queryInstance)) {
         continue;
       }
 
@@ -1032,6 +1072,10 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
 
   } catch (error) {
     console.error('SDK query error:', error);
+    // The generator threw while the CLI may still be alive (wedged mid-call,
+    // ignoring the stdin close below). Tear the subprocess down for good —
+    // a leftover process keeps burning quota and holds its MCP servers open.
+    runAbortController?.abort();
 
     // Clean up session on error — only while this run still owns the map entry
     // (a superseding run may have replaced it).
@@ -1080,6 +1124,10 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
       idleReleaseTimer = null;
     }
     releasePromptStream();
+    // Approvals still pending at teardown are ghosts: the run can no longer
+    // act on them, and leaving them in the map serves dead prompts to
+    // reconnecting clients and parks the canUseTool callback forever.
+    cancelPendingApprovalsForSession(sessionKey());
   }
 }
 
@@ -1105,15 +1153,32 @@ async function abortClaudeSDKSession(sessionId) {
     // Per-instance kill mark: the run loop checks this to swallow the
     // already-generated leftovers the generator still yields after interrupt.
     abortedInstances.add(session.instance);
+    // Un-park any pending tool approval first: a waiting canUseTool callback
+    // holds the SDK mid-tool-call and keeps the CLI alive even after the
+    // interrupt lands.
+    cancelPendingApprovalsForSession(sessionId);
+    // The CLI writes what it already generated — often the nearly complete
+    // turn — into its transcript during wind-down, after this instant.
+    // fetchHistory prunes that window so the flushed output cannot resurface.
+    markAbortedTurn(sessionId);
 
-    // Call interrupt() on the query instance. It requests the interrupt over
-    // the streaming control protocol and can fail/hang when the CLI is wedged;
-    // fall back to closing the generator, whose finally block tears the
-    // subprocess down for good.
+    // interrupt() is a cooperative control request: it resolves but does
+    // nothing during CLI startup (agent-sdk #429) and never settles when the
+    // CLI is wedged mid-API-call (#425). Race it with a timeout and hard-kill
+    // the subprocess on timeout or failure — a killed CLI cannot keep
+    // generating, and it cannot flush its wind-down output either.
     try {
-      await session.instance.interrupt();
+      await new Promise((resolve, reject) => {
+        const timer = setTimeout(
+          () => reject(new Error(`interrupt() did not settle within ${INTERRUPT_SETTLE_TIMEOUT_MS}ms`)),
+          INTERRUPT_SETTLE_TIMEOUT_MS
+        );
+        timer.unref?.();
+        Promise.resolve(session.instance.interrupt()).then(resolve, reject);
+      });
     } catch (interruptError) {
-      console.error(`interrupt() failed for session ${sessionId}, closing query generator:`, interruptError);
+      console.error(`interrupt() failed for session ${sessionId}, closing query generator:`, interruptError?.message || interruptError);
+      session.abortController?.abort();
       await session.instance.return?.();
     }
 
@@ -1124,8 +1189,12 @@ async function abortClaudeSDKSession(sessionId) {
     // Update session status
     session.status = 'aborted';
 
-    // Clean up session
-    removeSession(sessionId);
+    // Clean up the map entry only while this run still owns it: a newer run
+    // may have registered under the same key during the interrupt wait, and
+    // deleting its entry would strand its only abort handle.
+    if (getSession(sessionId)?.instance === session.instance) {
+      removeSession(sessionId);
+    }
 
     return true;
   } catch (error) {
@@ -1194,6 +1263,10 @@ function reconnectSessionWriter(sessionId, newRawWs) {
 export const claudeRuntime = {
   run: queryClaudeSDK,
   abort: abortClaudeSDKSession,
+  // True while the CLI subprocess is still held open (including the
+  // post-turn background-work hold) even after the registry already flipped
+  // the run to completed — the window where a rewind must stay rejected.
+  hasActiveProcess: isClaudeSDKSessionActive,
   permissions: {
     resolve: resolveToolApproval,
     listPending: getPendingApprovalsForSession,
@@ -1209,5 +1282,6 @@ export {
   resolveToolApproval,
   getPendingApprovalsForSession,
   reconnectSessionWriter,
-  extractTokenBudget
+  extractTokenBudget,
+  matchesToolPermission
 };

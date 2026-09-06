@@ -41,6 +41,7 @@ import { escapeRegExp } from '../utils/chatFormatting';
 
 import { useFileMentions } from './useFileMentions';
 import { type SlashCommand, useSlashCommands } from './useSlashCommands';
+import { isSessionAbortSuppressed } from './abort-suppression';
 
 interface UseChatComposerStateArgs {
   selectedProject: Project | null;
@@ -1038,6 +1039,12 @@ export function useChatComposerState({
     // still live (the cleanup below cancels the send in that case).
     const delay = wasLoading ? 0 : 750;
     const timer = setTimeout(() => {
+      // A run that just ended via abort must not trigger the queued flush:
+      // the user deliberately stopped the agent, so re-sending the queued
+      // draft would immediately re-ask the stopped question. Keep it queued.
+      if (sessionKey && isSessionAbortSuppressed(sessionKey)) {
+        return;
+      }
       // The saved key is the claim ticket shared with the app-level auto-send
       // (which handles sessions that finish while not viewed). If it's gone,
       // the message was already dispatched — don't send it twice.
