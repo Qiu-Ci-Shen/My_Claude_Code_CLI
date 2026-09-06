@@ -43,6 +43,7 @@ import {
 } from './modules/plugins/index.js';
 import providerRoutes from './modules/providers/provider.routes.js';
 import { voiceRoutes } from './modules/voice/index.js';
+import { createRewindRouter } from './modules/rewind/index.js';
 import browserUseRoutes from './modules/browser-use/browser-use.routes.js';
 import { assetsRoutes } from './modules/assets/index.js';
 import { fileTreeRoutes } from './modules/file-tree/index.js';
@@ -208,6 +209,9 @@ app.use('/api/providers', authenticateToken, providerRoutes);
 app.use('/api/agent', agentRoutes);
 
 app.use('/api/voice', authenticateToken, voiceRoutes);
+
+// Built-in Rewind routes (formerly the claude-rewind plugin RPC)
+app.use('/api/rewind', authenticateToken, createRewindRouter());
 
 // Serve public files (like api-docs.html)
 app.use(express.static(path.join(APP_ROOT, 'public')));

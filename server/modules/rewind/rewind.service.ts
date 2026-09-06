@@ -41,7 +41,7 @@ export type SessionRow = {
   jsonl_path: string | null;
 };
 
-export type LocateParams = { timestamp: unknown; textPrefix: unknown };
+export type LocateParams = { timestamp?: unknown; textPrefix?: unknown };
 export type RestorePlan = {
   restore: { filePath: string; backupPath: string }[];
   remove: { filePath: string }[];
