@@ -1,13 +1,13 @@
 import { authenticatedFetch } from '../utils/api';
 
 /**
- * claude-rewind 插件的 RPC 封装。
+ * 内置 Rewind 的 API 封装（原 claude-rewind 插件 RPC 的原生等价物）。
  *
- * 截断会话与恢复代码文件的能力都在插件后端（locate 定位消息 uuid →
- * rewind 截断转录 + 可选恢复 checkpoint 文件，自带原子备份），这里只做
- * 带认证的 HTTP 调用。编辑重发功能依赖该插件处于安装且启用状态。
+ * 截断会话与恢复代码文件的能力都在服务端 rewind 模块（locate 定位消息 uuid →
+ * execute 截断转录 + 可选恢复 checkpoint 文件，自带原子备份），这里只做
+ * 带认证的 HTTP 调用。编辑重发与用户消息回退按钮共用此客户端。
  */
-const RPC_BASE = '/api/plugins/claude-rewind/rpc';
+const RPC_BASE = '/api/rewind';
 
 /** 从当前路由（/session/<id>）提取会话 id；新会话（根路径）为 null。 */
 export function currentSessionIdFromPath(): string | null {
@@ -37,7 +37,7 @@ export type RewindLocateResult = { found: boolean; uuid?: string };
 
 export function rewindLocate(
   sessionId: string | null,
-  // 转录里的时间戳原样透传（ISO 字符串/数字均可），由插件归一后做容差匹配；
+  // 转录里的时间戳原样透传（ISO 字符串/数字均可），由服务端归一后做容差匹配；
   // 这里绝不能 Number() 转换——ISO 字符串会变 NaN→null 导致定位永远失败。
   timestamp: string | number | Date | null | undefined,
   textPrefix: string,
@@ -50,7 +50,7 @@ export function rewindExecute(
   targetUuid: string,
   restoreFiles: boolean,
 ): Promise<{ ok: boolean; error?: string }> {
-  return rpc<{ ok: boolean; error?: string }>('/rewind', {
+  return rpc<{ ok: boolean; error?: string }>('/execute', {
     sessionId,
     targetUuid,
     restoreFiles,
