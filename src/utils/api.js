@@ -72,8 +72,10 @@ export const expireAuthSession = () => {
 
 export const getStoredAuthToken = () => {
   const token = localStorage.getItem('auth-token');
+  // 过期 token 不在此处清除：滑动宽限刷新需要它（签名有效、宽限期内可换新）。
+  // 过期时仅返回 null（请求不带 Authorization），清除交给刷新失败后的
+  // expireAuthSession，保证「睡眠错过刷新 → 醒来一次请求完成静默续期」。
   if (token && isAuthTokenExpired(token)) {
-    expireAuthSession();
     return null;
   }
   return token;
@@ -92,7 +94,42 @@ export const storeAuthToken = (token) => {
 };
 
 // Utility function for authenticated API calls
-export const authenticatedFetch = (url, options = {}) => {
+let refreshInFlight = null;
+
+/**
+ * 滑动宽限刷新（单飞）：并发 401 只发起一次刷新，其余共享同一个 Promise。
+ * 携带原始存储 token（允许已过期但仍在宽限期内）请求 /api/auth/refresh。
+ * 成功返回新 token 并广播刷新事件；失败返回 null（调用方负责过期清理）。
+ */
+export const refreshAuthToken = () => {
+  if (!refreshInFlight) {
+    refreshInFlight = (async () => {
+      try {
+        const token = localStorage.getItem('auth-token');
+        if (!token) return null;
+        const response = await fetch('/api/auth/refresh', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!response.ok) return null;
+        const data = await response.json().catch(() => null);
+        const newToken = data?.token || response.headers.get('X-Refreshed-Token');
+        if (newToken && isValidRefreshedToken(newToken)) {
+          storeAuthToken(newToken);
+          return newToken;
+        }
+        return null;
+      } catch {
+        return null;
+      } finally {
+        refreshInFlight = null;
+      }
+    })();
+  }
+  return refreshInFlight;
+};
+
+export const authenticatedFetch = async (url, options = {}) => {
   const token = getStoredAuthToken();
 
   const defaultHeaders = {};
@@ -106,22 +143,43 @@ export const authenticatedFetch = (url, options = {}) => {
     defaultHeaders['Authorization'] = `Bearer ${token}`;
   }
 
-  return fetch(url, {
+  let response = await fetch(url, {
     ...options,
     headers: {
       ...defaultHeaders,
       ...options.headers,
     },
-  }).then((response) => {
-    const refreshedToken = response.headers.get('X-Refreshed-Token');
-    if (refreshedToken) {
-      storeAuthToken(refreshedToken);
-    }
-    if (response.headers.get('X-Auth-Error')) {
-      expireAuthSession();
-    }
-    return response;
   });
+
+  const refreshedToken = response.headers.get('X-Refreshed-Token');
+  if (refreshedToken) {
+    storeAuthToken(refreshedToken);
+  }
+
+  // 认证类失败：尝试滑动刷新一次，成功则重放原请求（刷新端点自身除外，
+  // 防止重入）。刷新失败 → 过期清理 → 既有事件流走干净登出。
+  if (response.headers.get('X-Auth-Error') && !url.startsWith('/api/auth/')) {
+    const newToken = await refreshAuthToken();
+    if (newToken) {
+      response = await fetch(url, {
+        ...options,
+        headers: {
+          ...defaultHeaders,
+          ...options.headers,
+          Authorization: `Bearer ${newToken}`,
+        },
+      });
+      const replayedRefresh = response.headers.get('X-Refreshed-Token');
+      if (replayedRefresh) storeAuthToken(replayedRefresh);
+      if (response.headers.get('X-Auth-Error')) {
+        expireAuthSession();
+      }
+      return response;
+    }
+    expireAuthSession();
+  }
+
+  return response;
 };
 
 // API endpoints

@@ -154,9 +154,83 @@ const authenticateWebSocket = (token) => {
   }
 };
 
+
+// 滑动宽限刷新：签名有效、且过期未超过宽限期的 token 仍可换取新 token。
+// 场景：桌面端 OS 睡眠/渲染进程节流错过半程刷新定时器 → token 过期 →
+// 原本 /refresh 自己也要求有效 token，死锁成只能重新登录。
+const REFRESH_GRACE_MS = 7 * 24 * 60 * 60 * 1000; // 过期后 7 天内可刷新
+
+/** 纯函数：解码后的 token 是否仍在刷新宽限期内（供单测）。 */
+const isWithinRefreshGrace = (decoded, nowMs = Date.now()) => {
+    if (!decoded || typeof decoded.exp !== 'number') {
+        return false;
+    }
+    return nowMs <= decoded.exp * 1000 + REFRESH_GRACE_MS;
+};
+
+const authenticateRefresh = (req, res, next) => {
+    // Platform mode: use single database user
+    if (IS_PLATFORM) {
+        try {
+            const user = userDb.getFirstUser();
+            if (!user) {
+                return res.status(500).json({ error: 'Platform mode: No user found in database' });
+            }
+            req.user = user;
+            return next();
+        } catch (error) {
+            console.error('Platform mode error:', error);
+            return res.status(500).json({ error: 'Platform mode: Failed to fetch user' });
+        }
+    }
+
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if (!token) {
+        res.setHeader('X-Auth-Error', 'invalid-token');
+        return res.status(401).json({
+            error: 'Access denied. No token provided.',
+            code: 'AUTH_TOKEN_INVALID',
+        });
+    }
+
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET, { ignoreExpiration: true });
+        const user = userDb.getUserById(decoded.userId);
+        if (!user) {
+            res.setHeader('X-Auth-Error', 'invalid-token');
+            return res.status(401).json({
+                error: 'Invalid token. User not found.',
+                code: 'AUTH_TOKEN_INVALID',
+            });
+        }
+        if (!isWithinRefreshGrace(decoded)) {
+            res.setHeader('X-Auth-Error', 'session-expired');
+            return res.status(401).json({
+                error: 'Session expired beyond refresh grace. Please log in again.',
+                code: 'AUTH_TOKEN_EXPIRED',
+            });
+        }
+        req.user = user;
+        next();
+    } catch (error) {
+        console.warn(
+            'Refresh token verification failed:',
+            error instanceof Error ? error.message : String(error),
+        );
+        res.setHeader('X-Auth-Error', 'invalid-token');
+        return res.status(401).json({
+            error: 'Invalid token',
+            code: 'AUTH_TOKEN_INVALID',
+        });
+    }
+};
+
 export {
   validateApiKey,
   authenticateToken,
+  authenticateRefresh,
+  isWithinRefreshGrace,
   generateToken,
   authenticateWebSocket,
   JWT_SECRET

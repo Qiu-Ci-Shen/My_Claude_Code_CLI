@@ -423,6 +423,11 @@ export function handleChatConnection(
         case 'chat.permission-response':
           handlePermissionResponse(data, dependencies);
           return;
+        case 'ping':
+          // 应用层心跳：浏览器无法发协议级 ping，客户端以此检测半开连接
+          // （约 70s 未收到任何服务端消息即强制重连）
+          sendJson(ws, { type: 'pong', timestamp: new Date().toISOString() });
+          return;
         default:
           sendProtocolError(ws, 'UNKNOWN_MESSAGE_TYPE', `Unknown message type "${messageType}".`);
           return;

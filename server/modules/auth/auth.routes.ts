@@ -12,6 +12,7 @@ type AuthenticatedRequest = express.Request & { user?: unknown };
 export function createAuthRouter(
   service: ReturnType<typeof createAuthService>,
   authenticateToken: RequestHandler,
+  authenticateRefresh: RequestHandler,
 ): express.Router {
   const router = express.Router();
 
@@ -91,7 +92,8 @@ export function createAuthRouter(
     res.json(service.getCurrentUser((req as AuthenticatedRequest).user));
   });
 
-  router.post('/refresh', authenticateToken, (req, res) => {
+  // 滑动宽限刷新：接受有效或宽限期内过期的 token（见 auth.middleware）
+  router.post('/refresh', authenticateRefresh, (req, res) => {
     res.json(service.refreshSession((req as AuthenticatedRequest).user));
   });
 

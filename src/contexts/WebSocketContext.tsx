@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 
 import { useAuth } from '../components/auth/context/AuthContext';
 import { IS_PLATFORM } from '../shared/utils';
-import { expireAuthSession, isAuthTokenExpired } from '../utils/api';
+import { isAuthTokenExpired, refreshAuthToken } from '../utils/api';
 
 /**
  * One frame received from the chat websocket. The server guarantees every
@@ -58,7 +58,9 @@ const buildWebSocketUrl = (token: string | null) => {
   if (IS_PLATFORM) return `${protocol}//${window.location.host}/ws`; // Platform mode: Use same domain as the page (goes through proxy)
   if (!token) return null;
   if (isAuthTokenExpired(token)) {
-    expireAuthSession();
+    // 宽限期内先尝试滑动刷新：成功会派发 token 更新事件并触发本 effect 重连；
+    // 超出宽限（刷新失败）才由刷新失败的路径过期会话。
+    void refreshAuthToken();
     return null;
   }
   return `${protocol}//${window.location.host}/ws?token=${encodeURIComponent(token)}`; // OSS mode: Use same host:port that served the page
@@ -77,6 +79,10 @@ const useWebSocketProviderState = (): WebSocketContextType => {
   const [latestMessage, setLatestMessage] = useState<ServerEvent | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // 应用层心跳：浏览器发不了协议级 ping，用 {type:'ping'} 轮询 + 服务端 pong
+  // 检测半开连接（静默丢消息的「假连接」），70s 无服务端消息即强制重连。
+  const lastServerActivityRef = useRef<number>(Date.now());
+  const heartbeatRef = useRef<number | null>(null);
   const { isLoading: isAuthLoading, token, user } = useAuth();
 
   const dispatch = useCallback((event: ServerEvent) => {
@@ -104,6 +110,10 @@ const useWebSocketProviderState = (): WebSocketContextType => {
       unmountedRef.current = true;
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
+      }
+      if (heartbeatRef.current !== null) {
+        window.clearInterval(heartbeatRef.current);
+        heartbeatRef.current = null;
       }
       const activeSocket = wsRef.current;
       if (activeSocket) {
@@ -135,14 +145,30 @@ const useWebSocketProviderState = (): WebSocketContextType => {
 
       websocket.onopen = () => {
         setIsConnected(true);
+        lastServerActivityRef.current = Date.now();
         if (hasConnectedRef.current) {
           // This is a reconnect — signal so components can catch up on missed messages
           dispatch({ kind: 'websocket_reconnected', timestamp: Date.now() });
         }
         hasConnectedRef.current = true;
+
+        if (heartbeatRef.current === null) {
+          heartbeatRef.current = window.setInterval(() => {
+            const socket = wsRef.current;
+            if (!socket || socket.readyState !== WebSocket.OPEN) return;
+            if (Date.now() - lastServerActivityRef.current > 70_000) {
+              // 半开连接：socket 看似 OPEN 但服务端已无声——强制走 onclose 重连
+              console.warn('WebSocket heartbeat timeout; forcing reconnect');
+              socket.close();
+              return;
+            }
+            socket.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
+          }, 25_000);
+        }
       };
 
       websocket.onmessage = (event) => {
+        lastServerActivityRef.current = Date.now();
         try {
           const data = JSON.parse(event.data) as ServerEvent;
           dispatch(data);
@@ -157,6 +183,10 @@ const useWebSocketProviderState = (): WebSocketContextType => {
         }
         setIsConnected(false);
         wsRef.current = null;
+        if (heartbeatRef.current !== null) {
+          window.clearInterval(heartbeatRef.current);
+          heartbeatRef.current = null;
+        }
 
         // Attempt to reconnect after 3 seconds
         reconnectTimeoutRef.current = setTimeout(() => {

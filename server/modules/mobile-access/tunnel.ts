@@ -2,7 +2,8 @@
 // Exposes a local port as a public https://<random>.trycloudflare.com URL.
 
 import { spawn, execSync } from 'node:child_process';
-import { mkdir, access, chmod, rm, stat, rename, cp, open } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { mkdir, access, chmod, rm, stat, rename, cp, open, readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import { join, dirname } from 'node:path';
 import { pipeline } from 'node:stream/promises';
@@ -12,6 +13,30 @@ import { createWriteStream, createReadStream } from 'node:fs';
 // (?!api\.) excludes the reserved api subdomain some cloudflared versions print
 // before the real tunnel URL (dsh-pocket issue #32).
 export const QUICK_TUNNEL_URL_RE = /https:\/\/(?!api\.)[a-z0-9-]+\.trycloudflare\.com/i;
+
+async function sha256File(filePath: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const hash = createHash('sha256');
+    const rs = createReadStream(filePath);
+    rs.on('error', reject);
+    rs.on('data', (chunk) => hash.update(chunk));
+    rs.on('end', () => resolve(hash.digest('hex')));
+  });
+}
+
+/** 官方发布的伴生 .sha256 资产（404/不可达视为无参考值——镜像存在的意义就是 GitHub 不可达） */
+async function fetchOfficialSha256(asset: string, signal?: AbortSignal): Promise<string | null> {
+  try {
+    const url = `https://github.com/cloudflare/cloudflared/releases/latest/download/${asset}.sha256`;
+    const timeout = AbortSignal.timeout(8_000);
+    const res = await fetch(url, { signal: signal ? AbortSignal.any([signal, timeout]) : timeout });
+    if (!res.ok) return null;
+    const text = (await res.text()).trim().split(/\s+/)[0]?.toLowerCase() ?? '';
+    return /^[0-9a-f]{64}$/.test(text) ? text : null;
+  } catch {
+    return null;
+  }
+}
 
 function platformBinary() {
   const archMap: Record<string, string> = { x64: 'amd64', arm64: 'arm64' };
@@ -151,6 +176,43 @@ async function downloadCloudflared(binPath: string, signal?: AbortSignal): Promi
         ? `Install manually then retry: winget install cloudflared; or put ${asset} into ${dir}`
         : `Install manually then retry: npm i -g cloudflared`),
     );
+  }
+
+  // ---- 完整性校验（防第三方镜像投毒）----
+  // 参考值优先级：本地记录的 .sha256（上次官方源下载成功时登记）> 官方伴生
+  // .sha256 资产。两者皆无 → 接受本次下载但登记其哈希，供后续下载校验。
+  const expectedHash = (await readFile(`${binPath}.sha256`, 'utf8').then((t) => t.trim().toLowerCase()).catch(() => null))
+    ?? (await fetchOfficialSha256(asset, fetchSignal));
+  const actualHash = await sha256File(tmpFile);
+  if (expectedHash && actualHash !== expectedHash) {
+    await rm(tmpFile, { force: true }).catch(() => {});
+    throw new Error(
+      `cloudflared checksum mismatch (got ${actualHash.slice(0, 16)}…, expected ${expectedHash.slice(0, 16)}…) — download rejected`,
+    );
+  }
+  if (!expectedHash) {
+    console.warn(
+      `[MobileAccess] cloudflared downloaded without a reference checksum; recorded ${actualHash.slice(0, 16)}… for future verification`,
+    );
+  }
+  await writeFile(`${binPath}.sha256`, `${actualHash}\n`).catch(() => {});
+
+  // 魔数校验：exe=MZ / tgz=gzip(0x1f8b)，拦下镜像返回的错误页/HTML
+  {
+    const handle = await open(tmpFile, 'r');
+    try {
+      const head = Buffer.alloc(2);
+      await handle.read(head, 0, 2, 0);
+      const magicOk = isWindows
+        ? head[0] === 0x4d && head[1] === 0x5a
+        : head[0] === 0x1f && head[1] === 0x8b;
+      if (!magicOk) {
+        await rm(tmpFile, { force: true }).catch(() => {});
+        throw new Error('downloaded cloudflared file has invalid magic bytes — likely a mirror error page');
+      }
+    } finally {
+      await handle.close();
+    }
   }
 
   const extracted = join(dir, `cloudflared${ext}`);
