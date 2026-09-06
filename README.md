@@ -115,11 +115,9 @@ cp .env.example .env
 - **Git 面板** — 状态、暂存、提交、分支（支持中文分支名）、提交历史与 diff、远端 Fetch/Pull/Push/发布，失败原因直接显示在面板上
 - **内置终端** — node-pty 驱动的真实 shell，多标签
 - **MCP 管理** — 查看/编辑各 Provider 的 MCP 服务器配置
-- **插件系统** — 模块化插件（前端 tab / 后台模块 / 可选 Node 后端），本机已内置：
-  - **Push to Talk** — 按住 Alt 说话，松开自动识别填入输入框
-  - **Claude Rewind** — 消息级回退 + 主题自适应确认弹窗
+- **插件系统** — 模块化插件（前端 tab / 后台模块 / 可选 Node 后端），可在 设置 → 插件 从 Git 仓库安装
 - **手机访问** — 局域网/隧道 + 6 位 PIN 配对，手机浏览器获得完整界面（PWA，可加到主屏，支持推送通知）
-- **语音** — 语音输入（STT）与语音回复（TTS），任何 OpenAI 兼容语音接口均可
+- **语音** — 语音输入（STT）与语音回复（TTS），任何 OpenAI 兼容语音接口均可；**按住说话**（push-to-talk）按住左 Alt 说话松开自动识别填入，键位可换、可在设置关闭
 - **Task Master** — 集成 task-master-ai 任务管理
 - **Browser Use** — 让智能体操控浏览器（可选功能）
 - **Worktree** — git worktree 一键开分支工作区
@@ -162,55 +160,12 @@ cp .env.example .env
 
 在 **设置 → 插件** 中直接从 Git 仓库安装（粘贴仓库 URL 回车），或自己开发：
 
-- 插件安装位置：`~/.claude-code-ui/plugins/`
+- 插件安装位置：`~/.claude-code-ui/plugins/`（桌面壳 / `.env` 也可用 `QIU_PLUGINS_DIR` 指向其他目录）
 - 插件 = `manifest.json` + 前端入口（可带 Node 后端文件），支持 tab 挂载点和后台模块（`backgroundOnly`，如全局快捷键类）
 - 换图标：替换 `desktop/assets/logo-windows.ico` 后执行 `node scripts/regenerate-icons.mjs`，全套 27 个图标（PWA/favicon/logo/icns）一键重生成
 
-### 内置插件启用
-
-仓库自带两个插件（源码在仓库 `plugins/` 目录）：
-
-- **Push to Talk** — 按住左 Alt 说话，松开自动识别填入输入框（需先在 设置 → 语音 配好 STT，见上文「语音」章节）
-- **Claude Rewind** — 消息级回退
-
-应用只加载 `QIU_PLUGINS_DIR` 指向的目录（默认 `~/.claude-code-ui/plugins`），仓库自带的 `plugins/` 文件夹**不会**被自动扫描，需要用下面任一方式启用：
-
-**方式一：桌面版（零配置，推荐）**
-
-```bash
-npm run app
-```
-
-桌面壳启动时会自动把插件目录指向仓库的 `plugins/`，无需任何设置。
-
-**方式二：.env 指向（推荐浏览器模式）**
-
-```bash
-cp .env.example .env
-```
-
-编辑 `.env`，取消注释并设置（Windows 路径建议用正斜杠写法）：
-
-```bash
-QIU_PLUGINS_DIR=/你的仓库路径/plugins              # Linux/macOS
-QIU_PLUGINS_DIR=D:/你的仓库路径/qiu-ai-lz/plugins   # Windows
-```
-
-相对路径 `./plugins` 也可，以启动命令的执行目录为基准。改完重启服务生效。
-
-**方式三：复制安装**
-
-把仓库 `plugins/` 下的插件文件夹复制到 `~/.claude-code-ui/plugins/`：
-
-```powershell
-# Windows PowerShell
-New-Item -ItemType Directory -Force "$env:USERPROFILE\.claude-code-ui\plugins" | Out-Null
-Copy-Item -Recurse -Force .\plugins\* "$env:USERPROFILE\.claude-code-ui\plugins\"
-```
-
-**注意**：Claude Rewind 的 Node 后端（`server.js`）依赖宿主 `node_modules`（better-sqlite3），并从插件自身位置自动向上两级定位——插件留在项目 `plugins/` 内（方式一/二）时全自动生效；复制到项目外（本方式）后需把 `server.js` 里 `resolveHostNodeModules()` 改指到本应用安装位置的 `node_modules`。
-
-**验证**：重启后在 **设置 → 插件** 能看到 Push to Talk 与 Claude Rewind 即成功。`git pull` 更新仓库后，方式一/二的插件自动跟随更新，方式三需重新复制。
+> 回退（rewind）与按住说话（push-to-talk）已内置为原生功能，无需安装插件：
+> 回退在用户消息旁的 ⟲ 按钮（含文件 checkpoint 恢复），按住说话见「语音」章节。
 
 ## 数据与配置位置
 

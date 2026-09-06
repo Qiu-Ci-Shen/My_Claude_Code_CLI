@@ -1,6 +1,6 @@
 // Qiu_Ai_LZ 桌面启动器
 // 流程：校验构建新鲜度(过期自动重建) → 复用或拉起本地服务 → 就绪后自动进入应用 → 退出时善后
-// 注意：本应用不创建菜单栏——Windows 下菜单栏会吞掉 Alt 键，push-to-talk 插件依赖按住 Alt 说话。
+// 注意：本应用不创建菜单栏——Windows 下菜单栏会吞掉 Alt 键，内置的 push-to-talk（按住 Alt 说话）依赖它。
 import { app, BrowserWindow, Menu, dialog, ipcMain, screen, shell } from 'electron';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
