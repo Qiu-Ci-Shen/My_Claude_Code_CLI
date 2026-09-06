@@ -490,6 +490,12 @@ export function useProjectsState({
         setIsLoadingProjects(true);
       }
       const response = await api.projects();
+      // 401/500 等会返回 {error} 对象——不设防的话被当作 Project[] 灌进状态，
+      // 下游 .map 直接炸（应用白屏）。非 200 一律按失败处理。
+      if (!response.ok) {
+        console.error('Failed to fetch projects:', response.status);
+        return;
+      }
       const projectData = (await response.json()) as Project[];
 
       setProjects((prevProjects) => {
@@ -1110,10 +1116,14 @@ export function useProjectsState({
       }),
     );
 
-    if (selectedProject?.projectId === projectId && mergedProjectForSelection) {
-      setSelectedProject(mergedProjectForSelection);
+    if (mergedProjectForSelection) {
+      // 用 updater 取最新选择：await 期间用户可能已切到别的项目——闭包里的
+      // selectedProject 是调用时的旧值，直接比较会把用户拽回上一个项目。
+      setSelectedProject((current) =>
+        current && current.projectId === projectId ? mergedProjectForSelection : current,
+      );
     }
-  }, [projects, selectedProject?.projectId]);
+  }, [projects]);
 
   // `projectId` is the DB identifier passed from the sidebar's delete flow
   // after the migration away from folder-derived project names.

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../../utils/api';
 import type { CodeEditorFile } from '../types/types';
 import { isBinaryFile } from '../utils/binaryFile';
@@ -23,6 +23,10 @@ export const useCodeEditorDocument = ({ file, projectPath }: UseCodeEditorDocume
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  // 读取失败时置位：错误信息绝不写进可编辑缓冲（否则 Ctrl+S 会用报错文案覆盖磁盘文件）
+  const [loadError, setLoadError] = useState<string | null>(null);
+  // 未保存修改跟踪：缓冲内容 vs 磁盘加载内容（关闭前确认用）
+  const loadedContentRef = useRef('');
   const [isBinary, setIsBinary] = useState(false);
   // Some binaries (images, PDFs, audio, video) can be rendered natively, so the
   // editor shows an inline preview instead of the generic binary placeholder.
@@ -37,24 +41,27 @@ export const useCodeEditorDocument = ({ file, projectPath }: UseCodeEditorDocume
   const fileDiffOldString = file.diffInfo?.old_string;
 
   useEffect(() => {
+    // 竞态守卫：慢的旧文件读取不得覆盖新文件的内容（否则 Ctrl+S 会把 A 的
+    // 字节写进 B）。依赖变化时 cleanup 先行，迟到响应一律丢弃——与
+    // CodeEditorMediaPreview 的 loadedKey 门控同款思路。
+    let active = true;
     const loadFileContent = async () => {
       try {
         setLoading(true);
         setIsBinary(false);
+        setLoadError(null);
+        setContent('');
+        loadedContentRef.current = '';
 
         // Natively previewable media (image/pdf/audio/video) is rendered by
         // CodeEditorMediaPreview, so there is nothing to read as text here.
-        // Clear any buffer left over from a previously opened text file so a
-        // stray save can't write stale content over the binary file.
         if (getPreviewKind(file.name)) {
-          setContent('');
           setLoading(false);
           return;
         }
 
         // Check if file is binary by extension
         if (isBinaryFile(file.name)) {
-          setContent('');
           setIsBinary(true);
           setLoading(false);
           return;
@@ -63,6 +70,7 @@ export const useCodeEditorDocument = ({ file, projectPath }: UseCodeEditorDocume
         // Diff payload may already include full old/new snapshots, so avoid disk read.
         if (file.diffInfo && fileDiffNewString !== undefined && fileDiffOldString !== undefined) {
           setContent(fileDiffNewString);
+          loadedContentRef.current = fileDiffNewString;
           setLoading(false);
           return;
         }
@@ -77,23 +85,33 @@ export const useCodeEditorDocument = ({ file, projectPath }: UseCodeEditorDocume
         }
 
         const data = await response.json();
+        if (!active) return;
         setContent(data.content);
+        loadedContentRef.current = data.content;
       } catch (error) {
         const message = getErrorMessage(error);
         console.error('Error loading file:', error);
-        setContent(`// Error loading file: ${message}\n// File: ${fileName}\n// Path: ${filePath}`);
+        if (!active) return;
+        setLoadError(message);
+        setContent('');
       } finally {
-        setLoading(false);
+        if (active) {
+          setLoading(false);
+        }
       }
     };
 
     loadFileContent();
+    return () => {
+      active = false;
+    };
   }, [file.diffInfo, file.name, fileDiffNewString, fileDiffOldString, fileName, filePath, fileProjectId]);
 
   const handleSave = useCallback(async () => {
     // Preview-only and binary files have no editable text buffer; never write
     // them back (e.g. via Cmd/Ctrl+S) or we'd corrupt the file on disk.
-    if (previewKind || isBinaryFile(fileName)) {
+    // 读取失败的占位同样不可保存——缓冲区里没有文件内容。
+    if (previewKind || isBinaryFile(fileName) || loadError) {
       return;
     }
 
@@ -121,6 +139,7 @@ export const useCodeEditorDocument = ({ file, projectPath }: UseCodeEditorDocume
 
       await response.json();
 
+      loadedContentRef.current = content;
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2000);
     } catch (error) {
@@ -130,7 +149,7 @@ export const useCodeEditorDocument = ({ file, projectPath }: UseCodeEditorDocume
     } finally {
       setSaving(false);
     }
-  }, [content, filePath, fileProjectId, previewKind, fileName]);
+  }, [content, filePath, fileProjectId, previewKind, fileName, loadError]);
 
   const handleDownload = useCallback(() => {
     const blob = new Blob([content], { type: 'text/plain' });
@@ -147,6 +166,12 @@ export const useCodeEditorDocument = ({ file, projectPath }: UseCodeEditorDocume
     URL.revokeObjectURL(url);
   }, [content, file.name]);
 
+  // 缓冲内容与磁盘内容是否分叉（关闭前确认的依据）
+  const isDirty = useCallback(
+    () => !loadError && content !== loadedContentRef.current,
+    [loadError, content],
+  );
+
   return {
     content,
     setContent,
@@ -154,6 +179,8 @@ export const useCodeEditorDocument = ({ file, projectPath }: UseCodeEditorDocume
     saving,
     saveSuccess,
     saveError,
+    loadError,
+    isDirty,
     isBinary,
     previewKind,
     fileProjectId,

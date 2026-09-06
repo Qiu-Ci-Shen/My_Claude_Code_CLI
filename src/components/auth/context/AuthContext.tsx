@@ -146,7 +146,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       const userResponse = await api.auth.user();
       if (!userResponse.ok) {
-        clearSession();
+        // 仅认证类失败清会话；502/504 等瞬时故障（服务重启中）不清——
+        // 否则每次后端重启都会把已登录用户踢回登录页。
+        if (userResponse.status === 401 || userResponse.status === 403) {
+          clearSession();
+        }
         return;
       }
 

@@ -63,6 +63,8 @@ export default function CodeEditor({
     saving,
     saveSuccess,
     saveError,
+    loadError,
+    isDirty,
     isBinary,
     previewKind,
     fileProjectId,
@@ -181,6 +183,7 @@ export default function CodeEditor({
     onSave: handleSave,
     onClose,
     dependency: content,
+    isDirty,
   });
 
   if (loading) {
@@ -284,6 +287,15 @@ export default function CodeEditor({
           {saveError && (
             <div className="border-b border-red-200 bg-red-50 px-3 py-1.5 text-xs text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300">
               {saveError}
+            </div>
+          )}
+
+          {loadError && (
+            <div className="border-b border-red-200 bg-red-50 px-3 py-1.5 text-xs text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300">
+              {t('loadError', {
+                defaultValue: '文件加载失败，已禁止保存（避免用空缓冲覆盖磁盘内容）：{{message}}',
+                message: loadError,
+              })}
             </div>
           )}
 

@@ -137,6 +137,33 @@ const normalizeNotificationPreferences = (
   };
 };
 
+/**
+ * 自动保存签名：列出 saveSettings 的全部输入，任一变化才触发落盘。
+ */
+function buildAutoSaveSignature(values: {
+  allowedTools: string[];
+  disallowedTools: string[];
+  skipPermissions: boolean;
+  projectSortOrder: ProjectSortOrder;
+  cursorAllowed: string[];
+  cursorDisallowed: string[];
+  cursorSkip: boolean;
+  codexMode: CodexPermissionMode;
+  notificationPreferences: NotificationPreferencesState;
+}): string {
+  return JSON.stringify([
+    values.allowedTools,
+    values.disallowedTools,
+    values.skipPermissions,
+    values.projectSortOrder,
+    values.cursorAllowed,
+    values.cursorDisallowed,
+    values.cursorSkip,
+    values.codexMode,
+    values.notificationPreferences,
+  ]);
+}
+
 export function useSettingsController({ isOpen, initialTab }: UseSettingsControllerArgs) {
   const { isDarkMode, toggleDarkMode } = useTheme() as ThemeContextValue;
   const closeTimerRef = useRef<number | null>(null);
@@ -158,6 +185,8 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
     createDefaultNotificationPreferences()
   ));
   const [codexPermissionMode, setCodexPermissionMode] = useState<CodexPermissionMode>('default');
+  // 自动保存签名：loadSettings 完成时登记，其后与签名不同的状态才触发保存
+  const [loadedAutoSaveSignature, setLoadedAutoSaveSignature] = useState<string | null>(null);
 
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [loginProvider, setLoginProvider] = useState<ActiveLoginProvider>('');
@@ -168,58 +197,87 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
   } = useProviderAuthStatus();
 
   const loadSettings = useCallback(async () => {
+    const loaded = {
+      allowedTools: [] as string[],
+      disallowedTools: [] as string[],
+      skipPermissions: false,
+      projectSortOrder: 'name' as ProjectSortOrder,
+      cursorAllowed: [] as string[],
+      cursorDisallowed: [] as string[],
+      cursorSkip: false,
+      codexMode: 'default' as CodexPermissionMode,
+      notificationPreferences: createDefaultNotificationPreferences(),
+    };
     try {
       const savedClaudeSettings = parseJson<ClaudeSettingsStorage>(
         localStorage.getItem('claude-settings'),
         {},
       );
+      loaded.allowedTools = savedClaudeSettings.allowedTools || [];
+      loaded.disallowedTools = savedClaudeSettings.disallowedTools || [];
+      loaded.skipPermissions = Boolean(savedClaudeSettings.skipPermissions);
       setClaudePermissions({
-        allowedTools: savedClaudeSettings.allowedTools || [],
-        disallowedTools: savedClaudeSettings.disallowedTools || [],
-        skipPermissions: Boolean(savedClaudeSettings.skipPermissions),
+        allowedTools: loaded.allowedTools,
+        disallowedTools: loaded.disallowedTools,
+        skipPermissions: loaded.skipPermissions,
       });
-      setProjectSortOrder(savedClaudeSettings.projectSortOrder === 'date' ? 'date' : 'name');
+      loaded.projectSortOrder = savedClaudeSettings.projectSortOrder === 'date' ? 'date' : 'name';
+      setProjectSortOrder(loaded.projectSortOrder);
 
       const savedCursorSettings = parseJson<CursorSettingsStorage>(
         localStorage.getItem('cursor-tools-settings'),
         {},
       );
+      loaded.cursorAllowed = savedCursorSettings.allowedCommands || [];
+      loaded.cursorDisallowed = savedCursorSettings.disallowedCommands || [];
+      loaded.cursorSkip = Boolean(savedCursorSettings.skipPermissions);
       setCursorPermissions({
-        allowedCommands: savedCursorSettings.allowedCommands || [],
-        disallowedCommands: savedCursorSettings.disallowedCommands || [],
-        skipPermissions: Boolean(savedCursorSettings.skipPermissions),
+        allowedCommands: loaded.cursorAllowed,
+        disallowedCommands: loaded.cursorDisallowed,
+        skipPermissions: loaded.cursorSkip,
       });
 
       const savedCodexSettings = parseJson<CodexSettingsStorage>(
         localStorage.getItem('codex-settings'),
         {},
       );
-      setCodexPermissionMode(toCodexPermissionMode(savedCodexSettings.permissionMode));
+      loaded.codexMode = toCodexPermissionMode(savedCodexSettings.permissionMode);
+      setCodexPermissionMode(loaded.codexMode);
 
       try {
         const notificationResponse = await authenticatedFetch('/api/settings/notification-preferences');
+        // GET 失败/非 200：保留默认值并登记其签名——自动保存据此跳过，
+        // 绝不把默认偏好回写覆盖服务端存储的真实偏好。
         if (notificationResponse.ok) {
           const notificationData = await toResponseJson<NotificationPreferencesResponse>(notificationResponse);
           if (notificationData.success && notificationData.preferences) {
-            setNotificationPreferences(normalizeNotificationPreferences(notificationData.preferences));
-          } else {
-            setNotificationPreferences(createDefaultNotificationPreferences());
+            loaded.notificationPreferences = normalizeNotificationPreferences(notificationData.preferences);
           }
-        } else {
-          setNotificationPreferences(createDefaultNotificationPreferences());
         }
+        setNotificationPreferences(loaded.notificationPreferences);
       } catch {
-        setNotificationPreferences(createDefaultNotificationPreferences());
+        setNotificationPreferences(loaded.notificationPreferences);
       }
 
     } catch (error) {
       console.error('Error loading settings:', error);
       setClaudePermissions(createEmptyClaudePermissions());
       setCursorPermissions(createEmptyCursorPermissions());
-      setNotificationPreferences(createDefaultNotificationPreferences());
+      setNotificationPreferences(loaded.notificationPreferences);
       setCodexPermissionMode('default');
       setProjectSortOrder('name');
     }
+    setLoadedAutoSaveSignature(buildAutoSaveSignature({
+      allowedTools: loaded.allowedTools,
+      disallowedTools: loaded.disallowedTools,
+      skipPermissions: loaded.skipPermissions,
+      projectSortOrder: loaded.projectSortOrder,
+      cursorAllowed: loaded.cursorAllowed,
+      cursorDisallowed: loaded.cursorDisallowed,
+      cursorSkip: loaded.cursorSkip,
+      codexMode: loaded.codexMode,
+      notificationPreferences: loaded.notificationPreferences,
+    }));
   }, []);
 
   const openLoginForProvider = useCallback((provider: AgentProvider) => {
@@ -322,14 +380,28 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
     window.dispatchEvent(new Event('codeEditorSettingsChanged'));
   }, [codeEditorSettings]);
 
-  // Auto-save permissions and sort order with debounce
+  // Auto-save permissions and sort order with debounce.
+  // 签名门控：loadSettings 完成前不保存；与已加载签名一致的渲染（含加载本身
+  // 触发的渲染）跳过——修掉「初始守卫被首个 saveSettings 消耗」的伪保存。
   const autoSaveTimerRef = useRef<number | null>(null);
-  const isInitialLoadRef = useRef(true);
 
   useEffect(() => {
-    // Skip auto-save on initial load (settings are being loaded from localStorage)
-    if (isInitialLoadRef.current) {
-      isInitialLoadRef.current = false;
+    if (loadedAutoSaveSignature === null) {
+      return;
+    }
+
+    const currentSignature = buildAutoSaveSignature({
+      allowedTools: claudePermissions.allowedTools,
+      disallowedTools: claudePermissions.disallowedTools,
+      skipPermissions: claudePermissions.skipPermissions,
+      projectSortOrder,
+      cursorAllowed: cursorPermissions.allowedCommands,
+      cursorDisallowed: cursorPermissions.disallowedCommands,
+      cursorSkip: cursorPermissions.skipPermissions,
+      codexMode: codexPermissionMode,
+      notificationPreferences,
+    });
+    if (currentSignature === loadedAutoSaveSignature) {
       return;
     }
 
@@ -346,7 +418,22 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
         window.clearTimeout(autoSaveTimerRef.current);
       }
     };
-  }, [saveSettings]);
+  }, [
+    loadedAutoSaveSignature,
+    saveSettings,
+    claudePermissions.allowedTools,
+    claudePermissions.disallowedTools,
+    claudePermissions.skipPermissions,
+    projectSortOrder,
+    cursorPermissions.allowedCommands,
+    cursorPermissions.disallowedCommands,
+    cursorPermissions.skipPermissions,
+    codexPermissionMode,
+    notificationPreferences,
+  ]);
+
+  const saveSettingsRef = useRef(saveSettings);
+  saveSettingsRef.current = saveSettings;
 
   // Clear save status after 2 seconds
   useEffect(() => {
@@ -358,13 +445,7 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
     return () => window.clearTimeout(timer);
   }, [saveStatus]);
 
-  // Reset initial load flag when settings dialog opens
-  useEffect(() => {
-    if (isOpen) {
-      isInitialLoadRef.current = true;
-    }
-  }, [isOpen]);
-
+  // 关闭设置对话框：待保存的防抖定时器立即冲刷（否则 500ms 内关窗丢最后一笔修改）
   useEffect(() => () => {
     if (closeTimerRef.current !== null) {
       window.clearTimeout(closeTimerRef.current);
@@ -373,6 +454,7 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
     if (autoSaveTimerRef.current !== null) {
       window.clearTimeout(autoSaveTimerRef.current);
       autoSaveTimerRef.current = null;
+      void saveSettingsRef.current();
     }
   }, []);
 

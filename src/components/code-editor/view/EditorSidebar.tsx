@@ -118,7 +118,10 @@ export default function EditorSidebar({
         className={`h-full overflow-hidden border-l border-gray-200 dark:border-gray-700 ${useFlexLayout ? 'min-w-0 flex-1' : `min-w-[ flex-shrink-0${MIN_EDITOR_WIDTH}px]`}`}
         style={useFlexLayout ? undefined : { width: `${effectiveWidth}px`, minWidth: `${MIN_EDITOR_WIDTH}px` }}
       >
+        {/* key=文件路径：换文件时重置 showDiff/预览等本地 UI 状态（否则 diff 文件
+            跟在普通文件后面打开时，diff 视图永远不会出现） */}
         <CodeEditor
+          key={editingFile.path}
           file={editingFile}
           onClose={onCloseEditor}
           projectPath={projectPath}
