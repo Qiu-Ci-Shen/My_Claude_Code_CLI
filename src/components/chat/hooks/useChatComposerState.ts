@@ -699,12 +699,15 @@ export function useChatComposerState({
       // 轮次从服务端静默回填。──
       if (editTarget) {
         const sessionId = editTarget.sessionId;
-        if (!sessionId) {
+        const editedText = inputValueRef.current;
+        if (!sessionId || !editedText.trim()) {
+          // 空文本视同取消编辑
           onClearEditTarget?.();
           return;
         }
         onClearEditTarget?.();
-        const editedText = inputValueRef.current;
+        setInput(''); // 用户视角：消息已发出
+        inputValueRef.current = '';
         void (async () => {
           try {
             sendMessage({ type: 'chat.abort', sessionId });
@@ -716,21 +719,24 @@ export function useChatComposerState({
               await new Promise((resolve) => setTimeout(resolve, 80));
             }
 
-            // 一次请求完成「定位（含时间戳兜底：消息未落盘时按时刻清残留）+
-            // 截断」，随后把编辑后的文本作为新消息发出
-            const result = await rewindExecute(sessionId, undefined, false, {
-              timestamp: editTarget.timestamp,
-              textPrefix: editTarget.content.slice(0, 80),
-            });
-            if (!result.ok) {
-              throw new Error(result.error || '会话回退失败');
+            // 截断旧对话（一次请求完成定位+截断）。失败不阻塞发送——最坏
+            // 情况是旧回合残留在转录里，绝不因截断失败吞掉用户的新消息。
+            try {
+              const result = await rewindExecute(sessionId, undefined, false, {
+                timestamp: editTarget.timestamp,
+                textPrefix: editTarget.content.slice(0, 80),
+              });
+              if (!result.ok) {
+                console.warn('[EditResend] truncate skipped:', result.error);
+              }
+            } catch (truncateError) {
+              console.warn('[EditResend] truncate request failed:', truncateError);
             }
 
-            // 清槽重建视图（更早轮次静默回填），随即把编辑后的文本作为新消息发出
+            // 立即把编辑后的文本作为新消息发出（直连 chat.send，不依赖输入框
+            // 状态——截断清槽后伪造提交不可靠）
+            sendMessage({ type: 'chat.send', sessionId, content: editedText, options: {} });
             onTruncateCompleted?.(sessionId);
-            if (editedText.trim()) {
-              handleSubmitRef.current?.(createFakeSubmitEvent());
-            }
           } catch (err) {
             addMessage({
               type: 'error',
