@@ -1,5 +1,6 @@
 import type { InputHTMLAttributes } from 'react';
 import { useTranslation } from 'react-i18next';
+
 import SettingsSection from '../SettingsSection';
 import SettingsToggle from '../SettingsToggle';
 import { useUiPreferences } from '../../../../hooks/useUiPreferences';
@@ -83,6 +84,59 @@ export default function VoiceSettingsTab() {
               />
             </div>
             <p className="text-xs text-muted-foreground">{t('voiceSettings.note')}</p>
+          </div>
+        </SettingsSection>
+      )}
+
+      {voiceEnabled && (
+        <SettingsSection
+          title={t('voiceSettings.pttTitle', { defaultValue: '按住说话 (Push-to-Talk)' })}
+          description={t('voiceSettings.pttDescription', { defaultValue: '按住快捷键说话，松开自动识别并填入输入框；Esc 取消本次录音。' })}
+        >
+          <div className="space-y-4">
+            <div className="flex items-center justify-between rounded-lg border border-border p-3">
+              <div className="pr-3">
+                <div className="text-sm font-medium text-foreground">
+                  {t('voiceSettings.pttEnable', { defaultValue: '启用按住说话' })}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {t('voiceSettings.pttEnableDescription', { defaultValue: '默认键位为左 Alt（全局），输入框未聚焦时先唤起输入框' })}
+                </div>
+              </div>
+              <SettingsToggle
+                checked={config.pttEnabled}
+                onChange={(v) => update({ pttEnabled: v })}
+                ariaLabel={t('voiceSettings.pttEnable', { defaultValue: '启用按住说话' })}
+              />
+            </div>
+
+            {config.pttEnabled && (
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-foreground">
+                  {t('voiceSettings.pttKey', { defaultValue: '触发键位' })}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {([
+                    ['alt', '左 Alt（全局）'],
+                    ['space', '空格长按（输入框内）'],
+                    ['ctrlm', 'Ctrl+M（全局）'],
+                  ] as const).map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => update({ pttKey: key })}
+                      className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+                        config.pttKey === key
+                          ? 'border-primary bg-primary/10 text-foreground'
+                          : 'border-border text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </SettingsSection>
       )}

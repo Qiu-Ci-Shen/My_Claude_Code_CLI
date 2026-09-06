@@ -14,6 +14,8 @@ import { PaperclipIcon, MessageSquareIcon, XIcon, Loader2, ArrowUpIcon } from 'l
 
 import { useVoiceInput } from '../../hooks/useVoiceInput';
 import { useVoiceAvailable } from '../../hooks/useVoiceAvailable';
+import { usePushToTalk } from '../../hooks/usePushToTalk';
+import { useVoiceConfig } from '../../../../hooks/useVoiceConfig';
 import type { QueuedDraft } from '../../hooks/useChatComposerState';
 import type { SessionActivity } from '../../../../hooks/useSessionProtection';
 import type { PendingPermissionRequest, PermissionMode } from '../../types/types';
@@ -226,12 +228,48 @@ export default function ChatComposer({
     if (voiceErrorTimer.current) clearTimeout(voiceErrorTimer.current);
   }, []);
   const noopTranscript = useCallback(() => {}, []);
-  const { state: voiceState, toggle: voiceToggle, stop: voiceStop } = useVoiceInput(
+  const { state: voiceState, start: voiceStart, toggle: voiceToggle, stop: voiceStop } = useVoiceInput(
     onVoiceTranscript ?? noopTranscript,
     handleVoiceError,
   );
   const isRecording = voiceState === 'recording';
   const isTranscribing = voiceState === 'transcribing';
+
+  // ── 按住说话（push-to-talk，自插件内置）────────────────────────────
+  const { config: voiceConfig } = useVoiceConfig();
+  const insertPlainSpace = useCallback(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.focus();
+    const start = el.selectionStart ?? el.value.length;
+    const end = el.selectionEnd ?? el.value.length;
+    let done = false;
+    try {
+      el.setSelectionRange(start, end);
+      done = document.execCommand('insertText', false, ' ');
+    } catch {
+      done = false;
+    }
+    if (!done) {
+      const desc = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value');
+      if (desc?.set) {
+        desc.set.call(el, el.value.slice(0, start) + ' ' + el.value.slice(end));
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.setSelectionRange(start + 1, start + 1);
+      }
+    }
+  }, [textareaRef]);
+
+  usePushToTalk({
+    enabled: Boolean(onVoiceTranscript) && voiceAvailable && voiceConfig.pttEnabled,
+    binding: voiceConfig.pttKey,
+    state: voiceState,
+    onHoldStart: () => { void voiceStart(); },
+    onHoldRelease: () => voiceStop(),
+    onHoldCancel: () => voiceStop({ cancel: true }),
+    onTap: insertPlainSpace,
+    onActivateComposer: () => textareaRef.current?.focus(),
+  });
 
   // Detect if the AskUserQuestion interactive panel is active
   const hasQuestionPanel = pendingPermissionRequests.some(
@@ -496,6 +534,12 @@ export default function ChatComposer({
         </PromptInputFooter>
       </PromptInput>
       </div>}
+      {voiceConfig.pttEnabled && voiceAvailable && (isRecording || isTranscribing) && (
+        <div className="fixed bottom-4 right-4 z-[60] flex items-center gap-2 rounded-xl border border-border bg-popover px-3.5 py-2 text-[13px] text-popover-foreground shadow-lg">
+          <span className={`h-2.5 w-2.5 flex-none rounded-full ${isRecording ? 'animate-pulse bg-red-500' : 'bg-amber-500'}`} />
+          <span>{isRecording ? '录音中… 松开结束，Esc 取消' : '识别中…'}</span>
+        </div>
+      )}
     </div>
   );
 }

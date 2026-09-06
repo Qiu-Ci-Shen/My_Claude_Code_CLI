@@ -39,6 +39,7 @@ export function useVoiceInput(
   const streamRef = useRef<MediaStream | null>(null);
   const cancelledRef = useRef(false);
   const startingRef = useRef(false);
+  const discardRef = useRef(false);
   // Whether the in-progress stop should auto-send the transcript (vs just fill the box).
   const sendRef = useRef(false);
 
@@ -83,11 +84,18 @@ export function useVoiceInput(
       rec.onstop = async () => {
         stopTracks();
         if (cancelledRef.current) return;
-        // Capture and clear the send intent for this stop before any async work.
+        // Capture and clear the stop intents for this stop before any async work.
         const shouldSend = sendRef.current;
         sendRef.current = false;
+        const shouldDiscard = discardRef.current;
+        discardRef.current = false;
         const type = rec.mimeType || 'audio/webm';
         const blob = new Blob(chunksRef.current, { type });
+        chunksRef.current = [];
+        if (shouldDiscard) {
+          setState('idle');
+          return;
+        }
         if (blob.size < 800) {
           setState('idle');
           onError?.('Recording too short');
@@ -129,13 +137,15 @@ export function useVoiceInput(
     }
   }, [onTranscript, onError]);
 
-  // Stop recording. Pass { send: true } to auto-send the transcript once it's ready.
+  // Stop recording. Pass { send: true } to auto-send the transcript once it's ready,
+  // or { cancel: true } to discard the recording entirely (push-to-talk Esc/blur).
   // Guard on the recorder's own state (not React state) so a double tap, or the mic
   // and Send buttons both firing, can't call stop() on an already-inactive recorder.
-  const stop = useCallback((opts?: { send?: boolean }) => {
+  const stop = useCallback((opts?: { send?: boolean; cancel?: boolean }) => {
     const rec = recorderRef.current;
     if (rec && rec.state !== 'inactive') {
       sendRef.current = opts?.send ?? false;
+      discardRef.current = opts?.cancel ?? false;
       rec.stop();
     }
   }, []);
@@ -145,5 +155,5 @@ export function useVoiceInput(
     else if (state === 'idle') start();
   }, [state, start, stop]);
 
-  return { state, toggle, stop };
+  return { state, start, toggle, stop };
 }

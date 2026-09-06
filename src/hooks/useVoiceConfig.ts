@@ -1,4 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+
+/** 按住说话（push-to-talk）键位 */
+export type PttKey = 'alt' | 'space' | 'ctrlm';
+
+export const PTT_KEYS: PttKey[] = ['alt', 'space', 'ctrlm'];
 
 export type VoiceConfig = {
   baseUrl: string;
@@ -7,11 +12,24 @@ export type VoiceConfig = {
   ttsModel: string;
   ttsVoice: string;
   ttsFormat: string;
+  /** 按住说话开关（默认开，与原 push-to-talk 插件行为一致） */
+  pttEnabled: boolean;
+  /** 按住说话键位（默认左 Alt 全局） */
+  pttKey: PttKey;
 };
 
 const STORAGE_KEY = 'voiceConfig';
 export const VOICE_CONFIG_SYNC_EVENT = 'voice-config:sync';
-const DEFAULTS: VoiceConfig = { baseUrl: '', apiKey: '', sttModel: '', ttsModel: '', ttsVoice: '', ttsFormat: '' };
+const DEFAULTS: VoiceConfig = {
+  baseUrl: '',
+  apiKey: '',
+  sttModel: '',
+  ttsModel: '',
+  ttsVoice: '',
+  ttsFormat: '',
+  pttEnabled: true,
+  pttKey: 'alt',
+};
 
 export function readVoiceConfig(): VoiceConfig {
   try {
@@ -21,7 +39,14 @@ export function readVoiceConfig(): VoiceConfig {
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return { ...DEFAULTS };
     const config = { ...DEFAULTS };
     for (const key of Object.keys(DEFAULTS) as (keyof VoiceConfig)[]) {
-      if (typeof parsed[key] === 'string') config[key] = parsed[key];
+      const value = parsed[key];
+      if (key === 'pttEnabled') {
+        if (typeof value === 'boolean') config.pttEnabled = value;
+      } else if (key === 'pttKey') {
+        if (typeof value === 'string' && PTT_KEYS.includes(value as PttKey)) config.pttKey = value as PttKey;
+      } else if (typeof value === 'string') {
+        config[key] = value;
+      }
     }
     return config;
   } catch {
@@ -47,6 +72,13 @@ export function useVoiceConfig() {
   const [config, setConfig] = useState<VoiceConfig>(() =>
     typeof window === 'undefined' ? { ...DEFAULTS } : readVoiceConfig(),
   );
+
+  // 设置页（或任何消费方）更新后，其他挂载中的实例跟随刷新。
+  useEffect(() => {
+    const sync = () => setConfig(readVoiceConfig());
+    window.addEventListener(VOICE_CONFIG_SYNC_EVENT, sync);
+    return () => window.removeEventListener(VOICE_CONFIG_SYNC_EVENT, sync);
+  }, []);
 
   const update = (patch: Partial<VoiceConfig>) => {
     setConfig((prev) => {
