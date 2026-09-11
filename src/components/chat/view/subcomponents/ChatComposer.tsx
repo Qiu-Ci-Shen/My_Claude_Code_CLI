@@ -64,6 +64,8 @@ interface ChatComposerProps {
   handleGrantToolPermission: (suggestion: { entry: string; toolName: string }) => { success: boolean };
   activity: SessionActivity | null;
   isLoading: boolean;
+  /** 当前会话标识：切换会话时未完成的录音/转写自动取消 */
+  sessionId?: string | null;
   onAbortSession: () => void;
   permissionMode: PermissionMode | string;
   availablePermissionModes: (PermissionMode | string)[];
@@ -126,6 +128,7 @@ export default function ChatComposer({
   handleGrantToolPermission,
   activity,
   isLoading,
+  sessionId,
   onAbortSession,
   permissionMode,
   availablePermissionModes,
@@ -234,6 +237,15 @@ export default function ChatComposer({
   );
   const isRecording = voiceState === 'recording';
   const isTranscribing = voiceState === 'transcribing';
+
+  // 切换会话时，把属于旧会话的录音/转写就地取消——语音状态挂在单个
+  // Composer 实例上，不取消的话浮条会跨会话一直显示（2026-09-10 实测）。
+  const lastVoiceSessionRef = useRef(sessionId);
+  useEffect(() => {
+    if (lastVoiceSessionRef.current === sessionId) return;
+    lastVoiceSessionRef.current = sessionId;
+    voiceStop({ cancel: true });
+  }, [sessionId, voiceStop]);
 
   // ── 按住说话（push-to-talk，自插件内置）────────────────────────────
   const { config: voiceConfig } = useVoiceConfig();
@@ -535,10 +547,15 @@ export default function ChatComposer({
       </PromptInput>
       </div>}
       {voiceConfig.pttEnabled && voiceAvailable && (isRecording || isTranscribing) && (
-        <div className="fixed bottom-4 right-4 z-[60] flex items-center gap-2 rounded-xl border border-border bg-popover px-3.5 py-2 text-[13px] text-popover-foreground shadow-lg">
+        <button
+          type="button"
+          onClick={() => voiceStop({ cancel: true })}
+          title="取消本次录音/识别"
+          className="fixed bottom-4 right-4 z-[60] flex cursor-pointer items-center gap-2 rounded-xl border border-border bg-popover px-3.5 py-2 text-[13px] text-popover-foreground shadow-lg"
+        >
           <span className={`h-2.5 w-2.5 flex-none rounded-full ${isRecording ? 'animate-pulse bg-red-500' : 'bg-amber-500'}`} />
-          <span>{isRecording ? '录音中… 松开结束，Esc 取消' : '识别中…'}</span>
-        </div>
+          <span>{isRecording ? '录音中… 松开结束，Esc 取消' : '识别中… 点击或 Esc 取消'}</span>
+        </button>
       )}
     </div>
   );

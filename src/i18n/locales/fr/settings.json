@@ -92,8 +92,7 @@
     "apiTokens": "API & Tokens",
     "tasks": "Tâches",
     "notifications": "Notifications",
-    "plugins": "Plugins",
-    "about": "À propos"
+    "plugins": "Plugins"
   },
   "notifications": {
     "title": "Notifications",

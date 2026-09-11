@@ -24,7 +24,8 @@
     "fullscreen": "Fullscreen",
     "close": "Close",
     "previewMarkdown": "Preview markdown",
-    "editMarkdown": "Edit markdown"
+    "editMarkdown": "Edit markdown",
+    "previewHtml": "Open HTML preview in new tab"
   },
   "footer": {
     "lines": "Lines:",
@@ -39,5 +40,6 @@
     "loading": "Loading preview...",
     "error": "Unable to display this file.",
     "openInNewTab": "Open in new tab"
-  }
+  },
+  "loadError": "Failed to load file — saving is disabled to avoid overwriting it with an empty buffer: {{message}}"
 }

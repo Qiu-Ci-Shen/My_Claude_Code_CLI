@@ -36,7 +36,7 @@ function composerFocused(): boolean {
  *   按住期间出现其他按键（Alt+Tab、Alt+C 等）→ 放弃本次。
  * - 空格：仅输入框聚焦时生效，长按录音、轻点仍是普通空格，拼音选字（IME）不受影响。
  * - Ctrl+M：全局生效的组合键。
- * - Esc 取消本次录音；窗口失焦自动取消；录音中吞掉按键 repeat。
+ * - Esc 取消本次录音/转写；窗口失焦自动取消录音（含麦克风就绪前的按住）；录音中吞掉按键 repeat。
  */
 export function usePushToTalk({
   enabled,
@@ -82,7 +82,8 @@ export function usePushToTalk({
         return;
       }
       if (stateRef.current === 'transcribing') {
-        if (holdingRef.current) e.preventDefault();
+        // 转写中只拦住新的按压手势（防止开新一轮录音），不吞按键——
+        // 原先的 preventDefault 会干扰 Alt 等键的正常使用（2026-09-10 事故）
         return;
       }
       if (e.repeat) return;
@@ -119,9 +120,10 @@ export function usePushToTalk({
         if (binding === 'space') callbacksRef.current.onTap();
         return;
       }
-      if (stateRef.current === 'recording') {
-        callbacksRef.current.onHoldRelease();
-      }
+      // 计时器已触发（onHoldStart 发出过）：无论 state 是否已翻到 recording
+      // 都要把「松开」交给语音层——getUserMedia 可能仍在进行中，语音层需要
+      // 记录作废标记，否则麦克风就绪后会悬着一个没人停止的录音（2026-09-10）
+      callbacksRef.current.onHoldRelease();
     };
 
     // 组合键保护（alt/ctrlm 计时期间又按了别的键 → 放弃本次）
@@ -137,7 +139,8 @@ export function usePushToTalk({
 
     const onEscKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      if (stateRef.current !== 'recording') return;
+      // 录音中丢弃本次录音；转写中中止在途请求（两者都走 onHoldCancel）
+      if (stateRef.current === 'idle') return;
       holdingRef.current = false;
       clearPressTimer();
       callbacksRef.current.onHoldCancel();
@@ -145,8 +148,11 @@ export function usePushToTalk({
 
     const onBlurWindow = () => {
       clearPressTimer();
+      const wasHolding = holdingRef.current;
       holdingRef.current = false;
-      if (stateRef.current === 'recording') {
+      // 录音中失焦取消；按住中但 state 还没翻到 recording（getUserMedia 进行中）
+      // 同样要取消，否则麦克风会在后台就绪、录音悬着没人停止
+      if (stateRef.current === 'recording' || (wasHolding && stateRef.current === 'idle')) {
         callbacksRef.current.onHoldCancel();
       }
     };

@@ -1,6 +1,8 @@
 import { authenticatedFetch } from '../utils/api';
 import { readVoiceConfig, voiceConfigHeaders } from '../hooks/useVoiceConfig';
 
+import { fetchWithRetry } from './voiceFetch';
+
 function directUrl(baseUrl: string, path: string): string {
   return `${baseUrl.replace(/\/$/, '')}${path}`;
 }
@@ -9,26 +11,38 @@ export function voiceConfigSignature(): string {
   return JSON.stringify(readVoiceConfig());
 }
 
-export function transcribeVoice(blob: Blob, filename: string): Promise<Response> {
+export function transcribeVoice(
+  blob: Blob,
+  filename: string,
+  signal?: AbortSignal,
+): Promise<Response> {
   const config = readVoiceConfig();
   const body = new FormData();
 
   if (config.baseUrl.trim()) {
     body.append('file', blob, filename);
     body.append('model', config.sttModel || 'whisper-1');
-    return fetch(directUrl(config.baseUrl.trim(), '/audio/transcriptions'), {
-      method: 'POST',
-      headers: config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {},
-      body,
-    });
+    return fetchWithRetry(
+      directUrl(config.baseUrl.trim(), '/audio/transcriptions'),
+      {
+        method: 'POST',
+        headers: config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {},
+        body,
+      },
+      { signal },
+    );
   }
 
   body.append('audio', blob, filename);
-  return authenticatedFetch('/api/voice/transcribe', {
-    method: 'POST',
-    headers: voiceConfigHeaders(),
-    body,
-  });
+  return fetchWithRetry(
+    '/api/voice/transcribe',
+    {
+      method: 'POST',
+      headers: voiceConfigHeaders(),
+      body,
+    },
+    { signal, fetchImpl: (input, init) => authenticatedFetch(String(input), init) },
+  );
 }
 
 export function synthesizeVoice(text: string, signal: AbortSignal): Promise<Response> {

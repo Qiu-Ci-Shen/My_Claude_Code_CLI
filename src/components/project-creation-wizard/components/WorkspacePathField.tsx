@@ -6,14 +6,6 @@ import { getSuggestionRootPath } from '../utils/pathUtils';
 import type { FolderSuggestion } from '../types';
 import FolderBrowserModal from './FolderBrowserModal';
 
-declare global {
-  interface Window {
-    qiuDesktopFs?: {
-      pickFolder?: () => Promise<string | null>;
-    };
-  }
-}
-
 type WorkspacePathFieldProps = {
   value: string;
   disabled?: boolean;

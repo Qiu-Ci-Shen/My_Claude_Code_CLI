@@ -233,11 +233,6 @@ export const api = {
     const queryString = params.toString();
     return authenticatedFetch(`/api/providers/sessions/${encodeURIComponent(sessionId)}/messages${queryString ? `?${queryString}` : ''}`);
   },
-  renameProject: (projectId, displayName) =>
-    authenticatedFetch(`/api/projects/${projectId}/rename`, {
-      method: 'PUT',
-      body: JSON.stringify({ displayName }),
-    }),
   restoreProject: (projectId) =>
     authenticatedFetch(`/api/projects/${encodeURIComponent(projectId)}/restore`, {
       method: 'POST',
@@ -263,13 +258,6 @@ export const api = {
     authenticatedFetch(`/api/providers/sessions/${encodeURIComponent(sessionId)}`),
   runningSessions: () =>
     authenticatedFetch('/api/providers/sessions/running'),
-  recentConversations: ({ limit = 40, offset = 0 } = {}) => {
-    const params = new URLSearchParams({
-      limit: String(limit),
-      offset: String(offset),
-    });
-    return authenticatedFetch(`/api/providers/sessions/recent?${params.toString()}`);
-  },
   providerSessionId: (sessionId) =>
     authenticatedFetch(`/api/providers/sessions/${encodeURIComponent(sessionId)}/provider-id`),
   restoreSession: (sessionId) =>
@@ -300,15 +288,6 @@ export const api = {
     authenticatedFetch('/api/projects/create-project', {
       method: 'POST',
       body: JSON.stringify(projectData),
-    }),
-  migrateLegacyProjectStars: (projectIds) =>
-    authenticatedFetch('/api/projects/migrate-legacy-stars', {
-      method: 'POST',
-      body: JSON.stringify({ projectIds }),
-    }),
-  toggleProjectStar: (projectId) =>
-    authenticatedFetch(`/api/projects/${encodeURIComponent(projectId)}/toggle-star`, {
-      method: 'POST',
     }),
   readFile: (projectId, filePath) =>
     authenticatedFetch(`/api/file-tree/projects/${projectId}/file?filePath=${encodeURIComponent(filePath)}`),

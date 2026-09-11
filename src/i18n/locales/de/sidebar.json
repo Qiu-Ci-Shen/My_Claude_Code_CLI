@@ -3,12 +3,10 @@
     "title": "Projekte",
     "newProject": "Neues Projekt",
     "deleteProject": "Projekt entfernen",
-    "renameProject": "Projekt umbenennen",
     "noProjects": "Keine Projekte gefunden",
     "loadingProjects": "Projekte werden geladen...",
     "searchPlaceholder": "Projekte durchsuchen...",
     "projectNamePlaceholder": "Projektname",
-    "starred": "Favoriten",
     "all": "Alle",
     "untitledSession": "Unbenannte Sitzung",
     "newSession": "Neue Sitzung",
@@ -49,7 +47,6 @@
     "save": "Speichern",
     "cancel": "Abbrechen",
     "clearSearch": "Suche leeren",
-    "openCommandPalette": "Befehlspalette öffnen",
     "attentionRequiredIndicator": "Sitzung erfordert Aufmerksamkeit"
   },
   "navigation": {
@@ -67,14 +64,9 @@
     "cancel": "Abbrechen",
     "save": "Speichern",
     "delete": "Löschen",
-    "rename": "Umbenennen",
-    "joinCommunity": "Community beitreten",
-    "reportIssue": "Problem melden",
-    "starOnGithub": "Stern auf GitHub"
+    "rename": "Umbenennen"
   },
-  "branding": {
-    "openSource": "Open Source"
-  },
+  "branding": {},
   "status": {
     "active": "Aktiv",
     "inactive": "Inaktiv",

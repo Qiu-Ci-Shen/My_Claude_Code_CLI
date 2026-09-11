@@ -111,8 +111,7 @@
     "tasks": "작업",
     "browser": "브라우저",
     "notifications": "알림",
-    "plugins": "플러그인",
-    "about": "정보"
+    "plugins": "플러그인"
   },
   "notifications": {
     "title": "알림",

@@ -3,12 +3,10 @@
     "title": "Projeler",
     "newProject": "Yeni Proje",
     "deleteProject": "Projeyi Kaldır",
-    "renameProject": "Projeyi Yeniden Adlandır",
     "noProjects": "Proje bulunamadı",
     "loadingProjects": "Projeler yükleniyor...",
     "searchPlaceholder": "Projelerde ara...",
     "projectNamePlaceholder": "Proje adı",
-    "starred": "Yıldızlı",
     "all": "Tümü",
     "untitledSession": "Adsız Oturum",
     "newSession": "Yeni Oturum",
@@ -49,7 +47,6 @@
     "save": "Kaydet",
     "cancel": "İptal",
     "clearSearch": "Aramayı temizle",
-    "openCommandPalette": "Komut paletini aç",
     "attentionRequiredIndicator": "Oturum ilgi bekliyor"
   },
   "navigation": {
@@ -67,14 +64,9 @@
     "cancel": "İptal",
     "save": "Kaydet",
     "delete": "Sil",
-    "rename": "Yeniden Adlandır",
-    "joinCommunity": "Topluluğa Katıl",
-    "reportIssue": "Sorun Bildir",
-    "starOnGithub": "GitHub'da Yıldızla"
+    "rename": "Yeniden Adlandır"
   },
-  "branding": {
-    "openSource": "Açık Kaynak"
-  },
+  "branding": {},
   "status": {
     "active": "Aktif",
     "inactive": "Pasif",

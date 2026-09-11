@@ -13,15 +13,22 @@ import { filterPostAbortTranscriptEntries, getAbortedTurnTimestamps } from './ab
 const PROVIDER = 'claude';
 
 // 转录解析缓存：历史 API 每次请求都重读+重解析整个 JSONL（多 MB 文件每次几十
-// 毫秒，且激活/刷新/回退后都会触发）。mtime+size 未变化时直接复用解析结果；
-// 条目数超上限按插入序淘汰。缓存为原始解析条目（未按 providerSessionId 过滤）。
+// 毫秒，且激活/刷新/回退后都会触发）。mtime+size 未变化时直接复用解析结果。
+// 缓存为原始解析条目（未按 providerSessionId 过滤）。
+// 淘汰按「原始字节预算 + 文件数」双上限、命中提升为 LRU：解析后的对象体积约为
+// 原始字节的 3-5 倍，只限文件数挡不住内存（30 个大文件可常驻数百 MB~1GB）。
 const transcriptParseCache = new Map<string, { mtimeMs: number; size: number; entries: AnyRecord[] }>();
 const TRANSCRIPT_CACHE_MAX_FILES = 30;
+const TRANSCRIPT_CACHE_MAX_BYTES = 64 * 1024 * 1024;
+let transcriptCacheBytes = 0;
 
 async function readTranscriptEntries(jsonlPath: string): Promise<AnyRecord[]> {
   const stat = await fsp.stat(jsonlPath);
   const cached = transcriptParseCache.get(jsonlPath);
   if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) {
+    // LRU：命中后移到队尾，热点会话不会被插入序淘汰误伤
+    transcriptParseCache.delete(jsonlPath);
+    transcriptParseCache.set(jsonlPath, cached);
     return cached.entries;
   }
 
@@ -42,10 +49,33 @@ async function readTranscriptEntries(jsonlPath: string): Promise<AnyRecord[]> {
     }
   }
 
-  transcriptParseCache.set(jsonlPath, { mtimeMs: stat.mtimeMs, size: stat.size, entries });
-  if (transcriptParseCache.size > TRANSCRIPT_CACHE_MAX_FILES) {
-    const oldest = transcriptParseCache.keys().next().value;
-    if (oldest !== undefined) transcriptParseCache.delete(oldest);
+  // 单文件超过预算不缓存：解析后内存还要再翻几倍，宁可每次重读也不让它独占预算。
+  // 同路径的旧条目（内容已变）先扣掉旧权重再入账。
+  if (stat.size <= TRANSCRIPT_CACHE_MAX_BYTES) {
+    if (cached) {
+      transcriptCacheBytes -= cached.size;
+    }
+    transcriptParseCache.set(jsonlPath, { mtimeMs: stat.mtimeMs, size: stat.size, entries });
+    transcriptCacheBytes += stat.size;
+    while (
+      (transcriptParseCache.size > TRANSCRIPT_CACHE_MAX_FILES
+        || transcriptCacheBytes > TRANSCRIPT_CACHE_MAX_BYTES)
+      && transcriptParseCache.size > 1
+    ) {
+      const oldestKey = transcriptParseCache.keys().next().value;
+      if (oldestKey === undefined) {
+        break;
+      }
+      const oldestEntry = transcriptParseCache.get(oldestKey);
+      transcriptParseCache.delete(oldestKey);
+      if (oldestEntry) {
+        transcriptCacheBytes -= oldestEntry.size;
+      }
+    }
+  } else if (cached) {
+    // 文件涨过预算阈值：清掉旧缓存条目，权重同步出账
+    transcriptParseCache.delete(jsonlPath);
+    transcriptCacheBytes -= cached.size;
   }
   return entries;
 }
@@ -75,7 +105,33 @@ type ClaudeHistoryMessagesResult =
     limit?: number | null;
   };
 
+// subagent 工具解析缓存：历史 API 每次请求都对会话涉及的每个 agent-*.jsonl
+// 全量重解析（重会话可能有几十个 1MB 级文件），mtime+size 未变时复用。
+const agentToolsParseCache = new Map<string, { mtimeMs: number; size: number; tools: AnyRecord[] }>();
+const AGENT_TOOLS_CACHE_MAX_FILES = 40;
+
 async function parseAgentTools(filePath: string): Promise<AnyRecord[]> {
+  try {
+    const stat = await fsp.stat(filePath);
+    const cached = agentToolsParseCache.get(filePath);
+    if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) {
+      return cached.tools;
+    }
+
+    const tools = await parseAgentToolsUncached(filePath);
+    agentToolsParseCache.set(filePath, { mtimeMs: stat.mtimeMs, size: stat.size, tools });
+    if (agentToolsParseCache.size > AGENT_TOOLS_CACHE_MAX_FILES) {
+      const oldest = agentToolsParseCache.keys().next().value;
+      if (oldest !== undefined) agentToolsParseCache.delete(oldest);
+    }
+    return tools;
+  } catch {
+    // stat 失败（文件缺失等）：交给解析函数按原逻辑告警并返回空数组
+    return parseAgentToolsUncached(filePath);
+  }
+}
+
+async function parseAgentToolsUncached(filePath: string): Promise<AnyRecord[]> {
   const tools: AnyRecord[] = [];
 
   try {
@@ -621,6 +677,33 @@ export class ClaudeSessionsProvider implements IProviderSessions {
           role: 'assistant',
           content: raw.message.content,
         }));
+      }
+      return messages;
+    }
+
+    /**
+     * 本地命令被拒或无法执行时（如 /compact 压缩空间不足），CLI 以
+     * system/local_command 行给出说明。转成普通文本下发，否则点压缩按钮
+     * 「没有任何反应」，用户看不到失败原因。
+     */
+    if (raw.type === 'system' && raw.subtype === 'local_command') {
+      const stdout = typeof raw.content === 'string'
+        ? extractTaggedContent(raw.content, 'local-command-stdout')
+        : null;
+      if (stdout !== null) {
+        const stdoutText = stripAnsiFormatting(stdout).trim();
+        if (stdoutText) {
+          messages.push(createNormalizedMessage({
+            id: baseId,
+            sessionId,
+            timestamp: ts,
+            provider: PROVIDER,
+            kind: 'text',
+            role: 'assistant',
+            content: stdoutText,
+            isLocalCommandStdout: true,
+          }));
+        }
       }
       return messages;
     }

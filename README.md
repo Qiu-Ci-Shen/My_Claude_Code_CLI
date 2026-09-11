@@ -231,8 +231,9 @@ cp .env.example .env
 
 | 用途 | 模型名 | 说明 |
 |---|---|---|
-| 语音识别 STT（免费） | `FunAudioLLM/SenseVoiceSmall` | 免费但高峰期拥挤，偶发 503 属服务端过载——**本应用已内置最多 10 次自动重试** |
-| 语音识别 STT（付费，更稳） | `XingChenAGI/XingChenASR-V3.2` | 实测响应快、成功率高，按量计费 |
+| 语音识别 STT（免费） | `FunAudioLLM/SenseVoiceSmall` | 免费但高峰期拥挤：2026-09-10 实测单次成功要 ~37s 且常挂起；应用内置瞬时错误重试 2 次 + 单次 45s 超时，识别中可点击浮条或按 Esc 取消 |
+| 语音识别 STT（付费，快而稳） | `Qwen/Qwen3-ASR-1.7B` | 2026-09-10 实测 0.5s 响应、中文识别准确；官方价 ¥0.00022/秒（≈¥0.013/分钟，说一句话约 1 厘~2 厘钱）——免费模型抽风时首选 |
+| 语音识别 STT（付费） | `XingChenAGI/XingChenASR-V3.2` | 实测 0.7s 响应、成功率高，按量计费 |
 | 语音回复 TTS | `FunAudioLLM/CosyVoice2-0.5B` | 可选音色，用于朗读 AI 回复 |
 
 更多模型在 [硅基流动模型广场](https://cloud.siliconflow.cn/models)（筛选「音频」分类）查看。不限于硅基流动——其他服务商只要 BaseURL + Key + 模型名三件套齐全即可（如 OpenAI 官方 `whisper-1`）。

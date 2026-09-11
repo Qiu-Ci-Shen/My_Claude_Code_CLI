@@ -9,7 +9,9 @@
     "copied": "消息已复制",
     "selectFormat": "选择复制格式",
     "copyAsMarkdown": "复制为 Markdown",
-    "copyAsText": "复制为纯文本"
+    "copyAsText": "复制为纯文本",
+    "markdownShort": "MD",
+    "textShort": "TXT"
   },
   "messageTypes": {
     "user": "U",
@@ -155,7 +157,15 @@
       "opencode": "准备好使用带有 {{model}} 的 OpenCode。请在下方开始输入您的消息。",
       "default": "请在上方选择一个提供者以开始"
     },
-    "pressToSearch": "按 <kbd>{{shortcut}}</kbd> 搜索会话、文件和提交"
+    "pressToSearch": "按 <kbd>{{shortcut}}</kbd> 搜索会话、文件和提交",
+    "clickToChange": "点击切换模型",
+    "chooseModel": "选择模型",
+    "chooseModelDescription": "内置模型与自定义模型合并在一个列表",
+    "addModel": "添加模型",
+    "searchModels": "搜索模型...",
+    "noModelsFound": "未找到模型。",
+    "loadingModels": "正在加载模型…",
+    "manageModels": "管理模型"
   },
   "session": {
     "continue": {
@@ -236,5 +246,18 @@
   },
   "tasks": {
     "nextTaskPrompt": "开始下一个任务"
+  },
+  "composer": {
+    "reasoning": "推理",
+    "model": "模型",
+    "effortDefault": "默认",
+    "loadingModels": "正在加载模型…",
+    "modelMenu": "选择模型与推理强度",
+    "permissionHeading": "{{provider}} 的操作应如何批准？"
+  },
+  "compactSummary": {
+    "label": "上下文已压缩",
+    "show": "查看摘要",
+    "hide": "收起摘要"
   }
 }

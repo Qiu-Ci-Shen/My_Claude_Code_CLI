@@ -19,6 +19,18 @@ type ProviderTokenUsageServiceDependencies = {
   fileExists: (filePath: string) => boolean;
   readDirectory: (directoryPath: string) => Promise<Dirent[]>;
   readTextFile: (filePath: string) => Promise<string>;
+  /**
+   * Reads a usage-scan window from a file: the last `tailBytes` plus the first
+   * `headBytes`. `truncated` is false when the file fits in the tail window,
+   * in which case `tail`/`head` are the whole content. Transcripts grow to
+   * multi-MB while only the tail carries current usage; scanning the window
+   * avoids reading+ splitting the whole file on every session open.
+   */
+  readTextFileWindow: (
+    filePath: string,
+    tailBytes: number,
+    headBytes: number,
+  ) => Promise<{ tail: string; head: string; truncated: boolean }>;
   getClaudeContextWindow: () => string | undefined;
 };
 
@@ -46,6 +58,11 @@ type OpenCodeTokenRow = {
   cacheWriteTokens: number | null;
 };
 
+// 使用量扫描窗口：最后一条 usage（以及压缩边界与其之前的 usage）总在尾窗内；
+// 头窗只用于读首个 model 标记（上下文窗口判定），64KB 足够覆盖任何真实转录。
+const CLAUDE_USAGE_TAIL_BYTES = 512 * 1024;
+const CLAUDE_USAGE_HEAD_BYTES = 64 * 1024;
+
 const defaultDependencies: ProviderTokenUsageServiceDependencies = {
   getSessionById: (sessionId) => sessionsDb.getSessionById(sessionId),
   getHomeDirectory: () => os.homedir(),
@@ -53,6 +70,27 @@ const defaultDependencies: ProviderTokenUsageServiceDependencies = {
   fileExists: (filePath) => fsSync.existsSync(filePath),
   readDirectory: (directoryPath) => fsp.readdir(directoryPath, { withFileTypes: true }),
   readTextFile: (filePath) => fsp.readFile(filePath, 'utf8'),
+  readTextFileWindow: async (filePath, tailBytes, headBytes) => {
+    const fileStat = await fsp.stat(filePath);
+    if (fileStat.size <= tailBytes) {
+      const content = await fsp.readFile(filePath, 'utf8');
+      return { tail: content, head: content, truncated: false };
+    }
+
+    const handle = await fsp.open(filePath, 'r');
+    try {
+      const tailSize = Math.min(tailBytes, fileStat.size);
+      const headSize = Math.min(headBytes, fileStat.size);
+      const tailBuffer = Buffer.alloc(tailSize);
+      await handle.read(tailBuffer, 0, tailSize, fileStat.size - tailSize);
+      const headBuffer = Buffer.alloc(headSize);
+      await handle.read(headBuffer, 0, headSize, 0);
+      // 尾窗从中间截断：首行可能是半截行，扫描端的 JSON.parse 容错会跳过它。
+      return { tail: tailBuffer.toString('utf8'), head: headBuffer.toString('utf8'), truncated: true };
+    } finally {
+      await handle.close();
+    }
+  },
   getClaudeContextWindow: () => process.env.CONTEXT_WINDOW,
 };
 
@@ -158,16 +196,34 @@ function resolveClaudeContextWindow(
   return Number.isFinite(parsedContextWindow) ? parsedContextWindow : 160_000;
 }
 
-function readClaudeTokenUsage(fileContent: string, configuredContextWindow: string | undefined): TokenUsageResult {
+function readClaudeTokenUsage(
+  scanContent: string,
+  configuredContextWindow: string | undefined,
+  windowHeadContent: string,
+): { result: TokenUsageResult; foundUsage: boolean } {
+  let foundUsage = false;
   let inputTokens = 0;
   let outputTokens = 0;
   let cacheReadTokens = 0;
   let cacheCreationTokens = 0;
-  const lines = fileContent.trim().split('\n');
+  let compactPostTokens = 0;
+  const lines = scanContent.trim().split('\n');
 
   for (let index = lines.length - 1; index >= 0; index -= 1) {
     try {
       const entry = JSON.parse(lines[index]) as AnyRecord;
+
+      // 压缩边界若比最后一条 usage 更晚，上下文占用以它的 postTokens 为准；
+      // 否则压缩完成后（下一回合之前）这里读到的仍是压缩前的高值。记录后
+      // 继续向前找最后一条 usage——缓存三桶沿用它的值仅供命中率展示。
+      if (entry.type === 'system' && entry.subtype === 'compact_boundary') {
+        if (compactPostTokens === 0) {
+          const metadata = (entry.compactMetadata ?? entry.compact_metadata) as AnyRecord | undefined;
+          compactPostTokens = readUsageNumber(metadata?.postTokens ?? metadata?.post_tokens);
+        }
+        continue;
+      }
+
       const usage = entry.type === 'assistant' ? entry.message?.usage : null;
       if (!usage) {
         continue;
@@ -184,24 +240,46 @@ function readClaudeTokenUsage(fileContent: string, configuredContextWindow: stri
       );
       inputTokens = directInputTokens + cacheReadTokens + cacheCreationTokens;
       outputTokens = readUsageNumber(usage.output_tokens ?? usage.outputTokens);
+      foundUsage = true;
       break;
     } catch {
       // Skip malformed lines without discarding usage from earlier messages.
     }
   }
 
-  const contextWindow = resolveClaudeContextWindow(fileContent, configuredContextWindow);
+  const contextWindow = resolveClaudeContextWindow(windowHeadContent, configuredContextWindow);
   const cacheTokens = cacheReadTokens + cacheCreationTokens;
 
+  if (compactPostTokens > 0) {
+    // post_tokens 即压缩后的上下文占用（不含固定前缀，与运行时读法一致）；
+    // 缓存三桶沿用最后一条 usage 的值，仅供命中率展示。
+    return {
+      foundUsage,
+      result: {
+        used: compactPostTokens,
+        total: contextWindow,
+        inputTokens: compactPostTokens,
+        outputTokens: 0,
+        cacheReadTokens,
+        cacheCreationTokens,
+        cacheTokens,
+        breakdown: { input: compactPostTokens, output: 0 },
+      },
+    };
+  }
+
   return {
-    used: inputTokens + outputTokens,
-    total: contextWindow,
-    inputTokens,
-    outputTokens,
-    cacheReadTokens,
-    cacheCreationTokens,
-    cacheTokens,
-    breakdown: { input: inputTokens, output: outputTokens },
+    foundUsage,
+    result: {
+      used: inputTokens + outputTokens,
+      total: contextWindow,
+      inputTokens,
+      outputTokens,
+      cacheReadTokens,
+      cacheCreationTokens,
+      cacheTokens,
+      breakdown: { input: inputTokens, output: outputTokens },
+    },
   };
 }
 
@@ -371,8 +449,23 @@ export function createProviderTokenUsageService(
         });
       }
 
+      const window = await dependencies.readTextFileWindow(
+        sessionFilePath,
+        CLAUDE_USAGE_TAIL_BYTES,
+        CLAUDE_USAGE_HEAD_BYTES,
+      );
+      const scanned = readClaudeTokenUsage(
+        window.tail,
+        dependencies.getClaudeContextWindow(),
+        window.head,
+      );
+      if (!window.truncated || scanned.foundUsage) {
+        return scanned.result;
+      }
+
+      // 尾窗被截断且未扫到 usage（如末尾被超长工具结果行占据）：全量读取保正确性。
       const fileContent = await dependencies.readTextFile(sessionFilePath);
-      return readClaudeTokenUsage(fileContent, dependencies.getClaudeContextWindow());
+      return readClaudeTokenUsage(fileContent, dependencies.getClaudeContextWindow(), fileContent).result;
     },
   };
 }

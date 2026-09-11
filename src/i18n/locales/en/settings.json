@@ -63,7 +63,12 @@
     "ttsModel": "Text-to-speech model",
     "voice": "Voice",
     "format": "Audio format",
-    "note": "A custom base URL is called directly by your browser and must allow browser CORS requests. Leave it blank to use the server-configured backend."
+    "note": "A custom base URL is called directly by your browser and must allow browser CORS requests. Leave it blank to use the server-configured backend.",
+    "pttTitle": "Push-to-Talk",
+    "pttDescription": "Hold the shortcut key to speak; release to transcribe into the input box. Esc cancels the recording.",
+    "pttEnable": "Enable push-to-talk",
+    "pttEnableDescription": "Default key is Left Alt (global); focuses the input box first when unfocused.",
+    "pttKey": "Trigger key"
   },
   "quickSettings": {
     "title": "Quick Settings",
@@ -99,7 +104,8 @@
     "handle": {
       "closePanel": "Close shortcuts panel",
       "openPanel": "Open shortcuts panel"
-    }
+    },
+    "paste": "Paste"
   },
   "mainTabs": {
     "label": "Settings",
@@ -112,8 +118,7 @@
     "browser": "Browser",
     "notifications": "Notifications",
     "plugins": "Plugins",
-    "mobileAccess": "Mobile Access",
-    "about": "About"
+    "mobileAccess": "Mobile Access"
   },
   "notifications": {
     "title": "Notifications",

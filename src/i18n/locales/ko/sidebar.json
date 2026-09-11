@@ -3,12 +3,10 @@
     "title": "프로젝트",
     "newProject": "새 프로젝트",
     "deleteProject": "프로젝트 제거",
-    "renameProject": "프로젝트 이름 변경",
     "noProjects": "프로젝트가 없습니다",
     "loadingProjects": "프로젝트 로딩 중...",
     "searchPlaceholder": "프로젝트 검색...",
     "projectNamePlaceholder": "프로젝트 이름",
-    "starred": "즐겨찾기",
     "all": "전체",
     "untitledSession": "제목 없는 세션",
     "newSession": "새 세션",
@@ -49,7 +47,6 @@
     "save": "저장",
     "cancel": "취소",
     "clearSearch": "검색 지우기",
-    "openCommandPalette": "명령 팔레트 열기",
     "attentionRequiredIndicator": "세션에 주의가 필요합니다"
   },
   "navigation": {
@@ -67,14 +64,9 @@
     "cancel": "취소",
     "save": "저장",
     "delete": "삭제",
-    "rename": "이름 변경",
-    "joinCommunity": "커뮤니티 참여",
-    "reportIssue": "문제 신고",
-    "starOnGithub": "GitHub에서 스타"
+    "rename": "이름 변경"
   },
-  "branding": {
-    "openSource": "오픈 소스"
-  },
+  "branding": {},
   "status": {
     "active": "활성",
     "inactive": "비활성",

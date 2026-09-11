@@ -3,12 +3,10 @@
     "title": "Projects",
     "newProject": "New Project",
     "deleteProject": "Remove Project",
-    "renameProject": "Rename Project",
     "noProjects": "No projects found",
     "loadingProjects": "Loading projects...",
     "searchPlaceholder": "Search projects...",
     "projectNamePlaceholder": "Project name",
-    "starred": "Starred",
     "all": "All",
     "untitledSession": "Untitled Session",
     "newSession": "New Session",
@@ -28,6 +26,18 @@
     "newSession": "New Session",
     "deleteSession": "Delete Session",
     "renameSession": "Rename Session",
+    "copySessionId": "Copy {{provider}} session ID",
+    "copySessionIdLoading": "Loading {{provider}} session ID…",
+    "copySessionIdCopied": "{{provider}} session ID copied",
+    "copySessionIdFailed": "Couldn't copy {{provider}} session ID",
+    "copySessionIdUnavailable": "{{provider}} session ID unavailable",
+    "archiveOrDeleteSession": "Archive or delete session",
+    "sessionOptions": "Session options",
+    "sessionOptionsFor": "Session options for {{name}}",
+    "providerSession": "{{provider}} session",
+    "sessionName": "Session name",
+    "clickToRetry": "Click to try again.",
+    "tapToRetry": "Tap to try again.",
     "noSessions": "No sessions yet",
     "loadingSessions": "Loading sessions...",
     "unnamed": "Unnamed",
@@ -49,8 +59,8 @@
     "save": "Save",
     "cancel": "Cancel",
     "clearSearch": "Clear search",
-    "openCommandPalette": "Open command palette",
-    "attentionRequiredIndicator": "Session needs attention"
+    "attentionRequiredIndicator": "Session needs attention",
+    "processingSessionIndicator": "Processing session"
   },
   "navigation": {
     "chat": "Chat",
@@ -67,14 +77,9 @@
     "cancel": "Cancel",
     "save": "Save",
     "delete": "Delete",
-    "rename": "Rename",
-    "joinCommunity": "Join Community",
-    "reportIssue": "Report Issue",
-    "starOnGithub": "Star on GitHub"
+    "rename": "Rename"
   },
-  "branding": {
-    "openSource": "Open Source"
-  },
+  "branding": {},
   "status": {
     "active": "Active",
     "inactive": "Inactive",
@@ -131,7 +136,12 @@
     "matches_one": "{{count}} match",
     "matches_other": "{{count}} matches",
     "projectsScanned_one": "{{count}} project scanned",
-    "projectsScanned_other": "{{count}} projects scanned"
+    "projectsScanned_other": "{{count}} projects scanned",
+    "runningTooltip": "Running sessions",
+    "archiveOnlyTooltip": "Archive only",
+    "archivedPlaceholder": "Search archived sessions...",
+    "runningPlaceholder": "Search running sessions...",
+    "modeRunning": "Running"
   },
   "recent": {
     "title": "Recent conversations",
@@ -150,6 +160,31 @@
     "removeFromSidebar": "Remove from sidebar only",
     "deleteAllData": "Delete all data permanently",
     "allConversationsDeleted": "The project will be removed from the sidebar. Your files, memories, and session data will be preserved.",
-    "cannotUndo": "You can re-add the project later."
+    "cannotUndo": "You can re-add the project later.",
+    "archiveProject": "Archive project",
+    "archiveSession": "Archive session",
+    "archiveSessionNotice": "Archive keeps the session out of the active list while preserving its history.",
+    "archivedSessionNotice": "This session is already archived. You can keep it hidden or delete it permanently.",
+    "deleteSessionPermanently": "Delete permanently"
+  },
+  "archived": {
+    "title": "Archive",
+    "restoreAction": "Restore",
+    "restoreProject": "Restore workspace",
+    "restore": "Restore session",
+    "restoreHint": "Restore items whenever you need them",
+    "loadingTitle": "Loading archive...",
+    "loadingDescription": "Fetching hidden workspaces and sessions you can restore later.",
+    "emptyTitle": "No archived items",
+    "emptyDescription": "Archived workspaces and sessions will appear here when you hide them from the active list.",
+    "noMatchingSessions": "No matching archived items",
+    "tryDifferentSearch": "Try a different search term.",
+    "deletePermanently": "Delete permanently"
+  },
+  "running": {
+    "title": "Running now",
+    "emptyTitle": "No sessions running",
+    "emptyDescription": "Active work will appear here while a provider is processing.",
+    "noMatchingSessions": "No running sessions match this search."
   }
 }

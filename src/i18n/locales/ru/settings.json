@@ -92,8 +92,7 @@
     "apiTokens": "API и токены",
     "tasks": "Задачи",
     "notifications": "Уведомления",
-    "plugins": "Плагины",
-    "about": "О программе"
+    "plugins": "Плагины"
   },
   "notifications": {
     "title": "Уведомления",

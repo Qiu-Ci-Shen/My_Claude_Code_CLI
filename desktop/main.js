@@ -152,7 +152,13 @@ function runBuild() {
     build.stderr?.on('data', forward);
 
     const timer = setTimeout(() => {
-      build.kill();
+      // Windows 上 build 是 cmd.exe 壳，kill() 只杀壳不杀树——vite/tsc 子进程
+      // 会孤儿化继续占用 CPU 并写 dist，必须 /T 整树杀（同 killServerTree）。
+      if (process.platform === 'win32') {
+        spawn('taskkill', ['/pid', String(build.pid), '/T', '/F'], { windowsHide: true });
+      } else {
+        build.kill();
+      }
       resolve(false);
     }, BUILD_TIMEOUT_MS);
 
@@ -347,6 +353,14 @@ if (!gotLock) {
       return result.canceled || result.filePaths.length === 0 ? null : result.filePaths[0];
     });
 
+    // 在资源管理器中打开目录；成功返回空串，失败返回错误描述
+    ipcMain.handle('qiu-desktop:open-folder', async (_event, dirPath) => {
+      if (typeof dirPath !== 'string' || dirPath.trim() === '') {
+        return '无效的目录路径';
+      }
+      return shell.openPath(dirPath);
+    });
+
     createWindow();
 
     try {
@@ -364,6 +378,8 @@ if (!gotLock) {
       setTimeout(() => enterApp(), 300);
     } catch (error) {
       console.error(error);
+      // 启动失败时回收自己拉起的服务，避免失败页挂着时留一个占端口的僵尸进程
+      killServerTree();
       sendStatus(`启动失败：${error.message}`, 'failed');
     }
   });

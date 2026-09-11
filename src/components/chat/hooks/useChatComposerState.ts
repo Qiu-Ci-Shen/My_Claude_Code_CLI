@@ -1038,6 +1038,50 @@ export function useChatComposerState({
     handleSubmitRef.current = handleSubmit;
   }, [handleSubmit]);
 
+  // 压缩上下文：与终端 CLI 的 /compact 同一条路——把命令作为一轮消息发给
+  // CLI，由它原生压缩；摘要只写进转录，本轮结束后由外层重取转录展示。
+  const handleCompactContext = useCallback(() => {
+    if (!selectedProject || isLoading) {
+      return;
+    }
+
+    const targetSessionId = selectedSession?.id || currentSessionId || null;
+    if (!targetSessionId) {
+      return;
+    }
+
+    const commandText = '/compact';
+    addMessage({
+      type: 'user',
+      content: commandText,
+      timestamp: new Date(),
+    });
+    onSessionProcessing?.(targetSessionId, {
+      statusText: null,
+      canInterrupt: true,
+    });
+    setIsUserScrolledUp(false);
+    setTimeout(() => scrollToBottom(), 100);
+
+    sendMessage({
+      type: 'chat.send',
+      sessionId: targetSessionId,
+      content: commandText,
+      options: buildSendOptions(commandText),
+    });
+  }, [
+    addMessage,
+    buildSendOptions,
+    currentSessionId,
+    isLoading,
+    onSessionProcessing,
+    scrollToBottom,
+    selectedProject,
+    selectedSession,
+    sendMessage,
+    setIsUserScrolledUp,
+  ]);
+
   // Once the in-flight turn ends, replay the queued draft through the normal
   // submit path. The draft itself is passed directly so submission never
   // depends on React committing restored attachment state first.
@@ -1411,6 +1455,7 @@ export function useChatComposerState({
     isDragActive,
     openAttachmentPicker: open,
     handleSubmit,
+    handleCompactContext,
     queuedDraft,
     editQueuedDraft,
     deleteQueuedDraft,

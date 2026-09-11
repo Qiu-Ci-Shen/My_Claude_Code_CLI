@@ -92,8 +92,7 @@
     "apiTokens": "API & トークン",
     "tasks": "タスク",
     "notifications": "通知",
-    "plugins": "プラグイン",
-    "about": "概要"
+    "plugins": "プラグイン"
   },
   "notifications": {
     "title": "通知",

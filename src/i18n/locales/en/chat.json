@@ -9,7 +9,9 @@
     "copied": "Message copied",
     "selectFormat": "Select copy format",
     "copyAsMarkdown": "Copy as markdown",
-    "copyAsText": "Copy as text"
+    "copyAsText": "Copy as text",
+    "markdownShort": "MD",
+    "textShort": "TXT"
   },
   "messageTypes": {
     "user": "U",
@@ -163,7 +165,15 @@
       "opencode": "Ready to use OpenCode with {{model}}. Start typing your message below.",
       "default": "Select a provider above to begin"
     },
-    "pressToSearch": "Press <kbd>{{shortcut}}</kbd> to search sessions, files, and commits"
+    "pressToSearch": "Press <kbd>{{shortcut}}</kbd> to search sessions, files, and commits",
+    "clickToChange": "Click to change model",
+    "chooseModel": "Choose a model",
+    "chooseModelDescription": "Built-in and custom models in one list",
+    "addModel": "Add model",
+    "searchModels": "Search models...",
+    "noModelsFound": "No models found.",
+    "loadingModels": "Loading models…",
+    "manageModels": "Manage models"
   },
   "session": {
     "continue": {
@@ -244,5 +254,10 @@
   },
   "tasks": {
     "nextTaskPrompt": "Start the next task"
+  },
+  "compactSummary": {
+    "label": "Context compacted",
+    "show": "Show summary",
+    "hide": "Hide summary"
   }
 }

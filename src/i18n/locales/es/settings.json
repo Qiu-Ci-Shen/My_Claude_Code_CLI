@@ -111,8 +111,7 @@
     "tasks": "Tareas",
     "browser": "Navegador",
     "notifications": "Notificaciones",
-    "plugins": "Plugins",
-    "about": "Acerca de"
+    "plugins": "Plugins"
   },
   "notifications": {
     "title": "Notificaciones",

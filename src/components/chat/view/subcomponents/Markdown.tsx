@@ -64,6 +64,47 @@ type CodeBlockProps = {
   forceBlock?: boolean;
 };
 
+type HighlightedCodeProps = {
+  raw: string;
+  language: string;
+  isDarkMode: boolean;
+};
+
+// 流式输出期间所在消息每 ~100ms 重渲染一次，而 react-syntax-highlighter
+// 每次渲染都会全量重新 tokenize（组件内部无缓存），长代码块的代价可观。
+// 按 raw/语言/主题 memo：内容未变时整块跳过重新高亮（复制按钮状态等低级
+// 重渲染不受影响）。
+const HighlightedCode = React.memo(function HighlightedCode({
+  raw,
+  language,
+  isDarkMode,
+}: HighlightedCodeProps) {
+  return (
+    <SyntaxHighlighter
+      language={language}
+      style={isDarkMode ? oneDark : oneLight}
+      customStyle={{
+        margin: 0,
+        borderRadius: 0,
+        fontSize: '0.8125rem',
+        lineHeight: 1.6,
+        padding: '0.5rem 1rem 1rem',
+        // The container owns the background so the label row and code read as one panel.
+        background: 'transparent',
+      }}
+      codeTagProps={{
+        style: {
+          fontFamily:
+            'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+          background: 'transparent',
+        },
+      }}
+    >
+      {raw}
+    </SyntaxHighlighter>
+  );
+});
+
 // `node` is destructured out so react-markdown's hast node never reaches the DOM.
 const CodeBlock = ({ node: _node, className, children, forceBlock, ...props }: CodeBlockProps) => {
   const { t } = useTranslation('chat');
@@ -143,28 +184,7 @@ const CodeBlock = ({ node: _node, className, children, forceBlock, ...props }: C
         </button>
       </div>
 
-      <SyntaxHighlighter
-        language={language}
-        style={isDarkMode ? oneDark : oneLight}
-        customStyle={{
-          margin: 0,
-          borderRadius: 0,
-          fontSize: '0.8125rem',
-          lineHeight: 1.6,
-          padding: '0.5rem 1rem 1rem',
-          // The container owns the background so the label row and code read as one panel.
-          background: 'transparent',
-        }}
-        codeTagProps={{
-          style: {
-            fontFamily:
-              'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-            background: 'transparent',
-          },
-        }}
-      >
-        {raw}
-      </SyntaxHighlighter>
+      <HighlightedCode raw={raw} language={language} isDarkMode={isDarkMode} />
     </div>
   );
 };
@@ -214,7 +234,10 @@ const markdownComponents = {
   ),
 };
 
-export function Markdown({ children, className, breaks = false }: MarkdownProps) {
+// memo 包住导出：流式期间此组件会被上层以「内容没变的字符串」反复重渲染，
+// 直接跳过可省掉 react-markdown 每次渲染的全量重解析（v10 无内部缓存）。
+// children 正常为字符串（浅比较即内容比较）；传元素时 memo 失效但不影响行为。
+export const Markdown = React.memo(function Markdown({ children, className, breaks = false }: MarkdownProps) {
   const content = normalizeInlineCodeFences(String(children ?? ''));
   const remarkPlugins = useMemo(
     () => (breaks
@@ -271,4 +294,4 @@ export function Markdown({ children, className, breaks = false }: MarkdownProps)
       </ReactMarkdown>
     </div>
   );
-}
+});

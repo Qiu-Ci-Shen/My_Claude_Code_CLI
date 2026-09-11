@@ -31,32 +31,38 @@ export default function MermaidDiagram({ code }: MermaidDiagramProps) {
     let cancelled = false;
     const renderId = `mermaid-${reactId.replace(/[^a-zA-Z0-9]/g, '')}`;
 
-    loadMermaid()
-      .then((mermaid) => {
-        mermaid.initialize({
-          startOnLoad: false,
-          securityLevel: 'strict',
-          theme: isDarkMode ? 'dark' : 'default',
-          suppressErrorRendering: true,
+    // 流式输出期间 code 每 ~100ms 变化一次；立刻渲染的话每次变化都要跑一遍
+    // 重量级 mermaid.render（且多半因代码未闭合而解析失败）。等到代码安静
+    // 250ms 再渲染一次，流式时只在成块结束后真正渲染。
+    const timer = window.setTimeout(() => {
+      loadMermaid()
+        .then((mermaid) => {
+          mermaid.initialize({
+            startOnLoad: false,
+            securityLevel: 'strict',
+            theme: isDarkMode ? 'dark' : 'default',
+            suppressErrorRendering: true,
+          });
+          return mermaid.render(renderId, code.trim());
+        })
+        .then((result) => {
+          if (!cancelled) {
+            setSvg(result.svg);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setSvg(null);
+          }
+          // suppressErrorRendering still leaves the scratch element behind on
+          // parse failures in some mermaid versions; clean it up.
+          document.getElementById(`d${renderId}`)?.remove();
         });
-        return mermaid.render(renderId, code.trim());
-      })
-      .then((result) => {
-        if (!cancelled) {
-          setSvg(result.svg);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setSvg(null);
-        }
-        // suppressErrorRendering still leaves the scratch element behind on
-        // parse failures in some mermaid versions; clean it up.
-        document.getElementById(`d${renderId}`)?.remove();
-      });
+    }, 250);
 
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
     };
   }, [code, isDarkMode, reactId]);
 

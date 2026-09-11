@@ -93,8 +93,7 @@
     "tasks": "Görevler",
     "computer": "Bilgisayar Kullanımı",
     "notifications": "Bildirimler",
-    "plugins": "Eklentiler",
-    "about": "Hakkında"
+    "plugins": "Eklentiler"
   },
   "notifications": {
     "title": "Bildirimler",

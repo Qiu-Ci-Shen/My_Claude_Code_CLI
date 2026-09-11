@@ -38,6 +38,11 @@ type WebSocketContextType = {
    * Kept only for low-frequency consumers (TaskMaster broadcasts). High-rate
    * chat streams must use `subscribe` — React may batch state updates, which
    * makes `latestMessage` lossy under load.
+   *
+   * Only `taskmaster-*` frames are stored: updating this state for every chat
+   * stream chunk re-renders every `useWebSocket()` consumer (fired per frame,
+   * bypassing memo) since the context value changes. TaskMasterContext is the
+   * sole reader and ignores all other frame types anyway.
    */
   latestMessage: ServerEvent | null;
   isConnected: boolean;
@@ -93,7 +98,11 @@ const useWebSocketProviderState = (): WebSocketContextType => {
         console.error('WebSocket listener error:', error);
       }
     }
-    setLatestMessage(event);
+    // 只把 taskmaster 广播存进 latestMessage（唯一消费者）。聊天流每帧都
+    // setState 会让所有 useWebSocket() 消费者按帧重渲染整个应用。
+    if (typeof event.type === 'string' && event.type.startsWith('taskmaster-')) {
+      setLatestMessage(event);
+    }
   }, []);
 
   useEffect(() => {

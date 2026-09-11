@@ -3,12 +3,10 @@
     "title": "プロジェクト",
     "newProject": "新規プロジェクト",
     "deleteProject": "プロジェクトを除去",
-    "renameProject": "プロジェクト名を変更",
     "noProjects": "プロジェクトが見つかりません",
     "loadingProjects": "プロジェクトを読み込んでいます...",
     "searchPlaceholder": "プロジェクトを検索...",
     "projectNamePlaceholder": "プロジェクト名",
-    "starred": "お気に入り",
     "all": "すべて",
     "untitledSession": "無題のセッション",
     "newSession": "新しいセッション",
@@ -48,7 +46,6 @@
     "activeSessionIndicator": "最近アクティブなセッション（過去10分以内）",
     "save": "保存",
     "cancel": "キャンセル",
-    "openCommandPalette": "コマンドパレットを開く",
     "attentionRequiredIndicator": "セッションが対応を必要としています"
   },
   "navigation": {
@@ -66,14 +63,9 @@
     "cancel": "キャンセル",
     "save": "保存",
     "delete": "削除",
-    "rename": "名前の変更",
-    "joinCommunity": "コミュニティに参加",
-    "reportIssue": "問題を報告",
-    "starOnGithub": "GitHubでスター"
+    "rename": "名前の変更"
   },
-  "branding": {
-    "openSource": "オープンソース"
-  },
+  "branding": {},
   "status": {
     "active": "アクティブ",
     "inactive": "非アクティブ",

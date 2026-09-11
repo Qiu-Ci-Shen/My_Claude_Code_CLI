@@ -34,42 +34,6 @@ export const readProjectSortOrder = (): ProjectSortOrder => {
   }
 };
 
-const LEGACY_STARRED_PROJECTS_STORAGE_KEY = 'starredProjects';
-
-/**
- * Reads legacy project stars from localStorage (used only for one-time migration to backend).
- */
-export const readLegacyStarredProjectIds = (): string[] => {
-  try {
-    const saved = localStorage.getItem(LEGACY_STARRED_PROJECTS_STORAGE_KEY);
-    if (!saved) {
-      return [];
-    }
-
-    const parsed = JSON.parse(saved) as unknown;
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed
-      .map((value) => String(value).trim())
-      .filter((value) => value.length > 0);
-  } catch {
-    return [];
-  }
-};
-
-/**
- * Clears the legacy localStorage stars key after migration to backend completes.
- */
-export const clearLegacyStarredProjectIds = () => {
-  try {
-    localStorage.removeItem(LEGACY_STARRED_PROJECTS_STORAGE_KEY);
-  } catch {
-    // Keep UI responsive even if storage is unavailable.
-  }
-};
-
 const getCreatedTimestamp = (session: SessionWithProvider): string => {
   return String(session.createdAt || session.created_at || '');
 };
@@ -141,18 +105,6 @@ export const sortProjects = (
   const byName = [...projects];
 
   byName.sort((projectA, projectB) => {
-    // Star order now comes from backend `projects.isStarred`.
-    const aStarred = Boolean(projectA.isStarred);
-    const bStarred = Boolean(projectB.isStarred);
-
-    if (aStarred && !bStarred) {
-      return -1;
-    }
-
-    if (!aStarred && bStarred) {
-      return 1;
-    }
-
     if (projectSortOrder === 'date') {
       return getProjectLastActivity(projectB).getTime() - getProjectLastActivity(projectA).getTime();
     }

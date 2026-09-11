@@ -63,7 +63,12 @@
     "ttsModel": "文字转语音模型",
     "voice": "语音",
     "format": "音频格式",
-    "note": "自定义基础 URL 由您的浏览器直接调用，必须允许浏览器 CORS 请求。留空以使用服务器配置的后端。"
+    "note": "自定义基础 URL 由您的浏览器直接调用，必须允许浏览器 CORS 请求。留空以使用服务器配置的后端。",
+    "pttTitle": "按住说话 (Push-to-Talk)",
+    "pttDescription": "按住快捷键说话，松开自动识别并填入输入框；Esc 取消本次录音。",
+    "pttEnable": "启用按住说话",
+    "pttEnableDescription": "默认键位为左 Alt（全局），输入框未聚焦时先唤起输入框",
+    "pttKey": "触发键位"
   },
   "quickSettings": {
     "title": "快速设置",
@@ -99,7 +104,8 @@
     "handle": {
       "closePanel": "关闭快捷键面板",
       "openPanel": "打开快捷键面板"
-    }
+    },
+    "paste": "粘贴"
   },
   "mainTabs": {
     "label": "设置",
@@ -112,7 +118,6 @@
     "browser": "浏览器",
     "notifications": "通知",
     "plugins": "插件",
-    "about": "关于",
     "mobileAccess": "手机访问"
   },
   "notifications": {

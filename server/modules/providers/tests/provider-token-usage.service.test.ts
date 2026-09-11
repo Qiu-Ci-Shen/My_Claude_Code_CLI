@@ -84,6 +84,99 @@ test('token usage lookup requires only the app-facing session id for Claude', as
   }
 });
 
+test('Claude compact boundary postTokens overrides the stale pre-compact usage', async () => {
+  const tempDirectory = await mkdtemp(path.join(tmpdir(), 'provider-token-usage-compact-'));
+  const sessionFilePath = path.join(tempDirectory, 'provider-session.jsonl');
+
+  try {
+    await writeFile(sessionFilePath, [
+      JSON.stringify({
+        type: 'assistant',
+        model: 'sonnet[1m]',
+        message: {
+          usage: {
+            input_tokens: 352_210,
+            cache_read_input_tokens: 20,
+            cache_creation_input_tokens: 5,
+            output_tokens: 457,
+          },
+        },
+      }),
+      JSON.stringify({
+        type: 'system',
+        subtype: 'compact_boundary',
+        compactMetadata: { trigger: 'manual', preTokens: 352_761, postTokens: 14_708, durationMs: 71_158 },
+      }),
+      JSON.stringify({
+        type: 'system',
+        subtype: 'local_command',
+        content: '<local-command-stdout>Compacted</local-command-stdout>',
+      }),
+    ].join('\n'));
+
+    const service = createProviderTokenUsageService({
+      getSessionById: () => createSessionRow({ jsonl_path: sessionFilePath }),
+    });
+
+    assert.deepEqual(await service.getSessionTokenUsage('app-session'), {
+      used: 14_708,
+      total: 1_000_000,
+      inputTokens: 14_708,
+      outputTokens: 0,
+      cacheReadTokens: 20,
+      cacheCreationTokens: 5,
+      cacheTokens: 25,
+      breakdown: { input: 14_708, output: 0 },
+    });
+  } finally {
+    await rm(tempDirectory, { recursive: true, force: true });
+  }
+});
+
+test('Claude usage from a turn after the compact boundary wins over postTokens', async () => {
+  const tempDirectory = await mkdtemp(path.join(tmpdir(), 'provider-token-usage-post-compact-'));
+  const sessionFilePath = path.join(tempDirectory, 'provider-session.jsonl');
+
+  try {
+    await writeFile(sessionFilePath, [
+      JSON.stringify({
+        type: 'system',
+        subtype: 'compact_boundary',
+        compactMetadata: { trigger: 'manual', preTokens: 352_761, postTokens: 14_708 },
+      }),
+      JSON.stringify({
+        type: 'assistant',
+        model: 'sonnet[1m]',
+        message: {
+          usage: {
+            input_tokens: 100,
+            cache_read_input_tokens: 20,
+            cache_creation_input_tokens: 5,
+            output_tokens: 30,
+          },
+        },
+      }),
+    ].join('\n'));
+
+    const service = createProviderTokenUsageService({
+      getSessionById: () => createSessionRow({ jsonl_path: sessionFilePath }),
+    });
+
+    assert.deepEqual(await service.getSessionTokenUsage('app-session'), {
+      used: 155,
+      total: 1_000_000,
+      inputTokens: 125,
+      outputTokens: 30,
+      cacheReadTokens: 20,
+      cacheCreationTokens: 5,
+      cacheTokens: 25,
+      breakdown: { input: 125, output: 30 },
+    });
+  } finally {
+    await rm(tempDirectory, { recursive: true, force: true });
+  }
+});
+
 test('Codex token usage uses the latest token_count snapshot', async () => {
   const tempDirectory = await mkdtemp(path.join(tmpdir(), 'provider-token-usage-codex-'));
   const sessionFilePath = path.join(tempDirectory, 'rollout-provider-session.jsonl');
@@ -201,4 +294,111 @@ test('token usage reports SESSION_NOT_FOUND for an unknown app session id', asyn
       && error.statusCode === 404
     ),
   );
+});
+
+test('Claude 大文件只读尾窗取 usage、头窗取模型标记，不整读全文', async () => {
+  const tempDirectory = await mkdtemp(path.join(tmpdir(), 'provider-token-usage-window-'));
+  const sessionFilePath = path.join(tempDirectory, 'provider-session.jsonl');
+
+  try {
+    // 首行（头窗内）带 [1m] 模型标记 + 一个不应被采用的旧 usage；
+    // 中间一条 600KB 巨型行把尾窗起点推入该行内部（首行半截，解析容错跳过）；
+    // 尾窗内是真正的最新 usage。
+    const bigFiller = JSON.stringify({
+      type: 'user',
+      message: { role: 'user', content: 'x'.repeat(600 * 1024) },
+    });
+    await writeFile(sessionFilePath, [
+      JSON.stringify({
+        type: 'assistant',
+        model: 'claude-sonnet[1m]',
+        message: {
+          usage: {
+            input_tokens: 999_999,
+            cache_read_input_tokens: 0,
+            cache_creation_input_tokens: 0,
+            output_tokens: 1,
+          },
+        },
+      }),
+      bigFiller,
+      JSON.stringify({
+        type: 'assistant',
+        message: {
+          usage: {
+            input_tokens: 100,
+            cache_read_input_tokens: 20,
+            cache_creation_input_tokens: 5,
+            output_tokens: 30,
+          },
+        },
+      }),
+    ].join('\n'));
+
+    const service = createProviderTokenUsageService({
+      getSessionById: () => createSessionRow({ jsonl_path: sessionFilePath }),
+      getClaudeContextWindow: () => '180000',
+    });
+
+    assert.deepEqual(await service.getSessionTokenUsage('app-session'), {
+      used: 155,
+      total: 1_000_000,
+      inputTokens: 125,
+      outputTokens: 30,
+      cacheReadTokens: 20,
+      cacheCreationTokens: 5,
+      cacheTokens: 25,
+      breakdown: { input: 125, output: 30 },
+    });
+  } finally {
+    await rm(tempDirectory, { recursive: true, force: true });
+  }
+});
+
+test('尾窗扫不到 usage 时回退全量读取（末尾被超长行占据的场景）', async () => {
+  const tempDirectory = await mkdtemp(path.join(tmpdir(), 'provider-token-usage-fallback-'));
+  const sessionFilePath = path.join(tempDirectory, 'provider-session.jsonl');
+
+  try {
+    const lines = [
+      JSON.stringify({
+        type: 'assistant',
+        model: 'claude-sonnet[1m]',
+        message: {
+          usage: {
+            input_tokens: 100,
+            cache_read_input_tokens: 20,
+            cache_creation_input_tokens: 5,
+            output_tokens: 30,
+          },
+        },
+      }),
+    ];
+    // 末尾 900KB 巨型行把唯一 usage 推出 512KB 尾窗
+    for (let index = 0; index < 3; index += 1) {
+      lines.push(JSON.stringify({
+        type: 'user',
+        message: { role: 'user', content: 'y'.repeat(300 * 1024) },
+      }));
+    }
+    await writeFile(sessionFilePath, lines.join('\n'));
+
+    const service = createProviderTokenUsageService({
+      getSessionById: () => createSessionRow({ jsonl_path: sessionFilePath }),
+      getClaudeContextWindow: () => '180000',
+    });
+
+    assert.deepEqual(await service.getSessionTokenUsage('app-session'), {
+      used: 155,
+      total: 1_000_000,
+      inputTokens: 125,
+      outputTokens: 30,
+      cacheReadTokens: 20,
+      cacheCreationTokens: 5,
+      cacheTokens: 25,
+      breakdown: { input: 125, output: 30 },
+    });
+  } finally {
+    await rm(tempDirectory, { recursive: true, force: true });
+  }
 });

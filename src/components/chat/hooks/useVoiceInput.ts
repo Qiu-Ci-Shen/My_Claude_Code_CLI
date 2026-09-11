@@ -48,12 +48,22 @@ export function useVoiceInput(
     streamRef.current = null;
   };
 
+  // 在途转写请求与取消标记；sessionRef 标识「这一次录音」，防止迟到的
+  // onstop/finally 回调覆写新一次录音的状态。
+  const abortRef = useRef<AbortController | null>(null);
+  const abortedRef = useRef(false);
+  const sessionRef = useRef(0);
+  // 麦克风就绪（getUserMedia 返回）之前按键已松开/取消：标记本次手势作废，
+  // 就绪后直接释放麦克风，防止「按住即放」这次录音无人停止、麦克风永久占用。
+  const pendingStopRef = useRef(false);
+
   // Stop the mic if the component unmounts mid-recording.
   useEffect(() => {
     cancelledRef.current = false;
     return () => {
       cancelledRef.current = true;
       startingRef.current = false;
+      abortRef.current?.abort();
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
       recorderRef.current = null;
@@ -63,11 +73,22 @@ export function useVoiceInput(
   const start = useCallback(async () => {
     if (startingRef.current || (recorderRef.current && recorderRef.current.state !== 'inactive')) return;
     startingRef.current = true;
+    abortedRef.current = false;
+    pendingStopRef.current = false;
+    const session = sessionRef.current + 1;
+    sessionRef.current = session;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true },
       });
       if (cancelledRef.current) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
+      // 就绪前按键已松开或取消：这次手势作废（不开启录音器），麦克风立即释放。
+      // 同一同步块内不会再有事件插入，查这一次就够。
+      if (pendingStopRef.current) {
+        pendingStopRef.current = false;
         stream.getTracks().forEach((t) => t.stop());
         return;
       }
@@ -83,7 +104,7 @@ export function useVoiceInput(
 
       rec.onstop = async () => {
         stopTracks();
-        if (cancelledRef.current) return;
+        if (cancelledRef.current || session !== sessionRef.current) return;
         // Capture and clear the stop intents for this stop before any async work.
         const shouldSend = sendRef.current;
         sendRef.current = false;
@@ -96,27 +117,37 @@ export function useVoiceInput(
           setState('idle');
           return;
         }
+        // 松开按键后、onstop 到达前被 Esc/点击取消：丢弃本次转写
+        if (abortedRef.current) {
+          abortedRef.current = false;
+          setState('idle');
+          return;
+        }
         if (blob.size < 800) {
           setState('idle');
           onError?.('Recording too short');
           return;
         }
+        const abortController = new AbortController();
+        abortRef.current = abortController;
         setState('transcribing');
         try {
           const ext = type.includes('mp4') ? 'm4a' : type.includes('ogg') ? 'ogg' : 'webm';
-          const res = await transcribeVoice(blob, `recording.${ext}`);
+          const res = await transcribeVoice(blob, `recording.${ext}`, abortController.signal);
+          if (cancelledRef.current || abortedRef.current || session !== sessionRef.current) return;
           if (!res.ok) throw new Error(`transcribe ${res.status}`);
           const data = await res.json();
-          if (cancelledRef.current) return;
+          if (cancelledRef.current || abortedRef.current || session !== sessionRef.current) return;
           const text = String(data?.text || '').trim();
           if (text) onTranscript(text, shouldSend);
           else onError?.('No speech detected');
         } catch (e) {
-          if (!cancelledRef.current) {
+          if (!cancelledRef.current && !abortedRef.current && session === sessionRef.current) {
             onError?.(`Transcription failed: ${e instanceof Error ? e.message : String(e)}`);
           }
         } finally {
-          if (!cancelledRef.current) setState('idle');
+          if (abortRef.current === abortController) abortRef.current = null;
+          if (!cancelledRef.current && session === sessionRef.current) setState('idle');
         }
       };
 
@@ -141,18 +172,31 @@ export function useVoiceInput(
   // or { cancel: true } to discard the recording entirely (push-to-talk Esc/blur).
   // Guard on the recorder's own state (not React state) so a double tap, or the mic
   // and Send buttons both firing, can't call stop() on an already-inactive recorder.
+  // 取消还覆盖「录音器已停但 onstop 未到」与「转写请求在途」两个窗口——那里
+  // recorder.stop() 已无效，改为标记中止并掐掉在途 fetch。
   const stop = useCallback((opts?: { send?: boolean; cancel?: boolean }) => {
     const rec = recorderRef.current;
     if (rec && rec.state !== 'inactive') {
       sendRef.current = opts?.send ?? false;
       discardRef.current = opts?.cancel ?? false;
       rec.stop();
+      return;
+    }
+    if (startingRef.current) {
+      // getUserMedia 还没返回：本次手势作废（就绪后直接释放麦克风）
+      pendingStopRef.current = true;
+      return;
+    }
+    if (opts?.cancel) {
+      abortedRef.current = true;
+      abortRef.current?.abort();
     }
   }, []);
 
   const toggle = useCallback(() => {
     if (state === 'recording') stop();
-    else if (state === 'idle') start();
+    else if (state === 'transcribing') stop({ cancel: true });
+    else start();
   }, [state, start, stop]);
 
   return { state, start, toggle, stop };

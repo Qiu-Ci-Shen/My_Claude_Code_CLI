@@ -3,12 +3,10 @@
     "title": "Projets",
     "newProject": "Nouveau projet",
     "deleteProject": "Supprimer le projet",
-    "renameProject": "Renommer le projet",
     "noProjects": "Aucun projet trouvé",
     "loadingProjects": "Chargement des projets...",
     "searchPlaceholder": "Rechercher des projets...",
     "projectNamePlaceholder": "Nom du projet",
-    "starred": "Favoris",
     "all": "Tous",
     "untitledSession": "Session sans titre",
     "newSession": "Nouvelle session",
@@ -49,7 +47,6 @@
     "save": "Enregistrer",
     "cancel": "Annuler",
     "clearSearch": "Effacer la recherche",
-    "openCommandPalette": "Ouvrir la palette de commandes",
     "attentionRequiredIndicator": "La session nécessite votre attention"
   },
   "navigation": {
@@ -67,14 +64,9 @@
     "cancel": "Annuler",
     "save": "Enregistrer",
     "delete": "Supprimer",
-    "rename": "Renommer",
-    "joinCommunity": "Rejoindre la communauté",
-    "reportIssue": "Signaler un problème",
-    "starOnGithub": "Étoile sur GitHub"
+    "rename": "Renommer"
   },
-  "branding": {
-    "openSource": "Open Source"
-  },
+  "branding": {},
   "status": {
     "active": "Actif",
     "inactive": "Inactif",

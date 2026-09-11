@@ -999,6 +999,15 @@ export async function readFileTimestamps(
 // ---------------------------
 //----------------- SESSION SYNCHRONIZER JSONL PARSING HELPERS ------------
 /**
+ * Cache for buildLookupMap results. The synchronizer rebuilds the
+ * history.jsonl lookup on every file event, but that index file only grows
+ * (hundreds of KB re-parsed line by line on each watcher tick). Reuse the
+ * parse while mtime+size are unchanged; callers treat the map as read-only.
+ */
+const lookupMapCache = new Map<string, { mtimeMs: number; size: number; lookup: Map<string, string> }>();
+const LOOKUP_MAP_CACHE_MAX_ENTRIES = 8;
+
+/**
  * Builds a first-seen key/value lookup map from a JSONL file.
  *
  * Use this for provider index files where session id -> display name metadata
@@ -1011,8 +1020,15 @@ export async function buildLookupMap(
   valueField: string
 ): Promise<Map<string, string>> {
   const lookup = new Map<string, string>();
+  const cacheKey = JSON.stringify([filePath, keyField, valueField]);
 
   try {
+    const fileStat = await stat(filePath);
+    const cached = lookupMapCache.get(cacheKey);
+    if (cached && cached.mtimeMs === fileStat.mtimeMs && cached.size === fileStat.size) {
+      return cached.lookup;
+    }
+
     const fileStream = fs.createReadStream(filePath);
     const lineReader = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
 
@@ -1029,6 +1045,13 @@ export async function buildLookupMap(
       if (typeof key === 'string' && typeof value === 'string' && !lookup.has(key)) {
         lookup.set(key, value);
       }
+    }
+
+    // 只在完整解析后入缓存；中途异常走 catch，保持原「部分结果」语义。
+    lookupMapCache.set(cacheKey, { mtimeMs: fileStat.mtimeMs, size: fileStat.size, lookup });
+    if (lookupMapCache.size > LOOKUP_MAP_CACHE_MAX_ENTRIES) {
+      const oldest = lookupMapCache.keys().next().value;
+      if (oldest !== undefined) lookupMapCache.delete(oldest);
     }
   } catch {
     // Missing or unreadable lookup files should not block session sync.

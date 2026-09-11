@@ -24,7 +24,8 @@
     "git": "Source Control",
     "tasks": "Tasks",
     "browser": "Browser",
-    "computer": "Computer"
+    "computer": "Computer",
+    "views": "Workspace views"
   },
   "status": {
     "loading": "Loading...",
@@ -53,7 +54,9 @@
     "back": "Back",
     "next": "Next",
     "previous": "Previous",
-    "logout": "Logout"
+    "logout": "Logout",
+    "scrollTabsLeft": "Scroll tabs left",
+    "scrollTabsRight": "Scroll tabs right"
   },
   "common": {
     "language": "Language",
@@ -68,7 +71,10 @@
     "version": "Version",
     "select": "Select",
     "selectAll": "Select All",
-    "deselectAll": "Deselect All"
+    "deselectAll": "Deselect All",
+    "cancel": "Cancel",
+    "done": "Done",
+    "failed": "Failed"
   },
   "time": {
     "justNow": "Just now",
@@ -133,6 +139,36 @@
       "refresh": "Refresh",
       "menuLabel": "File context menu",
       "loading": "Loading..."
+    },
+    "delete": {
+      "title": "Delete {{type}}",
+      "fileWarning": "This file will be permanently deleted.",
+      "folderWarning": "This folder and all its contents will be permanently deleted.",
+      "confirm": "Delete"
+    },
+    "dropToUpload": "Drop files to upload",
+    "dropToUploadTo": "Drop files to upload to \"{{folder}}\"",
+    "uploadComplete": "Upload complete",
+    "uploadFailed": "Upload failed",
+    "uploadFiles": "Upload files (max {{size}} each)",
+    "uploadToFolder": "Upload files to \"{{folder}}\"",
+    "uploadedCount": "Uploaded {{uploaded}} of {{total}} {{label}}",
+    "uploadingFiles": "Uploading files",
+    "toast": {
+      "copyFailed": "Failed to copy path",
+      "fileCreated": "File created successfully",
+      "fileDeleted": "File deleted",
+      "folderCreated": "Folder created successfully",
+      "folderDeleted": "Folder deleted",
+      "folderDownloaded": "Folder downloaded as ZIP",
+      "pathCopied": "Path copied to clipboard",
+      "renamed": "Renamed successfully"
+    },
+    "validation": {
+      "dotsOnly": "Filename cannot be only dots",
+      "emptyName": "Filename cannot be empty",
+      "invalidChars": "Filename contains invalid characters",
+      "reserved": "Filename is a reserved name"
     }
   },
   "projectWizard": {
@@ -240,31 +276,8 @@
     }
   },
   "versionUpdate": {
-    "title": "Update Available",
-    "newVersionReady": "A new version is ready",
-    "currentVersion": "Current Version",
-    "latestVersion": "Latest Version",
-    "whatsNew": "What's New:",
-    "viewFullRelease": "View full release",
-    "updateProgress": "Update Progress:",
-    "manualUpgrade": "Manual upgrade:",
-    "npmUpgradeCommand": "npm install -g qiu-ai-lz@latest",
-    "manualUpgradeHint": "Or click \"Update Now\" to run the update automatically.",
-    "updateCompleted": "Update completed successfully!",
-    "restartServer": "Please restart the server to apply changes.",
-    "updateFailed": "Update failed",
-    "buttons": {
-      "close": "Close",
-      "later": "Later",
-      "copyCommand": "Copy Command",
-      "updateNow": "Update Now",
-      "updating": "Updating..."
-    },
     "ariaLabels": {
-      "closeModal": "Close version upgrade modal",
       "showSidebar": "Show sidebar",
-      "settings": "Settings",
-      "updateAvailable": "Update available",
       "closeSidebar": "Close sidebar"
     }
   }

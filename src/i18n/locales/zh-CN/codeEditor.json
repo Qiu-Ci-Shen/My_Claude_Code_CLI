@@ -24,7 +24,8 @@
     "fullscreen": "全屏",
     "close": "关闭",
     "previewMarkdown": "预览 Markdown",
-    "editMarkdown": "编辑 Markdown"
+    "editMarkdown": "编辑 Markdown",
+    "previewHtml": "在新标签页中打开 HTML 预览"
   },
   "footer": {
     "lines": "行数：",
@@ -39,5 +40,6 @@
     "loading": "正在加载预览...",
     "error": "无法显示此文件。",
     "openInNewTab": "在新标签页中打开"
-  }
+  },
+  "loadError": "文件加载失败，已禁止保存（避免用空缓冲覆盖磁盘内容）：{{message}}"
 }

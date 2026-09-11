@@ -93,8 +93,7 @@
     "tasks": "任務",
     "computer": "電腦使用",
     "notifications": "通知",
-    "plugins": "外掛",
-    "about": "關於"
+    "plugins": "外掛"
   },
   "notifications": {
     "title": "通知",

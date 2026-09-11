@@ -15,6 +15,7 @@ import { Reasoning, ReasoningTrigger, ReasoningContent } from '../../../../share
 
 import ChatMessageImages from './ChatMessageImages';import ChatMessageFiles from './ChatMessageFiles';
 import { Markdown } from './Markdown';
+import CompactSummaryBlock from './CompactSummaryBlock';
 import MessageCopyControl from './MessageCopyControl';
 import MessageSpeakControl from './MessageSpeakControl';
 
@@ -160,6 +161,11 @@ const MessageComponent = memo(({ message, prevMessage, createDiff, onFileOpen, s
               U
             </div>
           )}
+        </div>
+      ) : message.isCompactSummary ? (
+        /* 压缩摘要默认折叠成一行，避免数千字正文铺满对话区 */
+        <div className="w-full">
+          <CompactSummaryBlock content={String(message.content || '')} />
         </div>
       ) : message.isTaskNotification ? (
         /* Compact task notification on the left */

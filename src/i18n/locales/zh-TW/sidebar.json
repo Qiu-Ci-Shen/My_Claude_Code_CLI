@@ -3,12 +3,10 @@
     "title": "專案",
     "newProject": "新增專案",
     "deleteProject": "移除專案",
-    "renameProject": "重新命名專案",
     "noProjects": "找不到專案",
     "loadingProjects": "載入專案中...",
     "searchPlaceholder": "搜尋專案...",
     "projectNamePlaceholder": "專案名稱",
-    "starred": "星號標記",
     "all": "全部",
     "untitledSession": "未命名工作階段",
     "newSession": "新工作階段",
@@ -48,7 +46,6 @@
     "save": "儲存",
     "cancel": "取消",
     "clearSearch": "清除搜尋",
-    "openCommandPalette": "開啟指令面板",
     "attentionRequiredIndicator": "工作階段需要處理"
   },
   "navigation": {
@@ -66,14 +63,9 @@
     "cancel": "取消",
     "save": "儲存",
     "delete": "刪除",
-    "rename": "重新命名",
-    "joinCommunity": "加入社群",
-    "reportIssue": "回報問題",
-    "starOnGithub": "在 GitHub 上加星"
+    "rename": "重新命名"
   },
-  "branding": {
-    "openSource": "開源"
-  },
+  "branding": {},
   "status": {
     "active": "使用中",
     "inactive": "非使用中",

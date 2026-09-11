@@ -561,6 +561,148 @@ function extractTokenBudget(sdkMessage) {
   return null;
 }
 
+// ===============================
+// 会话级缓存命中统计（看板用）
+// ===============================
+// 按 provider 会话累计三个互不相交的输入桶：直连（未缓存）/ 缓存读 / 缓存写。
+// 键是 provider 会话 id，进程生命周期内常驻——desktop 场景服务随应用重启，
+// 每个条目只有三个数字，不主动清理也不会膨胀。应用重启或 resume 到新
+// provider 会话时从零累计，口径是「本进程看到的该会话」。
+// 防假 100 原则对齐 DSH 的 cacheHitPercent：只要存在未命中输入，
+// 显示值封顶 99.9（一位小数口径），「100」严格保留给真·全命中。
+const sessionCacheUsage = new Map();
+
+/**
+ * 把单次请求的 usage 累加进会话桶。三桶不相交（inputTokens = 直连 + 读 + 写），
+ * 直接相加不重不漏；直连部分用差值还原并钳到非负，防上游报数异常把桶打负。
+ * @param {{uncached: number, read: number, write: number}} acc 会话累计桶
+ * @param {{inputTokens: number, cacheReadTokens: number, cacheCreationTokens: number}} usage 单次请求快照
+ */
+function accumulateCacheUsage(acc, usage) {
+  acc.uncached += Math.max(0, usage.inputTokens - usage.cacheReadTokens - usage.cacheCreationTokens);
+  acc.read += usage.cacheReadTokens;
+  acc.write += usage.cacheCreationTokens;
+}
+
+/**
+ * 会话累计缓存命中率（百分比，一位小数口径）。
+ * @param {{uncached: number, read: number, write: number}} acc 会话累计桶
+ * @returns {number|null} 命中率；尚无任何计费输入时为 null
+ */
+function computeSessionCacheHitPercent(acc) {
+  const denominator = acc.uncached + acc.read + acc.write;
+  if (denominator <= 0) return null;
+  const missed = acc.uncached + acc.write;
+  if (missed <= 0) return 100;
+  const hit = (acc.read / denominator) * 100;
+  // 舍入到一位小数后可能虚到 100.0（如 99.96%），此时压回 99.9
+  return Math.min(99.9, Math.round(hit * 10) / 10);
+}
+
+// ===============================
+// 上下文读数抖动抑制
+// ===============================
+// 中转/代理上游偶发上报「先掉近一半、下一条又弹回」的瞬时低值（实测
+// 2026-09-11 的 DeepSeek 中转：322k → 177k → 323k，每次都发生在回合首条
+// 请求），直接下发会让 Context 条来回蹦极。真实收缩只可能来自压缩/回退，
+// 且必然连续出现低值——所以单条低值先压住不下发，下一条仍低才认定真实
+// 收缩（压缩后由 resetContextUsageStabilizer 放行）；弹回则丢弃那条假低值。
+const contextUsageStabilizers = new Map();
+
+/**
+ * 判定一条上下文占用样本是否可信、可下发。
+ * @param {string|null} usageKey 会话键（provider 会话 id）
+ * @param {number} used 新样本的上下文占用
+ * @returns {boolean} true = 可信可发；false = 疑似抖动，本次压住
+ */
+function acceptContextUsageSample(usageKey, used) {
+  if (!usageKey) {
+    return true;
+  }
+  let state = contextUsageStabilizers.get(usageKey);
+  if (!state) {
+    state = { accepted: 0, pendingDrop: null };
+    contextUsageStabilizers.set(usageKey, state);
+  }
+  if (state.pendingDrop !== null) {
+    // 上一条低值之后仍低 → 真实收缩（压缩/回退），确认并接受；
+    // 弹回则丢弃低值，直接接受新值。
+    state.pendingDrop = null;
+    state.accepted = used;
+    return true;
+  }
+  if (state.accepted > 0 && used < state.accepted) {
+    state.pendingDrop = used;
+    return false;
+  }
+  state.accepted = used;
+  return true;
+}
+
+/**
+ * 压缩发生后调用：重置基线，让压缩后的低占用立即生效。
+ * @param {string|null} usageKey 会话键（provider 会话 id）
+ */
+function resetContextUsageStabilizer(usageKey) {
+  if (usageKey) {
+    contextUsageStabilizers.delete(usageKey);
+  }
+}
+
+/**
+ * 是否压缩边界事件（上下文真实收缩的信号，绕开抑制直接放行）。
+ * @param {Object} sdkMessage - SDK stream message
+ * @returns {boolean}
+ */
+function isCompactBoundaryMessage(sdkMessage) {
+  if (!sdkMessage || typeof sdkMessage !== 'object') {
+    return false;
+  }
+  return sdkMessage.subtype === 'compact_boundary' || sdkMessage.compact_result === 'success';
+}
+
+/**
+ * 从压缩边界消息提取压缩后的上下文占用。
+ * `compact_metadata.post_tokens` 是压缩后对话内容的 token 数，随边界消息一起
+ * 到达——立即下发让 UI 的 Context 条在压缩完成瞬间收缩；缺了这一步就要等
+ * 下一回合第一条 assistant 消息带 usage 才刷新，压缩完成后仍挂着旧高值。
+ * post_tokens 缺失（旧版 CLI，或仅含 compact_result 的状态消息）时返回 null，
+ * 调用方自然回退到下一回合刷新的旧行为。
+ * @param {unknown} sdkMessage - SDK compact_boundary 消息
+ * @returns {TokenBudget|null} 预算快照，或 null
+ */
+function extractCompactTokenBudget(sdkMessage) {
+  if (!sdkMessage || typeof sdkMessage !== 'object') {
+    return null;
+  }
+  const metadata = sdkMessage.compact_metadata || sdkMessage.compactMetadata;
+  if (!metadata || typeof metadata !== 'object') {
+    return null;
+  }
+  const postTokens = readNumber(metadata.post_tokens ?? metadata.postTokens);
+  if (postTokens <= 0) {
+    return null;
+  }
+  const contextWindow = resolveContextWindow(sdkMessage);
+  const contextPercent = Math.min(100, Math.max(0, Math.round((postTokens / contextWindow) * 100)));
+
+  return {
+    used: postTokens,
+    total: contextWindow,
+    inputTokens: postTokens,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheCreationTokens: 0,
+    cacheTokens: 0,
+    contextWindow,
+    contextPercent,
+    breakdown: {
+      input: postTokens,
+      output: 0,
+    },
+  };
+}
+
 // Tool calls that leave work running past the end of a turn. Bash only counts
 // when it is explicitly backgrounded; the rest defer or watch work by nature.
 const DEFERRED_WORK_TOOLS = new Set(['Monitor', 'ScheduleWakeup', 'CronCreate', 'TaskCreate']);
@@ -1003,9 +1145,38 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
         ws.send(msg);
       }
 
+      // 压缩边界：上下文真实收缩。重置抑制基线让后续低值立即生效，并立即
+      // 下发压缩后的上下文占用（post_tokens 就在边界消息里）——否则 UI 的
+      // Context 条要等下一回合第一条 assistant 消息才刷新，压缩完成后一段
+      // 时间里仍挂着压缩前的高值。
+      if (isCompactBoundaryMessage(message)) {
+        const usageKey = capturedSessionId || sessionId || null;
+        resetContextUsageStabilizer(usageKey);
+        const compactBudget = extractCompactTokenBudget(message);
+        if (compactBudget && acceptContextUsageSample(usageKey, compactBudget.used)) {
+          const acc = usageKey ? sessionCacheUsage.get(usageKey) : null;
+          if (acc) {
+            compactBudget.sessionCacheHitPercent = computeSessionCacheHitPercent(acc);
+          }
+          ws.send(createNormalizedMessage({ kind: 'status', text: 'token_budget', tokenBudget: compactBudget, sessionId: usageKey, provider: 'claude' }));
+        }
+      }
+
       // Extract and send token budget updates from assistant/result usage payloads
       const tokenBudgetData = extractTokenBudget(message);
-      if (tokenBudgetData) {
+      // 抖动抑制：单条可疑低值先不发（见 acceptContextUsageSample 注释）
+      if (tokenBudgetData && acceptContextUsageSample(capturedSessionId || sessionId || null, tokenBudgetData.used)) {
+        // 会话累计缓存命中：按 provider 会话累积三桶后随 token_budget 一起下发
+        const usageKey = capturedSessionId || sessionId || null;
+        if (usageKey) {
+          let acc = sessionCacheUsage.get(usageKey);
+          if (!acc) {
+            acc = { uncached: 0, read: 0, write: 0 };
+            sessionCacheUsage.set(usageKey, acc);
+          }
+          accumulateCacheUsage(acc, tokenBudgetData);
+          tokenBudgetData.sessionCacheHitPercent = computeSessionCacheHitPercent(acc);
+        }
         ws.send(createNormalizedMessage({ kind: 'status', text: 'token_budget', tokenBudget: tokenBudgetData, sessionId: capturedSessionId || sessionId || null, provider: 'claude' }));
       }
 
@@ -1298,5 +1469,10 @@ export {
   getPendingApprovalsForSession,
   reconnectSessionWriter,
   extractTokenBudget,
+  extractCompactTokenBudget,
+  accumulateCacheUsage,
+  computeSessionCacheHitPercent,
+  acceptContextUsageSample,
+  resetContextUsageStabilizer,
   matchesToolPermission
 };

@@ -325,7 +325,11 @@ export function useChatRealtimeHandlers({
             // Persist per-session so switching away and back keeps the bar
             // instead of dropping to zero until the next turn.
             if (sid) sessionStore.setTokenUsage(sid, msg.tokenBudget);
-            setTokenBudget(msg.tokenBudget as Record<string, unknown>);
+            // 后台会话的读数只入库（切回去能看到），不覆盖正看的这条——
+            // 多个会话同跑时两边的数字会互相顶掉，进度条会来回蹦。
+            if (!sid || sid === activeViewSessionId) {
+              setTokenBudget(msg.tokenBudget as Record<string, unknown>);
+            }
           } else if (msg.text && sid) {
             onSessionProcessing?.(sid, {
               statusText: msg.text as string,

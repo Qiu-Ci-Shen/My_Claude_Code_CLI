@@ -17,6 +17,7 @@ import { rewindExecute, type EditMessageTarget } from '../../../lib/rewindRpc';
 import ChatMessagesPane from './subcomponents/ChatMessagesPane';
 import ChatMessageRail from './subcomponents/ChatMessageRail';
 import ChatComposer from './subcomponents/ChatComposer';
+import CompactContextButton from './subcomponents/CompactContextButton';
 import ContextUsageBar from './subcomponents/ContextUsageBar';
 import CommandResultModal from './subcomponents/CommandResultModal';
 
@@ -129,6 +130,7 @@ function ChatInterface({
     scrollToBottomAndReset,
     handleScroll,
     requestLatestMessages,
+    refreshTokenBudget,
   } = useChatSessionState({
     isActive,
     selectedProject,
@@ -183,6 +185,7 @@ function ChatInterface({
     isDragActive,
     openAttachmentPicker,
     handleSubmit,
+    handleCompactContext,
     queuedDraft,
     editQueuedDraft,
     deleteQueuedDraft,
@@ -234,6 +237,34 @@ function ChatInterface({
     setPendingPermissionRequests,
     resolvePermissionModeForProvider,
   });
+
+  // 压缩上下文：点击把 /compact 交给 CLI 原生执行；压缩摘要只写转录、不在
+  // 实时流回放，等这一轮结束（isProcessing 落回 false）后清槽重取一次，
+  // 摘要与压缩边界便出现在对话里（与回退后的重取同路）。
+  const compactRefreshSessionRef = useRef<string | null>(null);
+  const canCompactContext = provider === 'claude'
+    && Boolean(selectedSession?.id || currentSessionId);
+  const handleCompactContextWithRefresh = useCallback(() => {
+    const targetSessionId = currentSessionId || selectedSession?.id || null;
+    if (!targetSessionId || provider !== 'claude') {
+      return;
+    }
+    compactRefreshSessionRef.current = targetSessionId;
+    handleCompactContext();
+  }, [currentSessionId, handleCompactContext, provider, selectedSession?.id]);
+
+  useEffect(() => {
+    const pendingSessionId = compactRefreshSessionRef.current;
+    if (!pendingSessionId || isProcessing) {
+      return;
+    }
+    compactRefreshSessionRef.current = null;
+    sessionStore.resetSlot(pendingSessionId);
+    void requestLatestMessages(pendingSessionId);
+    // 重取预算：压缩后转录里的读数已是压缩后值（postTokens 优先），把它
+    // 写回展示与槽位——广播万一没送达也不会一直挂着压缩前的旧百分比。
+    void refreshTokenBudget(pendingSessionId);
+  }, [isProcessing, requestLatestMessages, refreshTokenBudget, sessionStore]);
 
   // On WebSocket reconnect, request a bounded persisted-tail sync (deferred
   // while Chat is hidden), then re-subscribe — the
@@ -621,6 +652,7 @@ function ChatInterface({
           textareaRef={textareaRef}
           input={input}
           onVoiceTranscript={handleVoiceTranscript}
+          sessionId={selectedSession?.id}
           onInputChange={handleInputChange}
           onTextareaClick={handleTextareaClick}
           onTextareaKeyDown={handleKeyDown}
@@ -634,7 +666,15 @@ function ChatInterface({
           sendByCtrlEnter={sendByCtrlEnter}
         />
 
-        <ContextUsageBar tokenBudget={tokenBudget} />
+        <ContextUsageBar
+          tokenBudget={tokenBudget}
+          trailing={canCompactContext ? (
+            <CompactContextButton
+              onCompact={handleCompactContextWithRefresh}
+              disabled={isProcessing}
+            />
+          ) : null}
+        />
         </div>
       </div>
 

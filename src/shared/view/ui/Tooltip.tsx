@@ -10,6 +10,8 @@ type TooltipProps = {
   content?: ReactNode;
   position?: TooltipPosition;
   className?: string;
+  /** 应用到包裹容器的类（气泡样式用 className）；flex 布局等场景需要让容器可伸缩 */
+  containerClassName?: string;
   delay?: number;
 };
 
@@ -33,6 +35,7 @@ function Tooltip({
   content,
   position = 'top',
   className = '',
+  containerClassName = '',
   delay = 350,
 }: TooltipProps) {
   const [isVisible, setIsVisible] = useState(false);
@@ -169,7 +172,7 @@ function Tooltip({
   return (
     <div
       ref={containerRef}
-      className="relative inline-block"
+      className={cn('relative inline-block', containerClassName)}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onTouchStart={handleTouchStart}

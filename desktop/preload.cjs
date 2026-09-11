@@ -18,5 +18,6 @@ const isLocalOrigin =
 if (isLocalOrigin) {
   contextBridge.exposeInMainWorld('qiuDesktopFs', {
     pickFolder: () => ipcRenderer.invoke('qiu-desktop:pick-folder'),
+    openFolder: (dirPath) => ipcRenderer.invoke('qiu-desktop:open-folder', dirPath),
   });
 }

@@ -1,4 +1,3 @@
-import { Plus } from 'lucide-react';
 import type { TFunction } from 'i18next';
 
 import { Button } from '../../../../shared/view/ui';
@@ -34,7 +33,6 @@ type SidebarProjectSessionsProps = {
     provider: LLMProvider,
   ) => void;
   onLoadMoreSessions: (projectId: string) => void;
-  onNewSession: (project: Project) => void;
   t: TFunction;
 };
 
@@ -77,7 +75,6 @@ export default function SidebarProjectSessions({
   onSessionSelect,
   onDeleteSession,
   onLoadMoreSessions,
-  onNewSession,
   t,
 }: SidebarProjectSessionsProps) {
   if (!isExpanded) {
@@ -88,29 +85,6 @@ export default function SidebarProjectSessions({
 
   return (
     <div className="ml-3 space-y-1 border-l border-border pl-3">
-      <div className="px-3 pb-1 pt-1 md:hidden">
-        <button
-          className="flex h-8 w-full items-center justify-center gap-2 rounded-md bg-foreground text-xs font-medium text-background transition-all duration-150 hover:bg-foreground/90 active:scale-[0.98]"
-          onClick={() => {
-            onProjectSelect(project);
-            onNewSession(project);
-          }}
-        >
-          <Plus className="h-3 w-3" />
-          {t('sessions.newSession')}
-        </button>
-      </div>
-
-      <Button
-        variant="default"
-        size="sm"
-        className="hidden h-8 w-full justify-start gap-2 bg-foreground text-xs font-medium text-background transition-colors hover:bg-foreground/90 md:flex"
-        onClick={() => onNewSession(project)}
-      >
-        <Plus className="h-3 w-3" />
-        {t('sessions.newSession')}
-      </Button>
-
       {!initialSessionsLoaded ? (
         <SessionListSkeleton />
       ) : !hasSessions ? (

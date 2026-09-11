@@ -853,6 +853,11 @@ export function useChatSessionState({
       setTokenBudget(null);
       return;
     }
+    // 本会话已有实时读数（本进程内跑过）时不再用转录里的原始快照覆盖：
+    // 那条快照可能是上游中转上报的瞬时低值，切回会话会让进度条无故跳变。
+    if (sessionStore.getSessionSlot(selectedSession.id)?.tokenUsage) {
+      return;
+    }
     const fetchInitialTokenUsage = async () => {
       try {
         // The provider module resolves storage and provider details from the session id.
@@ -869,7 +874,30 @@ export function useChatSessionState({
       }
     };
     fetchInitialTokenUsage();
-  }, [selectedSession?.id]);
+  }, [selectedSession?.id, sessionStore]);
+
+  /**
+   * 压缩后重取预算：转录读取已认识压缩边界（postTokens 优先于旧 usage），
+   * 读到的就是压缩后的占用。写入槽位让后续切换会话也保持这条新值，不再
+   * 回落到压缩前的旧读数。
+   */
+  const refreshTokenBudget = useCallback(async (sessionId: string) => {
+    try {
+      const url = `/api/providers/sessions/${encodeURIComponent(sessionId)}/token-usage`;
+      const response = await authenticatedFetch(url);
+      if (!response.ok) {
+        return;
+      }
+      const payload = await response.json();
+      const budget = (payload.data ?? null) as Record<string, unknown> | null;
+      if (budget) {
+        sessionStore.setTokenUsage(sessionId, budget);
+        setTokenBudget(budget);
+      }
+    } catch (error) {
+      console.error('Failed to refresh token usage:', error);
+    }
+  }, [sessionStore]);
 
   const visibleMessages = useMemo(() => {
     if (chatMessages.length <= visibleMessageCount) return chatMessages;
@@ -1002,5 +1030,6 @@ export function useChatSessionState({
     isNearBottom,
     handleScroll,
     requestLatestMessages,
+    refreshTokenBudget,
   };
 }

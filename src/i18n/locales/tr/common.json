@@ -239,31 +239,8 @@
     }
   },
   "versionUpdate": {
-    "title": "Güncelleme Mevcut",
-    "newVersionReady": "Yeni bir sürüm hazır",
-    "currentVersion": "Mevcut Sürüm",
-    "latestVersion": "Son Sürüm",
-    "whatsNew": "Yenilikler:",
-    "viewFullRelease": "Tam sürüm notlarını gör",
-    "updateProgress": "Güncelleme İlerlemesi:",
-    "manualUpgrade": "Manuel yükseltme:",
-    "npmUpgradeCommand": "npm install -g qiu-ai-lz@latest",
-    "manualUpgradeHint": "Veya güncellemeyi otomatik çalıştırmak için \"Şimdi Güncelle\"ye tıkla.",
-    "updateCompleted": "Güncelleme başarıyla tamamlandı!",
-    "restartServer": "Değişikliklerin uygulanması için sunucuyu yeniden başlat.",
-    "updateFailed": "Güncelleme başarısız",
-    "buttons": {
-      "close": "Kapat",
-      "later": "Daha Sonra",
-      "copyCommand": "Komutu Kopyala",
-      "updateNow": "Şimdi Güncelle",
-      "updating": "Güncelleniyor..."
-    },
     "ariaLabels": {
-      "closeModal": "Sürüm yükseltme modalını kapat",
       "showSidebar": "Kenar çubuğunu göster",
-      "settings": "Ayarlar",
-      "updateAvailable": "Güncelleme mevcut",
       "closeSidebar": "Kenar çubuğunu kapat"
     }
   }

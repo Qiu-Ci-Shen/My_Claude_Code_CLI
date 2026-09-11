@@ -24,7 +24,8 @@
     "git": "源代码管理",
     "tasks": "任务",
     "browser": "浏览器",
-    "computer": "计算机"
+    "computer": "计算机",
+    "views": "工作区视图"
   },
   "status": {
     "loading": "加载中...",
@@ -53,7 +54,9 @@
     "back": "返回",
     "next": "下一步",
     "previous": "上一步",
-    "logout": "退出登录"
+    "logout": "退出登录",
+    "scrollTabsLeft": "向左滚动标签页",
+    "scrollTabsRight": "向右滚动标签页"
   },
   "common": {
     "language": "语言",
@@ -68,7 +71,10 @@
     "version": "版本",
     "select": "选择",
     "selectAll": "全选",
-    "deselectAll": "取消全选"
+    "deselectAll": "取消全选",
+    "cancel": "取消",
+    "done": "完成",
+    "failed": "失败"
   },
   "time": {
     "justNow": "刚刚",
@@ -132,6 +138,37 @@
       "refresh": "刷新",
       "menuLabel": "文件上下文菜单",
       "loading": "加载中..."
+    },
+    "loadFailed": "无法加载文件",
+    "delete": {
+      "title": "删除{{type}}",
+      "fileWarning": "此文件将被永久删除。",
+      "folderWarning": "此文件夹及其所有内容将被永久删除。",
+      "confirm": "删除"
+    },
+    "dropToUpload": "松开以上传文件",
+    "dropToUploadTo": "松开以上传到“{{folder}}”",
+    "uploadComplete": "上传完成",
+    "uploadFailed": "上传失败",
+    "uploadFiles": "上传文件（单个最大 {{size}}）",
+    "uploadToFolder": "上传文件到“{{folder}}”",
+    "uploadedCount": "已上传 {{uploaded}}/{{total}} 个{{label}}",
+    "uploadingFiles": "正在上传文件",
+    "toast": {
+      "copyFailed": "复制路径失败",
+      "fileCreated": "文件创建成功",
+      "fileDeleted": "文件已删除",
+      "folderCreated": "文件夹创建成功",
+      "folderDeleted": "文件夹已删除",
+      "folderDownloaded": "文件夹已打包为 ZIP 下载",
+      "pathCopied": "路径已复制到剪贴板",
+      "renamed": "重命名成功"
+    },
+    "validation": {
+      "dotsOnly": "文件名不能只有点号",
+      "emptyName": "文件名不能为空",
+      "invalidChars": "文件名包含非法字符",
+      "reserved": "文件名是保留名称"
     }
   },
   "projectWizard": {
@@ -239,31 +276,8 @@
     }
   },
   "versionUpdate": {
-    "title": "有可用更新",
-    "newVersionReady": "新版本已准备就绪",
-    "currentVersion": "当前版本",
-    "latestVersion": "最新版本",
-    "whatsNew": "新内容：",
-    "viewFullRelease": "查看完整发布",
-    "updateProgress": "更新进度：",
-    "manualUpgrade": "手动升级：",
-    "npmUpgradeCommand": "npm install -g qiu-ai-lz@latest",
-    "manualUpgradeHint": "或点击'立即更新'以自动运行更新。",
-    "updateCompleted": "更新成功完成！",
-    "restartServer": "请重启服务器以应用更改。",
-    "updateFailed": "更新失败",
-    "buttons": {
-      "close": "关闭",
-      "later": "稍后",
-      "copyCommand": "复制命令",
-      "updateNow": "立即更新",
-      "updating": "更新中..."
-    },
     "ariaLabels": {
-      "closeModal": "关闭版本升级模态框",
       "showSidebar": "显示侧边栏",
-      "settings": "设置",
-      "updateAvailable": "有可用更新",
       "closeSidebar": "关闭侧边栏"
     }
   }

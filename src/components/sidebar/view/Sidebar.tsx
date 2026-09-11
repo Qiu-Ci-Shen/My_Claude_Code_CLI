@@ -52,9 +52,7 @@ function Sidebar({
   const {
     isSidebarCollapsed,
     expandedProjects,
-    editingProject,
     showNewProject,
-    editingName,
     initialSessionsLoaded,
     currentTime,
     isRefreshing,
@@ -63,10 +61,6 @@ function Sidebar({
     searchFilter,
     searchMode,
     setSearchMode,
-    conversationResults,
-    isSearching,
-    searchProgress,
-    clearConversationResults,
     runningSessionsCount,
     deletingProjects,
     deleteConfirmation,
@@ -76,24 +70,11 @@ function Sidebar({
     archivedSessions,
     archivedSessionsCount,
     isArchivedSessionsLoading,
-    recentConversations,
-    recentConversationsTotal,
-    recentConversationsHasMore,
-    isRecentConversationsLoading,
-    isLoadingMoreRecentConversations,
-    recentConversationsError,
-    reloadRecentConversations,
-    loadMoreRecentConversations,
     toggleProject,
     handleSessionClick,
-    toggleStarProject,
-    isProjectStarred,
     getProjectSessions,
     loadingMoreProjects,
     loadMoreSessionsForProject,
-    startEditing,
-    cancelEditing,
-    saveProjectName,
     showDeleteSessionConfirmation,
     confirmDeleteSession,
     requestProjectDelete,
@@ -107,7 +88,6 @@ function Sidebar({
     collapseSidebar: handleCollapseSidebar,
     expandSidebar: handleExpandSidebar,
     setShowNewProject,
-    setEditingName,
     setEditingSession,
     setEditingSessionName,
     setSearchFilter,
@@ -153,8 +133,6 @@ function Sidebar({
     isLoading,
     loadingProgress,
     expandedProjects,
-    editingProject,
-    editingName,
     initialSessionsLoaded,
     currentTime,
     editingSession,
@@ -167,16 +145,8 @@ function Sidebar({
     activeSessions,
     attentionSessionIds,
     forceExpanded: searchMode === 'running',
-    isProjectStarred,
-    onEditingNameChange: setEditingName,
     onToggleProject: toggleProject,
     onProjectSelect: handleProjectSelect,
-    onToggleStarProject: toggleStarProject,
-    onStartEditingProject: startEditing,
-    onCancelEditingProject: cancelEditing,
-    onSaveProjectName: (projectName) => {
-      void saveProjectName(projectName);
-    },
     onDeleteProject: requestProjectDelete,
     onSessionSelect: handleSessionClick,
     onDeleteSession: showDeleteSessionConfirmation,
@@ -234,26 +204,12 @@ function Sidebar({
             archivedSessions={archivedSessions}
             archivedSessionsCount={archivedSessionsCount}
             isArchivedSessionsLoading={isArchivedSessionsLoading}
-            recentConversations={recentConversations}
-            recentConversationsTotal={recentConversationsTotal}
-            recentConversationsHasMore={recentConversationsHasMore}
-            isRecentConversationsLoading={isRecentConversationsLoading}
-            isLoadingMoreRecentConversations={isLoadingMoreRecentConversations}
-            recentConversationsError={recentConversationsError}
             searchFilter={searchFilter}
             onSearchFilterChange={setSearchFilter}
             onClearSearchFilter={() => setSearchFilter('')}
             searchMode={searchMode}
-            onSearchModeChange={(mode) => {
-              setSearchMode(mode);
-              if (mode === 'projects') clearConversationResults();
-            }}
-            conversationResults={conversationResults}
-            isSearching={isSearching}
-            searchProgress={searchProgress}
+            onSearchModeChange={setSearchMode}
             onRestoreArchivedProject={restoreArchivedProject}
-            onLoadMoreRecentConversations={loadMoreRecentConversations}
-            onRetryRecentConversations={reloadRecentConversations}
             onArchivedSessionClick={openArchivedSession}
             onRestoreArchivedSession={restoreArchivedSession}
             onDeleteArchivedSession={(session) => {
@@ -264,33 +220,6 @@ function Sidebar({
                 session.provider,
                 { isArchived: true },
               );
-            }}
-            onConversationResultClick={(projectId: string | null, sessionId: string, provider: string, messageTimestamp?: string | null, messageSnippet?: string | null) => {
-              // `projectId` (DB key) is the canonical identifier post-migration.
-              // The server emits null when it can't resolve a project row for
-              // the search hit; treat that as "no project" and still navigate
-              // to the session so the user can open it from the URL.
-              const resolvedProvider = (provider || 'claude') as LLMProvider;
-              const project = projectId ? projects.find(p => p.projectId === projectId) : null;
-              const searchTarget = { __searchTargetTimestamp: messageTimestamp || null, __searchTargetSnippet: messageSnippet || null };
-              const sessionObj = {
-                id: sessionId,
-                __provider: resolvedProvider,
-                __projectId: projectId ?? undefined,
-                ...searchTarget,
-              };
-              if (project) {
-                handleProjectSelect(project);
-                const sessions = getProjectSessions(project);
-                const existing = sessions.find(s => s.id === sessionId);
-                if (existing) {
-                  handleSessionClick({ ...existing, ...searchTarget }, project.projectId);
-                } else {
-                  handleSessionClick(sessionObj, project.projectId);
-                }
-              } else {
-                handleSessionClick(sessionObj, projectId ?? '');
-              }
             }}
             onRefresh={() => {
               void refreshProjects();

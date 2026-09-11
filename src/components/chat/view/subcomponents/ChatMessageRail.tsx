@@ -79,7 +79,15 @@ function ChatMessageRail({ containerRef, messages }: ChatMessageRailProps) {
         ),
       });
     });
-    setMarks(next);
+    // 结果不变时必须保持旧引用：measure 由依赖 marks 的 effect 驱动，
+    // 每轮都换引用会自激成无限测量循环（实测每秒数万次 querySelectorAll
+    // + 逐条 getBoundingClientRect，烧满一个 CPU 核）
+    setMarks((prev) =>
+      prev.length === next.length
+      && prev.every((mark, i) => mark.top === next[i].top && mark.question === next[i].question)
+        ? prev
+        : next,
+    );
     setScrollable(container.scrollHeight - container.clientHeight > 80);
     setRailHeight(container.clientHeight);
   }, [containerRef]);

@@ -3,12 +3,10 @@
     "title": "Проекты",
     "newProject": "Новый проект",
     "deleteProject": "Убрать проект",
-    "renameProject": "Переименовать проект",
     "noProjects": "Проекты не найдены",
     "loadingProjects": "Загрузка проектов...",
     "searchPlaceholder": "Поиск проектов...",
     "projectNamePlaceholder": "Имя проекта",
-    "starred": "Избранное",
     "all": "Все",
     "untitledSession": "Безымянный сеанс",
     "newSession": "Новый сеанс",
@@ -49,7 +47,6 @@
     "save": "Сохранить",
     "cancel": "Отмена",
     "clearSearch": "Очистить поиск",
-    "openCommandPalette": "Открыть палитру команд",
     "attentionRequiredIndicator": "Сессия требует внимания"
   },
   "navigation": {
@@ -67,14 +64,9 @@
     "cancel": "Отмена",
     "save": "Сохранить",
     "delete": "Удалить",
-    "rename": "Переименовать",
-    "joinCommunity": "Присоединиться к сообществу",
-    "reportIssue": "Сообщить о проблеме",
-    "starOnGithub": "Звезда на GitHub"
+    "rename": "Переименовать"
   },
-  "branding": {
-    "openSource": "Открытый исходный код"
-  },
+  "branding": {},
   "status": {
     "active": "Активен",
     "inactive": "Неактивен",
