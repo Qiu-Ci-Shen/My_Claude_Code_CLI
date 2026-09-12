@@ -72,10 +72,26 @@ export function rewindExecute(
 }
 
 
+/**
+ * 编辑目标携带的原始附件。`path` 指向上传存储的文件时可直接透传重发；
+ * Claude 转录把图片存成 base64，历史消息只剩 `data`——重发前需还原成
+ * File 重新上传换取存储路径（服务端只放行存储目录内的路径）。
+ */
+export type EditMessageAttachment = {
+  path?: string;
+  name?: string;
+  mimeType?: string;
+  size?: number;
+  /** 图片内联 data URL */
+  data?: string;
+};
+
 /** 编辑模式目标：✎ 选中的那条消息（ZCode 同款底部输入框编辑） */
 export type EditMessageTarget = {
   sessionId: string | null;
   timestamp: string | number | Date | null | undefined;
   /** 消息完整原文，载入输入框 */
   content: string;
+  /** 原消息的图片/文件，编辑重发时一并重发 */
+  attachments?: EditMessageAttachment[];
 };

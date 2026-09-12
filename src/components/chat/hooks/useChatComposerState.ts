@@ -17,6 +17,7 @@ import { authenticatedFetch } from '../../../utils/api';
 import { rewindExecute, type EditMessageTarget } from '../../../lib/rewindRpc';
 import type { MarkSessionProcessing, SessionActivityMap } from '../../../hooks/useSessionProtection';
 import { grantClaudeToolPermission } from '../utils/chatPermissions';
+import { resolveEditResendAttachments } from '../utils/editResendAttachments';
 import {
   clearQueuedMessage,
   readQueuedMessage,
@@ -710,6 +711,12 @@ export function useChatComposerState({
         inputValueRef.current = '';
         void (async () => {
           try {
+            // 原消息附件先恢复成可重发描述符再截断——上传失败时旧对话尚未被破坏
+            const resendAttachments = await resolveEditResendAttachments(
+              editTarget.attachments ?? [],
+              uploadAttachmentFiles,
+            );
+
             sendMessage({ type: 'chat.abort', sessionId });
 
             // 等待运行真正退出（abort 的 terminal complete 翻转 isLoading），
@@ -739,12 +746,22 @@ export function useChatComposerState({
             // 清槽会连乐观气泡一起清掉：先回填更早轮次，再补回编辑后的消息
             // 气泡并立即发送（气泡内容与 CLI 回显一致，合并去重收敛为一条）
             onTruncateCompleted?.(sessionId);
-            addMessage({ type: 'user', content: editedText, timestamp: new Date() });
+            const attachmentRecords = resendAttachments as ChatAttachment[];
+            addMessage({
+              type: 'user',
+              content: editedText,
+              timestamp: new Date(),
+              images: attachmentRecords.filter(isImageAttachment),
+              files: attachmentRecords.filter((attachment) => !isImageAttachment(attachment)),
+            });
             sendMessage({
               type: 'chat.send',
               sessionId,
               content: editedText,
-              options: buildSendOptions(editedText),
+              options: {
+                ...buildSendOptions(editedText),
+                attachments: resendAttachments,
+              },
             });
           } catch (err) {
             addMessage({

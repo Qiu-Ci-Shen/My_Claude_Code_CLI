@@ -512,6 +512,10 @@ function ChatInterface({
             sessionId: currentSessionId || selectedSession?.id || null,
             timestamp: message.timestamp,
             content: String(message.content || ''),
+            attachments: [
+              ...(Array.isArray(message.images) ? message.images : []),
+              ...(Array.isArray(message.files) ? message.files : []),
+            ],
           })}
           onRewindMessage={handleRewindMessage}
         />
@@ -520,7 +524,13 @@ function ChatInterface({
           {editTarget && (
             <div className="pointer-events-none absolute left-1/2 top-2 z-30 -translate-x-1/2">
               <div className="flex items-center gap-2 rounded-full border border-primary/40 bg-popover px-3 py-1 text-xs text-foreground shadow-md">
-                <span>正在编辑消息，Esc 取消</span>
+                <span>
+                  正在编辑消息
+                  {editTarget.attachments?.length
+                    ? `（连同 ${editTarget.attachments.length} 个附件重发）`
+                    : ''}
+                  ，Esc 取消
+                </span>
                 <button
                   type="button"
                   onClick={() => setEditTarget(null)}
