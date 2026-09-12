@@ -31,6 +31,15 @@ export default defineConfig(({ mode }) => {
       // Cloudflare quick tunnels terminate at random *.trycloudflare.com
       // subdomains; without this the dev server rejects their Host header.
       allowedHosts: ['.trycloudflare.com'],
+      // dist-server* 是 tsc 的服务端产物目录（不是 vite 的 outDir，默认不被忽略）：
+      // vite dev 监视到它会拿住其目录句柄，导致桌面壳重建换入时改名 dist-server 报 EPERM（2026-09-11 实锤）
+      watch: {
+        ignored: [
+          '**/dist-server', '**/dist-server/**',
+          '**/dist-server.next', '**/dist-server.next/**',
+          '**/dist-server.old', '**/dist-server.old/**',
+        ],
+      },
       proxy: {
         '/api': `http://${proxyHost}:${serverPort}`,
         '/ws': {
