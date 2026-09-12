@@ -9,6 +9,7 @@ import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/pris
 import { useTranslation } from 'react-i18next';
 
 import MermaidDiagram from '../../../code-editor/view/subcomponents/markdown/MermaidDiagram';
+import SvgDiagram from './SvgDiagram';
 import { normalizeInlineCodeFences } from '../../utils/chatFormatting';
 import { copyTextToClipboard } from '../../../../utils/clipboard';
 import { usePaletteOps } from '../../../../contexts/PaletteOpsContext';
@@ -135,6 +136,10 @@ const CodeBlock = ({ node: _node, className, children, forceBlock, ...props }: C
 
   if (language === 'mermaid') {
     return <MermaidDiagram code={raw} />;
+  }
+
+  if (language === 'svg') {
+    return <SvgDiagram code={raw} />;
   }
 
   return (
