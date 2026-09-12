@@ -189,7 +189,8 @@ export type MessageKind =
   | 'permission_cancelled'
   | 'session_created'
   | 'interactive_prompt'
-  | 'task_notification';
+  | 'task_notification'
+  | 'subagent_event';
 
 /**
  * Event kinds added by the chat gateway layer on top of provider message kinds.
@@ -363,6 +364,51 @@ export type FetchHistoryResult = {
   offset: number;
   limit: number | null;
   tokenUsage?: unknown;
+};
+
+/**
+ * Options for enumerating a session's subagent transcripts (Agents panel).
+ */
+export type FetchSubagentsOptions = {
+  projectPath?: string;
+  providerSessionId?: string;
+};
+
+/**
+ * One subagent of a session, merged from the subagents/ transcripts, their
+ * meta.json files, and the owning Agent/Task tool call in the main transcript.
+ */
+export type SubagentUsage = {
+  totalTokens: number;
+  toolUses: number;
+  durationMs: number;
+};
+
+export type SubagentSummary = {
+  taskId: string;
+  toolUseId: string | null;
+  agentType: string | null;
+  description: string | null;
+  name: string | null;
+  prompt: string | null;
+  status: 'running' | 'completed' | 'failed' | 'stopped' | 'interrupted';
+  isBackgrounded: boolean;
+  spawnDepth: number | null;
+  startedAt: string | null;
+  endedAt: string | null;
+  usage: SubagentUsage | null;
+  hasConversation: boolean;
+};
+
+/**
+ * A subagent's full conversation, normalized like session history messages so
+ * the same renderers apply.
+ */
+export type SubagentConversation = {
+  taskId: string;
+  agentType: string | null;
+  description: string | null;
+  messages: NormalizedMessage[];
 };
 
 // ---------------------------

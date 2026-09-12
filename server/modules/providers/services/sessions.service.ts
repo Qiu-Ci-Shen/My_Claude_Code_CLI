@@ -10,6 +10,8 @@ import type {
   FetchHistoryResult,
   LLMProvider,
   NormalizedMessage,
+  SubagentConversation,
+  SubagentSummary,
 } from '@/shared/types.js';
 import { AppError } from '@/shared/utils.js';
 
@@ -307,6 +309,54 @@ export const sessionsService = {
         sessionId,
       })),
     };
+  },
+
+  /**
+   * Lists a session's subagents for the Agents panel. Sessions without a
+   * provider transcript, or providers without subagent support, return an
+   * empty list.
+   */
+  async fetchSubagents(sessionId: string): Promise<SubagentSummary[]> {
+    const session = sessionsDb.getSessionById(sessionId);
+    if (!session || !session.provider_session_id) {
+      return [];
+    }
+
+    const provider = session.provider as LLMProvider;
+    const providerSessions = providerRegistry.resolveProvider(provider).sessions;
+    if (typeof providerSessions.listSubagents !== 'function') {
+      return [];
+    }
+
+    return providerSessions.listSubagents(sessionId, {
+      projectPath: session.project_path ?? '',
+      providerSessionId: session.provider_session_id,
+    });
+  },
+
+  /**
+   * Loads one subagent's full conversation for the Agents panel detail view.
+   * Returns null when the transcript is missing.
+   */
+  async fetchSubagentConversation(
+    sessionId: string,
+    taskId: string,
+  ): Promise<SubagentConversation | null> {
+    const session = sessionsDb.getSessionById(sessionId);
+    if (!session || !session.provider_session_id) {
+      return null;
+    }
+
+    const provider = session.provider as LLMProvider;
+    const providerSessions = providerRegistry.resolveProvider(provider).sessions;
+    if (typeof providerSessions.fetchSubagentConversation !== 'function') {
+      return null;
+    }
+
+    return providerSessions.fetchSubagentConversation(sessionId, taskId, {
+      projectPath: session.project_path ?? '',
+      providerSessionId: session.provider_session_id,
+    });
   },
 
   /**

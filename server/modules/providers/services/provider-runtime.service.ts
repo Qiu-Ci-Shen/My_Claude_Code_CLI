@@ -101,6 +101,22 @@ export function createProviderRuntimeService(
       }
     },
 
+    async stopSubagentTask(
+      providerName: LLMProvider,
+      sessionId: string,
+      taskId: string,
+    ): Promise<{ ok: boolean; error?: string }> {
+      const runtime = dependencies.resolveProvider(providerName).runtime;
+      if (typeof runtime.stopSubagentTask !== 'function') {
+        return { ok: false, error: 'unsupported' };
+      }
+      try {
+        return await runtime.stopSubagentTask(sessionId, taskId);
+      } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    },
+
     resolveToolApproval(requestId: string, decision: ProviderPermissionDecision): void {
       for (const provider of dependencies.listProviders()) {
         provider.runtime.permissions?.resolve(requestId, decision);

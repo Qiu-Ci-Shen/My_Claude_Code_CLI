@@ -424,6 +424,117 @@ function transformMessage(sdkMessage) {
   return sdkMessage;
 }
 
+/**
+ * Maps SDK task lifecycle system messages to the `subagent_event` payload the
+ * Agents panel consumes. Returns null for every non-task message so callers
+ * can forward unconditionally.
+ */
+function mapTaskEventToSubagentEvent(sdkMessage) {
+  if (!sdkMessage || sdkMessage.type !== 'system') {
+    return null;
+  }
+  const mapUsage = (usage) => (usage && typeof usage === 'object' ? {
+    totalTokens: readNumber(usage.total_tokens),
+    toolUses: readNumber(usage.tool_uses),
+    durationMs: readNumber(usage.duration_ms)
+  } : null);
+  switch (sdkMessage.subtype) {
+    case 'task_started':
+      return {
+        event: 'started',
+        taskId: sdkMessage.task_id || null,
+        toolUseId: sdkMessage.tool_use_id || null,
+        description: sdkMessage.description || null,
+        subagentType: sdkMessage.subagent_type || null,
+        isBackgrounded: Boolean(sdkMessage.is_backgrounded),
+        spawnDepth: typeof sdkMessage.spawn_depth === 'number' ? sdkMessage.spawn_depth : null,
+        taskType: sdkMessage.task_type || null,
+        prompt: typeof sdkMessage.prompt === 'string' ? sdkMessage.prompt : null,
+        ambient: Boolean(sdkMessage.ambient),
+        skipTranscript: Boolean(sdkMessage.skip_transcript)
+      };
+    case 'task_progress':
+      return {
+        event: 'progress',
+        taskId: sdkMessage.task_id || null,
+        toolUseId: sdkMessage.tool_use_id || null,
+        description: sdkMessage.description || null,
+        subagentType: sdkMessage.subagent_type || null,
+        usage: mapUsage(sdkMessage.usage),
+        lastToolName: sdkMessage.last_tool_name || null,
+        summary: typeof sdkMessage.summary === 'string' ? sdkMessage.summary : null,
+        ambient: Boolean(sdkMessage.ambient)
+      };
+    case 'task_updated':
+      return {
+        event: 'updated',
+        taskId: sdkMessage.task_id || null,
+        status: sdkMessage.patch?.status || null,
+        endTime: typeof sdkMessage.patch?.end_time === 'number' ? sdkMessage.patch.end_time : null,
+        isBackgrounded: typeof sdkMessage.patch?.is_backgrounded === 'boolean' ? sdkMessage.patch.is_backgrounded : null,
+        description: sdkMessage.patch?.description || null
+      };
+    case 'task_notification':
+      return {
+        event: 'finished',
+        taskId: sdkMessage.task_id || null,
+        toolUseId: sdkMessage.tool_use_id || null,
+        status: sdkMessage.status || null,
+        usage: mapUsage(sdkMessage.usage),
+        summary: typeof sdkMessage.summary === 'string' ? sdkMessage.summary : null,
+        ambient: Boolean(sdkMessage.ambient)
+      };
+    default:
+      return null;
+  }
+}
+
+// 任务系统的任务是全会话可见的：lead 或子代理启动的后台命令也会以任务事件
+// 形式出现在流里（task_type 'local_bash'，子代理名下的还带
+// owned_by_subagent），但它们不属于 Agents 面板——面板只呈现真正的子代理
+// （task_type 'local_agent'）。2026-09-12 实案：审核子代理跑的 npm test /
+// typecheck 被渲染成三张"agent 卡片"，面板看上去像单个 agent 的活动流水。
+const NON_AGENT_TASK_TYPES = new Set(['local_bash']);
+
+/**
+ * 决定一条 subagent_event 是否转发给 Agents 面板，并把 taskId 的分类记入
+ * 调用方持有的集合（按运行实例隔离）。
+ *
+ * 进程内事件有序：task_started 是每个任务的第一个事件，分类在那里一次完成；
+ * 其余事件凭 taskId 归属。未分类的罕见事件保守丢弃（缺 started 的兜底：
+ * 事件自带 subagent_type 时可即时补认为子代理）。
+ *
+ * @param {Object|null|undefined} subagentEvent - mapTaskEventToSubagentEvent 的输出
+ * @param {Set<string>} agentTaskIds - 已确认的子代理任务
+ * @param {Set<string>} nonAgentTaskIds - 已确认的非子代理任务
+ * @returns {boolean} 是否应转发
+ */
+function classifySubagentEvent(subagentEvent, agentTaskIds, nonAgentTaskIds) {
+  const taskId = subagentEvent?.taskId;
+  if (!taskId) {
+    return false;
+  }
+  if (nonAgentTaskIds.has(taskId)) {
+    return false;
+  }
+  if (agentTaskIds.has(taskId)) {
+    return true;
+  }
+  if (subagentEvent.taskType) {
+    if (NON_AGENT_TASK_TYPES.has(subagentEvent.taskType)) {
+      nonAgentTaskIds.add(taskId);
+      return false;
+    }
+    agentTaskIds.add(taskId);
+    return true;
+  }
+  if (subagentEvent.subagentType) {
+    agentTaskIds.add(taskId);
+    return true;
+  }
+  return false;
+}
+
 function readNumber(value) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -838,6 +949,9 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
   // captured from the stream for brand-new sessions).
   let capturedSessionId = providerSessionId;
   let sessionCreatedSent = false;
+  // Agents 面板的事件分类（见 classifySubagentEvent），仅本次运行有效
+  const agentTaskIds = new Set();
+  const nonAgentTaskIds = new Set();
   // Process-map key: the app session id when the caller supplied one, else
   // the provider-native id once captured (legacy/direct API callers).
   const sessionKey = () => sessionId || capturedSessionId || null;
@@ -1130,6 +1244,19 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
         ws.send(msg);
       }
 
+      // 子代理生命周期事件（task_started/progress/updated/notification）：
+      // 转发给前端 Agents 面板（ambient 任务由前端忽略）。分类器把后台
+      // Bash 等非子代理任务留在门外——任务系统对它们同样会发事件。
+      const subagentEvent = mapTaskEventToSubagentEvent(message);
+      if (subagentEvent && classifySubagentEvent(subagentEvent, agentTaskIds, nonAgentTaskIds)) {
+        ws.send(createNormalizedMessage({
+          kind: 'subagent_event',
+          provider: 'claude',
+          sessionId: sid,
+          subagentEvent
+        }));
+      }
+
       // 压缩边界：上下文真实收缩。重置抑制基线让后续低值立即生效，并立即
       // 下发压缩后的上下文占用（post_tokens 就在边界消息里）——否则 UI 的
       // Context 条要等下一回合第一条 assistant 消息才刷新，压缩完成后一段
@@ -1410,9 +1537,47 @@ async function abortClaudeSDKSession(sessionId) {
  * @param {string} sessionId - Session identifier
  * @returns {boolean} True if session is active
  */
+/**
+ * Stops one running subagent task (Agents panel stop button). The CLI emits a
+ * task_notification with status 'stopped' when the stop lands, which the run
+ * loop forwards as a subagent_event for the panel to consume.
+ *
+ * @param {string} sessionId - App-facing session id of the owning run
+ * @param {string} taskId - Task id from task_started/task_notification events
+ * @returns {Promise<{ok: boolean, error?: string}>}
+ */
+const STOP_SUBAGENT_TIMEOUT_MS = 8000;
+async function stopClaudeSubagentTask(sessionId, taskId) {
+  const session = getSession(sessionId);
+  const instance = session?.instance;
+  if (!instance || typeof instance.stopTask !== 'function') {
+    return { ok: false, error: 'no-active-run' };
+  }
+
+  let timer = null;
+  try {
+    // 控制请求没有超时（SDK 已知问题 #425）：mid-call 的 stopTask 可能永不
+    // settle，race 一个超时兜底，别把 WS 处理器钉死。
+    await Promise.race([
+      instance.stopTask(taskId),
+      new Promise((resolve, reject) => {
+        timer = setTimeout(() => reject(new Error('stop timeout')), STOP_SUBAGENT_TIMEOUT_MS);
+      })
+    ]);
+    return { ok: true };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { ok: false, error: message };
+  } finally {
+    if (timer) {
+      clearTimeout(timer);
+    }
+  }
+}
+
 function isClaudeSDKSessionActive(sessionId) {
   const session = getSession(sessionId);
-  return session && session.status === 'active';
+  return Boolean(session && session.status === 'active');
 }
 
 /**
@@ -1467,6 +1632,7 @@ export const claudeRuntime = {
   // post-turn background-work hold) even after the registry already flipped
   // the run to completed — the window where a rewind must stay rejected.
   hasActiveProcess: isClaudeSDKSessionActive,
+  stopSubagentTask: stopClaudeSubagentTask,
   permissions: {
     resolve: resolveToolApproval,
     listPending: getPendingApprovalsForSession,
@@ -1477,7 +1643,10 @@ export const claudeRuntime = {
 export {
   queryClaudeSDK,
   abortClaudeSDKSession,
+  stopClaudeSubagentTask,
   isClaudeSDKSessionActive,
+  mapTaskEventToSubagentEvent,
+  classifySubagentEvent,
   getActiveClaudeSDKSessions,
   resolveToolApproval,
   getPendingApprovalsForSession,

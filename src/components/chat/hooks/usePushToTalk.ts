@@ -143,6 +143,10 @@ export function usePushToTalk({
       if (stateRef.current === 'idle') return;
       holdingRef.current = false;
       clearPressTimer();
+      // 消费掉这次 Esc：浮条承诺「Esc 取消」的是本次识别，取消后事件止步于
+      // 本层——下游（ChatInterface 全局 Esc 的打断/退出编辑）经 defaultPrevented
+      // 让路，避免一次 Esc 既取消识别又退出编辑、把输入框恢复成空草稿（2026-09-12）
+      e.preventDefault();
       callbacksRef.current.onHoldCancel();
     };
 

@@ -817,6 +817,40 @@ router.get(
   }),
 );
 
+router.get(
+  '/sessions/:sessionId/subagents',
+  asyncHandler(async (req: Request, res: Response) => {
+    const sessionId = parseSessionId(req.params.sessionId);
+    const result = await sessionsService.fetchSubagents(sessionId);
+    res.json(createApiSuccessResponse({ subagents: result }));
+  }),
+);
+
+const SUBAGENT_ID_PATTERN = /^[A-Za-z0-9_-]{4,64}$/;
+
+router.get(
+  '/sessions/:sessionId/subagents/:taskId/messages',
+  asyncHandler(async (req: Request, res: Response) => {
+    const sessionId = parseSessionId(req.params.sessionId);
+    const taskId = readPathParam(req.params.taskId, 'taskId').trim();
+    if (!SUBAGENT_ID_PATTERN.test(taskId)) {
+      throw new AppError('Invalid subagent id.', {
+        code: 'INVALID_SUBAGENT_ID',
+        statusCode: 400,
+      });
+    }
+
+    const result = await sessionsService.fetchSubagentConversation(sessionId, taskId);
+    if (!result) {
+      throw new AppError(`Subagent "${taskId}" was not found.`, {
+        code: 'SUBAGENT_NOT_FOUND',
+        statusCode: 404,
+      });
+    }
+    res.json(createApiSuccessResponse(result));
+  }),
+);
+
 router.get('/search/sessions', asyncHandler(async (req: Request, res: Response) => {
   const query = parseSessionSearchQuery(req.query.q);
   const limit = parseSessionSearchLimit(req.query.limit);

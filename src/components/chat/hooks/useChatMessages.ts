@@ -80,6 +80,12 @@ export function normalizedToChatMessages(messages: NormalizedMessage[]): ChatMes
   }
 
   for (const msg of messages) {
+    // 子代理内部消息（带 parentToolUseId）归 Agents 面板，不进主聊天渲染
+    // （实时路由已在 useChatRealtimeHandlers 拦截，这里兜底防其余路径）
+    if (msg.parentToolUseId) {
+      continue;
+    }
+
     const sharedMetadata = {
       displayText: msg.displayText,
       commandName: msg.commandName,
@@ -143,7 +149,8 @@ export function normalizedToChatMessages(messages: NormalizedMessage[]): ChatMes
 
       case 'tool_use': {
         const tr = msg.toolResult || (msg.toolId ? toolResultMap.get(msg.toolId) : null);
-        const isSubagentContainer = msg.toolName === 'Task';
+        // CLI 2.x 把 Task 工具更名为 Agent，两个名字都认
+        const isSubagentContainer = msg.toolName === 'Task' || msg.toolName === 'Agent';
 
         // Build child tools from subagentTools
         const childTools: SubagentChildTool[] = [];

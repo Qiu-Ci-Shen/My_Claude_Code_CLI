@@ -3,7 +3,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import readline from 'node:readline';
 import type { IProviderSessions } from '@/shared/interfaces.js';
-import type { AnyRecord, FetchHistoryOptions, FetchHistoryResult, NormalizedMessage } from '@/shared/types.js';
+import type { AnyRecord, FetchHistoryOptions, FetchHistoryResult, FetchSubagentsOptions, NormalizedMessage, SubagentConversation, SubagentSummary } from '@/shared/types.js';
 import { parseFilesInputTag } from '@/shared/image-attachments.js';
 import { createNormalizedMessage, generateMessageId, readObjectRecord, sliceTailPage } from '@/shared/utils.js';
 import { sessionsDb } from '@/modules/database/index.js';
@@ -105,34 +105,41 @@ type ClaudeHistoryMessagesResult =
     limit?: number | null;
   };
 
-// subagent 工具解析缓存：历史 API 每次请求都对会话涉及的每个 agent-*.jsonl
-// 全量重解析（重会话可能有几十个 1MB 级文件），mtime+size 未变时复用。
-const agentToolsParseCache = new Map<string, { mtimeMs: number; size: number; tools: AnyRecord[] }>();
-const AGENT_TOOLS_CACHE_MAX_FILES = 40;
+// subagent 文件解析缓存：历史 API 对会话涉及的每个 agent-*.jsonl 全量重解析
+// （重会话可能有几十个 1MB 级文件），mtime+size 未变时复用。一次解析同时产出
+// 「工具列表」（挂到主转录的 Task/Agent tool_result 上）与「完整对话」
+//（Agents 面板的历史回看）。
+type AgentFileParse = {
+  tools: AnyRecord[];
+  conversation: NormalizedMessage[];
+};
+const agentFileParseCache = new Map<string, { mtimeMs: number; size: number } & AgentFileParse>();
+const AGENT_FILE_CACHE_MAX_FILES = 40;
 
-async function parseAgentTools(filePath: string): Promise<AnyRecord[]> {
+async function parseAgentFile(filePath: string): Promise<AgentFileParse> {
   try {
     const stat = await fsp.stat(filePath);
-    const cached = agentToolsParseCache.get(filePath);
+    const cached = agentFileParseCache.get(filePath);
     if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) {
-      return cached.tools;
+      return { tools: cached.tools, conversation: cached.conversation };
     }
 
-    const tools = await parseAgentToolsUncached(filePath);
-    agentToolsParseCache.set(filePath, { mtimeMs: stat.mtimeMs, size: stat.size, tools });
-    if (agentToolsParseCache.size > AGENT_TOOLS_CACHE_MAX_FILES) {
-      const oldest = agentToolsParseCache.keys().next().value;
-      if (oldest !== undefined) agentToolsParseCache.delete(oldest);
+    const parsed = await parseAgentFileUncached(filePath);
+    agentFileParseCache.set(filePath, { mtimeMs: stat.mtimeMs, size: stat.size, ...parsed });
+    if (agentFileParseCache.size > AGENT_FILE_CACHE_MAX_FILES) {
+      const oldest = agentFileParseCache.keys().next().value;
+      if (oldest !== undefined) agentFileParseCache.delete(oldest);
     }
-    return tools;
+    return parsed;
   } catch {
-    // stat 失败（文件缺失等）：交给解析函数按原逻辑告警并返回空数组
-    return parseAgentToolsUncached(filePath);
+    // stat 失败（文件缺失等）：交给解析函数按原逻辑告警并返回空结果
+    return parseAgentFileUncached(filePath);
   }
 }
 
-async function parseAgentToolsUncached(filePath: string): Promise<AnyRecord[]> {
+async function parseAgentFileUncached(filePath: string): Promise<AgentFileParse> {
   const tools: AnyRecord[] = [];
+  const conversation: NormalizedMessage[] = [];
 
   try {
     const fileStream = fs.createReadStream(filePath);
@@ -141,50 +148,17 @@ async function parseAgentToolsUncached(filePath: string): Promise<AnyRecord[]> {
       crlfDelay: Infinity,
     });
 
+    let lineIndex = 0;
     for await (const line of rl) {
       if (!line.trim()) {
         continue;
       }
+      lineIndex += 1;
 
       try {
         const entry = JSON.parse(line) as AnyRecord;
-
-        if (entry.message?.role === 'assistant' && Array.isArray(entry.message?.content)) {
-          for (const part of entry.message.content as AnyRecord[]) {
-            if (part.type === 'tool_use') {
-              tools.push({
-                toolId: part.id,
-                toolName: part.name,
-                toolInput: part.input,
-                timestamp: entry.timestamp,
-              });
-            }
-          }
-        }
-
-        if (entry.message?.role === 'user' && Array.isArray(entry.message?.content)) {
-          for (const part of entry.message.content as AnyRecord[]) {
-            if (part.type !== 'tool_result') {
-              continue;
-            }
-
-            const tool = tools.find((candidate) => candidate.toolId === part.tool_use_id);
-            if (!tool) {
-              continue;
-            }
-
-            tool.toolResult = {
-              content: typeof part.content === 'string'
-                ? part.content
-                : Array.isArray(part.content)
-                  ? part.content
-                    .map((contentPart: AnyRecord) => contentPart?.text || '')
-                    .join('\n')
-                  : JSON.stringify(part.content),
-              isError: Boolean(part.is_error),
-            };
-          }
-        }
+        collectAgentTools(entry, tools);
+        collectAgentConversation(entry, conversation, lineIndex);
       } catch {
         // Skip malformed lines that can happen during concurrent writes.
       }
@@ -194,7 +168,479 @@ async function parseAgentToolsUncached(filePath: string): Promise<AnyRecord[]> {
     console.warn(`Error parsing agent file ${filePath}:`, message);
   }
 
-  return tools;
+  return { tools, conversation };
+}
+
+/** Extracts the tool_use/tool_result pairs the main transcript attaches to its Agent call. */
+function collectAgentTools(entry: AnyRecord, tools: AnyRecord[]): void {
+  if (entry.message?.role === 'assistant' && Array.isArray(entry.message?.content)) {
+    for (const part of entry.message.content as AnyRecord[]) {
+      if (part.type === 'tool_use') {
+        tools.push({
+          toolId: part.id,
+          toolName: part.name,
+          toolInput: part.input,
+          timestamp: entry.timestamp,
+        });
+      }
+    }
+  }
+
+  if (entry.message?.role === 'user' && Array.isArray(entry.message?.content)) {
+    for (const part of entry.message.content as AnyRecord[]) {
+      if (part.type !== 'tool_result') {
+        continue;
+      }
+
+      const tool = tools.find((candidate) => candidate.toolId === part.tool_use_id);
+      if (!tool) {
+        continue;
+      }
+
+      tool.toolResult = {
+        content: toolResultText(part.content),
+        isError: Boolean(part.is_error),
+      };
+    }
+  }
+}
+
+/**
+ * Projection of a subagent transcript entry into the normalized message shape
+ * the Agents panel renders (user prompt, assistant text/thinking/tool calls,
+ * tool results). `sessionId` is left blank here because this parse result is
+ * cached per file, independent of the app session it will be served under.
+ */
+function collectAgentConversation(entry: AnyRecord, conversation: NormalizedMessage[], lineIndex: number): void {
+  if (entry.isMeta === true) {
+    return;
+  }
+  if (entry.type !== 'user' && entry.type !== 'assistant') {
+    return;
+  }
+  const message = entry.message as AnyRecord | undefined;
+  if (!message || !message.content) {
+    return;
+  }
+
+  const baseId = typeof entry.uuid === 'string' && entry.uuid ? entry.uuid : `agent_line_${lineIndex}`;
+  const timestamp = typeof entry.timestamp === 'string' ? entry.timestamp : undefined;
+  const push = (fields: AnyRecord) => {
+    conversation.push(createNormalizedMessage({
+      ...fields,
+      sessionId: '',
+      provider: PROVIDER,
+      ...(timestamp ? { timestamp } : {}),
+    } as Parameters<typeof createNormalizedMessage>[0]));
+  };
+
+  if (entry.type === 'user') {
+    if (typeof message.content === 'string') {
+      const text = message.content;
+      if (text.trim() && !isInternalContent(text)) {
+        push({ id: `${baseId}_text`, kind: 'text', role: 'user', content: text });
+      }
+      return;
+    }
+
+    if (Array.isArray(message.content)) {
+      let partIndex = 0;
+      for (const part of message.content as AnyRecord[]) {
+        partIndex += 1;
+        if (part?.type === 'tool_result') {
+          push({
+            id: `${baseId}_tr_${part.tool_use_id ?? partIndex}`,
+            kind: 'tool_result',
+            toolId: part.tool_use_id,
+            content: toolResultText(part.content),
+            isError: Boolean(part.is_error),
+            images: extractToolResultImages(part.content),
+          });
+        } else if (part?.type === 'text' && typeof part.text === 'string' && part.text.trim() && !isInternalContent(part.text)) {
+          push({ id: `${baseId}_text_${partIndex}`, kind: 'text', role: 'user', content: part.text });
+        }
+      }
+    }
+    return;
+  }
+
+  // assistant
+  if (typeof message.content === 'string') {
+    if (message.content.trim()) {
+      push({ id: `${baseId}_text`, kind: 'text', role: 'assistant', content: message.content });
+    }
+    return;
+  }
+
+  if (Array.isArray(message.content)) {
+    let partIndex = 0;
+    for (const part of message.content as AnyRecord[]) {
+      partIndex += 1;
+      if (part?.type === 'text' && typeof part.text === 'string' && part.text.trim()) {
+        push({ id: `${baseId}_text_${partIndex}`, kind: 'text', role: 'assistant', content: part.text });
+      } else if (part?.type === 'thinking' && typeof part.thinking === 'string' && part.thinking.trim()) {
+        push({ id: `${baseId}_think_${partIndex}`, kind: 'thinking', content: part.thinking });
+      } else if (part?.type === 'tool_use') {
+        push({
+          id: `${baseId}_tool_${part.id ?? partIndex}`,
+          kind: 'tool_use',
+          toolId: part.id,
+          toolName: part.name,
+          toolInput: part.input,
+        });
+      }
+    }
+  }
+}
+
+/**
+ * Resolves one subagent transcript path across CLI layouts: current releases
+ * nest them under `<projectDir>/<providerSessionId>/subagents/`; older releases
+ * wrote them flat next to the session transcript.
+ */
+function resolveAgentTranscriptPath(projectDir: string, providerSessionId: string | null, taskId: string): string {
+  const fileName = `agent-${taskId}.jsonl`;
+  const candidates = [
+    ...(providerSessionId ? [path.join(projectDir, providerSessionId, 'subagents', fileName)] : []),
+    path.join(projectDir, fileName),
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return candidates[0];
+}
+
+function agentMetaPathFor(transcriptPath: string): string {
+  return transcriptPath.endsWith('.jsonl')
+    ? `${transcriptPath.slice(0, -'.jsonl'.length)}.meta.json`
+    : `${transcriptPath}.meta.json`;
+}
+
+function readAgentMeta(transcriptPath: string): AnyRecord | null {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(agentMetaPathFor(transcriptPath), 'utf-8')) as AnyRecord;
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Background Agent launches echo the agent id inside the tool_result text trailer. */
+function extractAgentIdFromResultContent(content: unknown): string | null {
+  const text = typeof content === 'string'
+    ? content
+    : Array.isArray(content)
+      ? (content as AnyRecord[]).map((part) => (typeof part?.text === 'string' ? part.text : '')).join('\n')
+      : '';
+  const match = /agentId:\s*([A-Za-z0-9_-]{4,64})/.exec(text);
+  return match ? match[1] : null;
+}
+
+/** Tolerant reader for a completed Agent tool_result's aggregate usage. */
+function readSubagentUsageFromToolResult(toolUseResult: unknown): SubagentSummary['usage'] {
+  if (!toolUseResult || typeof toolUseResult !== 'object') {
+    return null;
+  }
+  const usage = (toolUseResult as AnyRecord).usage;
+  if (!usage || typeof usage !== 'object') {
+    return null;
+  }
+  const read = (value: unknown): number => (typeof value === 'number' && Number.isFinite(value) ? value : 0);
+  return {
+    totalTokens: read((usage as AnyRecord).total_tokens),
+    toolUses: read((usage as AnyRecord).tool_uses),
+    durationMs: read((usage as AnyRecord).duration_ms),
+  };
+}
+
+/**
+ * Background tasks report completion through `<task-notification>` XML carried
+ * by `queued_command` attachment entries (commandMode 'task-notification').
+ * Those are the authoritative completion signal for background agents — their
+ * Agent tool_result is only the immediate `async_launched` ack.
+ */
+type AgentNotification = {
+  taskId: string | null;
+  toolUseId: string | null;
+  status: string | null;
+  timestamp: string | null;
+  usage: SubagentSummary['usage'];
+};
+
+function parseAgentNotificationAttachment(entry: AnyRecord): AgentNotification | null {
+  const attachment = entry.attachment as AnyRecord | undefined;
+  if (!attachment || attachment.type !== 'queued_command' || attachment.commandMode !== 'task-notification') {
+    return null;
+  }
+  const prompt = typeof attachment.prompt === 'string' ? attachment.prompt : '';
+  if (!prompt.includes('<task-notification>')) {
+    return null;
+  }
+
+  const readTag = (tag: string): string | null => {
+    const match = new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`).exec(prompt);
+    return match ? match[1].trim() : null;
+  };
+
+  let usage: SubagentSummary['usage'] = null;
+  const usageBlock = readTag('usage');
+  if (usageBlock) {
+    const readNumber = (key: string): number => {
+      const match = new RegExp(`${key}[^0-9]*([0-9]+)`).exec(usageBlock);
+      return match ? Number(match[1]) : 0;
+    };
+    const totalTokens = readNumber('total_tokens');
+    const toolUses = readNumber('tool_uses');
+    const durationMs = readNumber('duration_ms');
+    if (totalTokens || toolUses || durationMs) {
+      usage = { totalTokens, toolUses, durationMs };
+    }
+  }
+
+  return {
+    taskId: readTag('task-id'),
+    toolUseId: readTag('tool-use-id'),
+    status: readTag('status'),
+    timestamp: typeof entry.timestamp === 'string'
+      ? entry.timestamp
+      : (typeof attachment.timestamp === 'string' ? attachment.timestamp : null),
+    usage,
+  };
+}
+
+function mapNotificationStatus(status: string | null): SubagentSummary['status'] | null {
+  if (status === 'completed' || status === 'failed' || status === 'stopped') {
+    return status;
+  }
+  return null;
+}
+
+/**
+ * Enumerates a session's subagents by merging three views: the agent-*.jsonl
+ * transcripts on disk (current `<sessionId>/subagents/` layout, legacy flat
+ * fallback), their meta.json companions, and the Agent/Task tool calls in the
+ * main transcript (prompt/name/description plus the completion tool_result).
+ */
+async function listSubagentsForSession(jsonlPath: string, providerSessionId: string): Promise<SubagentSummary[]> {
+  const projectDir = path.dirname(jsonlPath);
+
+  // 1) Transcript files across CLI layouts
+  const files: Array<{ taskId: string; filePath: string }> = [];
+  const collectFrom = async (dir: string): Promise<void> => {
+    let names: string[] = [];
+    try {
+      names = await fsp.readdir(dir);
+    } catch {
+      return;
+    }
+    for (const name of names) {
+      const match = /^agent-([A-Za-z0-9_-]{4,64})\.jsonl$/.exec(name);
+      if (match && !files.some((file) => file.taskId === match[1])) {
+        files.push({ taskId: match[1], filePath: path.join(dir, name) });
+      }
+    }
+  };
+  await collectFrom(path.join(projectDir, providerSessionId, 'subagents'));
+  if (files.length === 0) {
+    await collectFrom(projectDir);
+  }
+  if (files.length === 0) {
+    return [];
+  }
+
+  const metas = new Map<string, AnyRecord | null>();
+  for (const file of files) {
+    metas.set(file.taskId, readAgentMeta(file.filePath));
+  }
+  const fileByToolUseId = new Map<string, { taskId: string; filePath: string }>();
+  const fileByTaskId = new Map<string, { taskId: string; filePath: string }>();
+  for (const file of files) {
+    fileByTaskId.set(file.taskId, file);
+    const toolUseId = metas.get(file.taskId)?.toolUseId;
+    if (typeof toolUseId === 'string' && toolUseId) {
+      fileByToolUseId.set(toolUseId, file);
+    }
+  }
+
+  // 2) Agent calls + results from the main transcript
+  type AgentCall = {
+    toolUseId: string;
+    description: string | null;
+    subagentType: string | null;
+    name: string | null;
+    prompt: string | null;
+    runInBackground: boolean;
+    timestamp: string | null;
+  };
+  const agentCalls: AgentCall[] = [];
+  const results = new Map<string, { isError: boolean; isAsyncAck: boolean; agentId: string | null; timestamp: string | null; toolUseResult: unknown }>();
+  // 后台任务的完成通知：按 toolUseId 与 taskId 双键索引，后到者覆盖（同一
+  // task 恢复后可多次通知，最新一次为准）。
+  const notificationsByToolUseId = new Map<string, AgentNotification>();
+  const notificationsByTaskId = new Map<string, AgentNotification>();
+
+  try {
+    const entries = await readTranscriptEntries(jsonlPath);
+    for (const entry of entries) {
+      if (entry.sessionId && providerSessionId && entry.sessionId !== providerSessionId) {
+        continue;
+      }
+      const content = entry.message?.content;
+      if (entry.message?.role === 'assistant' && Array.isArray(content)) {
+        for (const part of content as AnyRecord[]) {
+          if (part?.type === 'tool_use' && (part.name === 'Agent' || part.name === 'Task')) {
+            const input = (part.input || {}) as AnyRecord;
+            agentCalls.push({
+              toolUseId: String(part.id ?? ''),
+              description: typeof input.description === 'string' ? input.description : null,
+              subagentType: typeof input.subagent_type === 'string' ? input.subagent_type : null,
+              name: typeof input.name === 'string' && input.name ? input.name : null,
+              prompt: typeof input.prompt === 'string' ? input.prompt : null,
+              runInBackground: Boolean(input.run_in_background),
+              timestamp: typeof entry.timestamp === 'string' ? entry.timestamp : null,
+            });
+          }
+        }
+      } else if (entry.message?.role === 'user' && Array.isArray(content)) {
+        for (const part of content as AnyRecord[]) {
+          if (part?.type !== 'tool_result' || !part.tool_use_id) {
+            continue;
+          }
+          const toolUseResult = entry.toolUseResult as AnyRecord | undefined;
+          const agentId = typeof toolUseResult?.agentId === 'string' && toolUseResult.agentId
+            ? toolUseResult.agentId
+            : extractAgentIdFromResultContent(part.content);
+          results.set(String(part.tool_use_id), {
+            isError: Boolean(part.is_error),
+            // 后台 Agent 的 tool_result 只是 async_launched 回执，不是完成信号。
+            isAsyncAck: toolUseResult?.isAsync === true || toolUseResult?.status === 'async_launched',
+            agentId,
+            timestamp: typeof entry.timestamp === 'string' ? entry.timestamp : null,
+            toolUseResult: entry.toolUseResult,
+          });
+        }
+      } else if (entry.type === 'attachment') {
+        const notification = parseAgentNotificationAttachment(entry);
+        if (notification) {
+          if (notification.toolUseId) {
+            notificationsByToolUseId.set(notification.toolUseId, notification);
+          }
+          if (notification.taskId) {
+            notificationsByTaskId.set(notification.taskId, notification);
+          }
+        }
+      }
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[ClaudeProvider] Failed to read agent calls for ${jsonlPath}:`, message);
+  }
+
+  // 3) Assemble: transcript calls in order, then orphan files by mtime
+  const summaries: SubagentSummary[] = [];
+  const consumed = new Set<string>();
+
+  for (const call of agentCalls) {
+    const result = results.get(call.toolUseId) ?? null;
+    const file = fileByToolUseId.get(call.toolUseId)
+      ?? (result?.agentId ? fileByTaskId.get(result.agentId) : undefined)
+      ?? null;
+    const meta = file ? metas.get(file.taskId) ?? null : null;
+    if (file) {
+      consumed.add(file.taskId);
+    }
+
+    const taskId = file?.taskId ?? result?.agentId ?? null;
+    const notification = notificationsByToolUseId.get(call.toolUseId)
+      ?? (taskId ? notificationsByTaskId.get(taskId) : undefined)
+      ?? null;
+    const completedResult = result && !result.isAsyncAck ? result : null;
+
+    let status: SubagentSummary['status'];
+    if (meta?.stoppedByUser === true) {
+      status = 'stopped';
+    } else if (mapNotificationStatus(notification?.status ?? null)) {
+      status = mapNotificationStatus(notification?.status ?? null) as SubagentSummary['status'];
+    } else if (completedResult) {
+      status = completedResult.isError ? 'failed' : 'completed';
+    } else {
+      status = 'running';
+    }
+
+    summaries.push({
+      taskId: taskId ?? call.toolUseId,
+      toolUseId: call.toolUseId || null,
+      agentType: (typeof meta?.agentType === 'string' && meta.agentType) || call.subagentType,
+      description: (typeof meta?.description === 'string' && meta.description) || call.description,
+      name: call.name,
+      prompt: call.prompt,
+      status,
+      isBackgrounded: call.runInBackground || meta?.requestShape === 'background',
+      spawnDepth: typeof meta?.spawnDepth === 'number' ? meta.spawnDepth : null,
+      startedAt: call.timestamp,
+      endedAt: notification?.timestamp ?? completedResult?.timestamp ?? null,
+      usage: notification?.usage ?? (completedResult ? readSubagentUsageFromToolResult(completedResult.toolUseResult) : null),
+      hasConversation: Boolean(file),
+    });
+  }
+
+  for (const file of files) {
+    if (consumed.has(file.taskId)) {
+      continue;
+    }
+    const meta = metas.get(file.taskId);
+    const notification = notificationsByTaskId.get(file.taskId) ?? null;
+    let startedAt: string | null = null;
+    try {
+      startedAt = fs.statSync(file.filePath).mtime.toISOString();
+    } catch {
+      startedAt = null;
+    }
+    summaries.push({
+      taskId: file.taskId,
+      toolUseId: typeof meta?.toolUseId === 'string' && meta.toolUseId ? meta.toolUseId : null,
+      agentType: typeof meta?.agentType === 'string' ? meta.agentType : null,
+      description: typeof meta?.description === 'string' ? meta.description : null,
+      name: null,
+      prompt: null,
+      status: meta?.stoppedByUser === true
+        ? 'stopped'
+        : (mapNotificationStatus(notification?.status ?? null) ?? 'running'),
+      isBackgrounded: meta?.requestShape === 'background',
+      spawnDepth: typeof meta?.spawnDepth === 'number' ? meta.spawnDepth : null,
+      startedAt,
+      endedAt: notification?.timestamp ?? null,
+      usage: notification?.usage ?? null,
+      hasConversation: true,
+    });
+  }
+
+  return summaries;
+}
+
+/** Loads one subagent's full conversation from its transcript file. */
+async function getSubagentConversationForSession(
+  sessionId: string,
+  taskId: string,
+  jsonlPath: string,
+  providerSessionId: string,
+): Promise<SubagentConversation | null> {
+  const projectDir = path.dirname(jsonlPath);
+  const filePath = resolveAgentTranscriptPath(projectDir, providerSessionId, taskId);
+  if (!fs.existsSync(filePath)) {
+    return null;
+  }
+
+  const { conversation } = await parseAgentFile(filePath);
+  const meta = readAgentMeta(filePath);
+  return {
+    taskId,
+    agentType: typeof meta?.agentType === 'string' ? meta.agentType : null,
+    description: typeof meta?.description === 'string' ? meta.description : null,
+    messages: conversation.map((message) => ({ ...message, sessionId })),
+  };
 }
 
 async function getSessionMessages(
@@ -213,8 +659,6 @@ async function getSessionMessages(
     }
 
     const projectDir = path.dirname(jsonLPath);
-    const files = await fsp.readdir(projectDir);
-    const agentFiles = files.filter((file) => file.endsWith('.jsonl') && file.startsWith('agent-'));
 
     const messages: AnyRecord[] = [];
     const agentToolsCache = new Map<string, AnyRecord[]>();
@@ -238,13 +682,13 @@ async function getSessionMessages(
     }
 
     for (const agentId of agentIds) {
-      const agentFileName = `agent-${agentId}.jsonl`;
-      if (!agentFiles.includes(agentFileName)) {
+      // 子代理转录在 CLI 新布局里位于 <会话id>/subagents/，旧布局在项目根目录
+      const agentFilePath = resolveAgentTranscriptPath(projectDir, providerSessionId, agentId);
+      if (!fs.existsSync(agentFilePath)) {
         continue;
       }
 
-      const agentFilePath = path.join(projectDir, agentFileName);
-      const tools = await parseAgentTools(agentFilePath);
+      const { tools } = await parseAgentFile(agentFilePath);
       agentToolsCache.set(agentId, tools);
     }
 
@@ -758,6 +1202,57 @@ export class ClaudeSessionsProvider implements IProviderSessions {
     }
 
     return messages;
+  }
+
+  /**
+   * Enumerates the session's subagents for the Agents panel. Always resolves —
+   * missing transcripts or parse failures yield an empty list.
+   */
+  async listSubagents(
+    sessionId: string,
+    options: FetchSubagentsOptions = {},
+  ): Promise<SubagentSummary[]> {
+    try {
+      const row = sessionsDb.getSessionById(sessionId);
+      const jsonlPath = row?.jsonl_path;
+      if (!jsonlPath) {
+        return [];
+      }
+      const providerSessionId = options.providerSessionId ?? row?.provider_session_id ?? sessionId;
+      return await listSubagentsForSession(jsonlPath, providerSessionId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`[ClaudeProvider] Failed to list subagents for ${sessionId}:`, message);
+      return [];
+    }
+  }
+
+  /**
+   * Loads one subagent's full conversation. Returns null when the transcript
+   * is missing or the id is malformed.
+   */
+  async fetchSubagentConversation(
+    sessionId: string,
+    taskId: string,
+    options: FetchSubagentsOptions = {},
+  ): Promise<SubagentConversation | null> {
+    try {
+      // 白名单：taskId 直接拼文件名，禁止路径字符
+      if (!/^[A-Za-z0-9_-]{4,64}$/.test(taskId)) {
+        return null;
+      }
+      const row = sessionsDb.getSessionById(sessionId);
+      const jsonlPath = row?.jsonl_path;
+      if (!jsonlPath) {
+        return null;
+      }
+      const providerSessionId = options.providerSessionId ?? row?.provider_session_id ?? sessionId;
+      return await getSubagentConversationForSession(sessionId, taskId, jsonlPath, providerSessionId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`[ClaudeProvider] Failed to load subagent conversation for ${sessionId}:`, message);
+      return null;
+    }
   }
 
   /**

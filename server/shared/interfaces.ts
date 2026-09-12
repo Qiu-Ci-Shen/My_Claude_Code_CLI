@@ -2,6 +2,7 @@ import type {
   AnyRecord,
   FetchHistoryOptions,
   FetchHistoryResult,
+  FetchSubagentsOptions,
   LLMProvider,
   McpScope,
   NormalizedMessage,
@@ -16,6 +17,8 @@ import type {
   ProviderRuntimeContext,
   ProviderRuntimePermissionGateway,
   ProviderRuntimeWriter,
+  SubagentConversation,
+  SubagentSummary,
   UpsertProviderMcpServerInput,
 } from '@/shared/types.js';
 
@@ -42,6 +45,12 @@ export interface IProviderRuntime {
    * transcript rewrite cannot race a CLI that is still appending.
    */
   hasActiveProcess?(sessionId: string): boolean;
+  /**
+   * Stops one running subagent task inside an active run (Agents panel stop
+   * button). Resolves with an error result instead of throwing when the
+   * session has no live run or the task cannot be reached.
+   */
+  stopSubagentTask?(sessionId: string, taskId: string): Promise<{ ok: boolean; error?: string }>;
   permissions?: ProviderRuntimePermissionGateway;
 }
 
@@ -161,6 +170,20 @@ export interface IProviderMcp {
 export interface IProviderSessions {
   normalizeMessage(raw: unknown, sessionId: string | null): NormalizedMessage[];
   fetchHistory(sessionId: string, options?: FetchHistoryOptions): Promise<FetchHistoryResult>;
+  /**
+   * Enumerates the session's subagents (Agents panel list view). Optional —
+   * providers without subagent transcripts simply omit it.
+   */
+  listSubagents?(sessionId: string, options?: FetchSubagentsOptions): Promise<SubagentSummary[]>;
+  /**
+   * Loads one subagent's full conversation (Agents panel detail view).
+   * Resolves to null when the transcript is missing.
+   */
+  fetchSubagentConversation?(
+    sessionId: string,
+    taskId: string,
+    options?: FetchSubagentsOptions,
+  ): Promise<SubagentConversation | null>;
 }
 
 // ---------------------------

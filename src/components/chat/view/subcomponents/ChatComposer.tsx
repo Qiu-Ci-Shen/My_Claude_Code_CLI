@@ -66,6 +66,8 @@ interface ChatComposerProps {
   isLoading: boolean;
   /** 当前会话标识：切换会话时未完成的录音/转写自动取消 */
   sessionId?: string | null;
+  /** 是否处于编辑重发模式：进入编辑时未完成的录音/转写自动取消 */
+  isEditingMessage?: boolean;
   onAbortSession: () => void;
   permissionMode: PermissionMode | string;
   availablePermissionModes: (PermissionMode | string)[];
@@ -129,6 +131,7 @@ export default function ChatComposer({
   activity,
   isLoading,
   sessionId,
+  isEditingMessage = false,
   onAbortSession,
   permissionMode,
   availablePermissionModes,
@@ -246,6 +249,16 @@ export default function ChatComposer({
     lastVoiceSessionRef.current = sessionId;
     voiceStop({ cancel: true });
   }, [sessionId, voiceStop]);
+
+  // 进入编辑重发模式时同理取消在途的录音/转写（2026-09-12 实测）：不取消的话
+  // 「识别中」会挂在整个编辑过程上，转写结果还会追加进被编辑的原文里。
+  // 编辑期间新起的话音不受影响——只在进入编辑的那一次转换上取消。
+  const lastVoiceEditRef = useRef(isEditingMessage);
+  useEffect(() => {
+    if (lastVoiceEditRef.current === isEditingMessage) return;
+    lastVoiceEditRef.current = isEditingMessage;
+    if (isEditingMessage) voiceStop({ cancel: true });
+  }, [isEditingMessage, voiceStop]);
 
   // ── 按住说话（push-to-talk，自插件内置）────────────────────────────
   const { config: voiceConfig } = useVoiceConfig();

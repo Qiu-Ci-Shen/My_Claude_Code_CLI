@@ -190,6 +190,9 @@ export function useVoiceInput(
     if (opts?.cancel) {
       abortedRef.current = true;
       abortRef.current?.abort();
+      // 取消立即生效：不等在途请求 settle。转写请求进入响应体阶段后挂住时，
+      // 只靠 abort 回调置 idle 会让界面一直停在「识别中」（2026-09-12）
+      setState('idle');
     }
   }, []);
 

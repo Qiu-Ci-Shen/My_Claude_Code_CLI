@@ -12,6 +12,10 @@ import { useChatRealtimeHandlers } from '../hooks/useChatRealtimeHandlers';
 import { isSessionAbortSuppressed } from '../hooks/abort-suppression';
 import { useChatComposerState } from '../hooks/useChatComposerState';
 import { useSessionStore } from '../../../stores/useSessionStore';
+import { useAgentsStore } from '../agents/useAgentsStore';
+import AgentsPanel from '../agents/AgentsPanel';
+import type { AgentRuntime } from '../agents/types';
+import { useDeviceSettings } from '../../../hooks/useDeviceSettings';
 import { rewindExecute, type EditMessageTarget } from '../../../lib/rewindRpc';
 
 import ChatMessagesPane from './subcomponents/ChatMessagesPane';
@@ -47,6 +51,8 @@ function ChatInterface({
   const { t } = useTranslation('chat');
 
   const sessionStore = useSessionStore();
+  const agentsStore = useAgentsStore();
+  const { isMobile } = useDeviceSettings({ trackPWA: false });
   const streamTimerRef = useRef<number | null>(null);
   const accumulatedStreamRef = useRef('');
   // When each session's `chat.subscribe` was last sent; idle acks older than
@@ -306,7 +312,16 @@ function ChatInterface({
     onWebSocketReconnect: handleWebSocketReconnect,
     requestLatestMessages,
     sessionStore,
+    agentsStore,
   });
+
+  // Agents 面板：切换会话时载入该会话的子代理历史（幂等；已载入则跳过）
+  const agentsSessionKey = currentSessionId || selectedSession?.id || null;
+  useEffect(() => {
+    if (agentsSessionKey) {
+      void agentsStore.loadSession(agentsSessionKey);
+    }
+  }, [agentsSessionKey, agentsStore]);
 
   useEffect(() => {
     if (!canAbortSession && !editTarget) {
@@ -433,6 +448,59 @@ function ChatInterface({
   // overlapping the last message.
   const hasActivityIndicator = Boolean(sessionActivity && pendingPermissionRequests.length === 0);
 
+  // ── Agents 面板：派生状态与动作 ─────────────────────────────────────
+  const agentsState = agentsStore.getSessionState(agentsSessionKey);
+  const agentsRunningCount = agentsState.order.reduce(
+    (count, taskId) => count + (agentsState.agents[taskId]?.status === 'running' ? 1 : 0),
+    0,
+  );
+  const showAgentsButton = provider === 'claude' && agentsState.order.length > 0 && !agentsState.panelOpen;
+  const showAgentsPanel = provider === 'claude' && agentsState.panelOpen;
+
+  const handleAgentsOpen = useCallback(() => {
+    if (agentsSessionKey) {
+      agentsStore.setPanelOpen(agentsSessionKey, true);
+    }
+  }, [agentsSessionKey, agentsStore]);
+
+  const handleAgentsClose = useCallback(() => {
+    if (agentsSessionKey) {
+      agentsStore.setPanelOpen(agentsSessionKey, false);
+    }
+  }, [agentsSessionKey, agentsStore]);
+
+  const handleAgentsSelect = useCallback((taskId: string | null) => {
+    if (agentsSessionKey) {
+      agentsStore.selectAgent(agentsSessionKey, taskId);
+    }
+  }, [agentsSessionKey, agentsStore]);
+
+  const handleAgentsRequestConversation = useCallback((taskId: string) => {
+    if (agentsSessionKey) {
+      void agentsStore.loadConversation(agentsSessionKey, taskId);
+    }
+  }, [agentsSessionKey, agentsStore]);
+
+  // 停止单个子代理：SDK stopTask 的 WS 命令；结果由 task_notification 回流
+  const handleStopAgent = useCallback((agent: AgentRuntime) => {
+    if (!agentsSessionKey) {
+      return;
+    }
+    sendMessage({ type: 'chat.stop-subagent', sessionId: agentsSessionKey, taskId: agent.taskId });
+  }, [agentsSessionKey, sendMessage]);
+
+  // 转达式消息：拼装指令填入主输入框（由 lead 用 SendMessage 转发）
+  const handleRelayAgent = useCallback((agent: AgentRuntime, text: string) => {
+    const target = agent.name
+      ? `teammate「${agent.name}」`
+      : `子代理「${agent.description || agent.taskId}」`;
+    setInput(`请把以下消息转达给 ${target}（SendMessage）并回报回应：\n\n${text}`);
+    textareaRef.current?.focus();
+    if (isMobile && agentsSessionKey) {
+      agentsStore.setPanelOpen(agentsSessionKey, false);
+    }
+  }, [agentsSessionKey, agentsStore, isMobile, setInput, textareaRef]);
+
   const selectedProviderLabel =
     provider === 'cursor'
       ? t('messageTypes.cursor')
@@ -459,8 +527,21 @@ function ChatInterface({
 
   return (
     <PermissionContext.Provider value={permissionContextValue}>
-      <div className="flex h-full min-h-0 flex-col">
-        <div className="relative flex min-h-0 flex-1 flex-col">
+      <div className="flex h-full min-h-0 min-w-0">
+        <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
+          <div className="relative flex min-h-0 flex-1 flex-col">
+          {showAgentsButton && (
+            <button
+              type="button"
+              onClick={handleAgentsOpen}
+              className="absolute right-3 top-2 z-20 flex items-center gap-1.5 rounded-full border border-purple-400/50 bg-background/95 px-2.5 py-1 text-[11.5px] text-purple-600 shadow-sm transition-colors hover:bg-purple-500/10 dark:border-purple-500/40 dark:text-purple-300"
+              title="打开 Agents 面板"
+            >
+              <span className={`h-1.5 w-1.5 rounded-full bg-purple-500 dark:bg-purple-400${agentsRunningCount > 0 ? ' animate-pulse' : ''}`} />
+              <span>Agents</span>
+              <span>{agentsRunningCount > 0 ? agentsRunningCount : agentsState.order.length}</span>
+            </button>
+          )}
           <ChatMessagesPane
           scrollContainerRef={scrollContainerRef}
           onWheel={handleScroll}
@@ -663,6 +744,7 @@ function ChatInterface({
           input={input}
           onVoiceTranscript={handleVoiceTranscript}
           sessionId={selectedSession?.id}
+          isEditingMessage={Boolean(editTarget)}
           onInputChange={handleInputChange}
           onTextareaClick={handleTextareaClick}
           onTextareaKeyDown={handleKeyDown}
@@ -686,6 +768,20 @@ function ChatInterface({
           ) : null}
         />
         </div>
+        </div>
+
+        {showAgentsPanel && (
+          <AgentsPanel
+            isMobile={isMobile}
+            state={agentsState}
+            sessionActive={isProcessing}
+            onClose={handleAgentsClose}
+            onSelect={handleAgentsSelect}
+            onStop={handleStopAgent}
+            onRelay={handleRelayAgent}
+            onRequestConversation={handleAgentsRequestConversation}
+          />
+        )}
       </div>
 
       <CommandResultModal

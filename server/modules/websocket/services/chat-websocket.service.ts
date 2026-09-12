@@ -73,6 +73,11 @@ type ProviderRuntimeGateway = {
     writer: ProviderRuntimeWriter,
   ): Promise<unknown>;
   abort(provider: LLMProvider, sessionId: string): Promise<boolean>;
+  stopSubagentTask(
+    provider: LLMProvider,
+    sessionId: string,
+    taskId: string,
+  ): Promise<{ ok: boolean; error?: string }>;
   resolveToolApproval(requestId: string, payload: ProviderPermissionDecision): void;
   getPendingApprovalsForSession(sessionId: string): unknown[];
 };
@@ -293,6 +298,43 @@ async function handleChatAbort(
 }
 
 /**
+ * Handles `chat.stop-subagent`: stops one running subagent task inside an
+ * active run (Agents panel stop button). Success needs no explicit reply —
+ * the CLI emits task_notification(status='stopped') which the run loop
+ * forwards as a subagent_event that lands the card on 已停止.
+ */
+async function handleStopSubagent(
+  ws: WebSocket,
+  data: AnyRecord,
+  dependencies: ChatWebSocketDependencies
+): Promise<void> {
+  const sessionId = readRequiredSessionId(data);
+  if (!sessionId) {
+    sendProtocolError(ws, 'SESSION_ID_REQUIRED', 'chat.stop-subagent requires a sessionId.');
+    return;
+  }
+
+  const taskId = typeof data.taskId === 'string' ? data.taskId.trim() : '';
+  // 路径/注入白名单：taskId 会用于日志与运行时查找，禁止任意字符
+  if (!/^[A-Za-z0-9_-]{4,64}$/.test(taskId)) {
+    sendProtocolError(ws, 'TASK_ID_INVALID', 'chat.stop-subagent requires a valid taskId.');
+    return;
+  }
+
+  const session = sessionsDb.getSessionById(sessionId);
+  const provider = session?.provider as LLMProvider | undefined;
+  if (!provider) {
+    sendProtocolError(ws, 'SESSION_NOT_FOUND', `Unknown session "${sessionId}".`);
+    return;
+  }
+
+  const result = await dependencies.runtime.stopSubagentTask(provider, sessionId, taskId);
+  if (!result.ok) {
+    sendProtocolError(ws, 'STOP_SUBAGENT_FAILED', result.error || 'Failed to stop the subagent.');
+  }
+}
+
+/**
  * Handles `chat.subscribe`: for each requested session, reports whether a run
  * is processing, re-attaches the live stream to this socket, replays missed
  * events (seq > lastSeq), and includes pending permission requests.
@@ -384,6 +426,7 @@ function handlePermissionResponse(data: AnyRecord, dependencies: ChatWebSocketDe
  * - `chat.abort`               { sessionId }
  * - `chat.subscribe`           { sessions: [{ sessionId, lastSeq? }] }
  * - `chat.permission-response` { requestId, allow, updatedInput?, message?, rememberEntry? }
+ * - `chat.stop-subagent`       { sessionId, taskId }
  *
  * Outbound protocol (server to client): every frame is `kind`-based — either
  * a provider `NormalizedMessage` (with `seq`) or a gateway event
@@ -422,6 +465,9 @@ export function handleChatConnection(
           return;
         case 'chat.permission-response':
           handlePermissionResponse(data, dependencies);
+          return;
+        case 'chat.stop-subagent':
+          await handleStopSubagent(ws, data, dependencies);
           return;
         case 'ping':
           // 应用层心跳：浏览器无法发协议级 ping，客户端以此检测半开连接

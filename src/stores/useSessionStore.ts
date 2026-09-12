@@ -40,7 +40,32 @@ export type MessageKind =
   | 'permission_cancelled'
   | 'session_created'
   | 'interactive_prompt'
-  | 'task_notification';
+  | 'task_notification'
+  | 'subagent_event';
+
+/**
+ * Subagent lifecycle payload carried by `subagent_event` frames (Agents panel).
+ * Mirrors the server's mapTaskEventToSubagentEvent output in
+ * claude-runtime.provider.js.
+ */
+export type SubagentEventPayload = {
+  event: 'started' | 'progress' | 'updated' | 'finished';
+  taskId: string | null;
+  toolUseId?: string | null;
+  description?: string | null;
+  subagentType?: string | null;
+  isBackgrounded?: boolean | null;
+  spawnDepth?: number | null;
+  taskType?: string | null;
+  prompt?: string | null;
+  status?: string | null;
+  usage?: { totalTokens: number; toolUses: number; durationMs: number } | null;
+  lastToolName?: string | null;
+  summary?: string | null;
+  endTime?: number | null;
+  ambient?: boolean;
+  skipTranscript?: boolean;
+};
 
 export interface NormalizedMessage {
   id: string;
@@ -93,6 +118,7 @@ export interface NormalizedMessage {
   actualSessionId?: string;
   parentToolUseId?: string;
   subagentTools?: unknown[];
+  subagentEvent?: SubagentEventPayload;
   isFinal?: boolean;
   // Cursor-specific ordering
   sequence?: number;

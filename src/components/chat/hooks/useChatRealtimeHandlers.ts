@@ -7,7 +7,8 @@ import { playChatCompletionSound, playNotificationSound } from '../../../utils/n
 import type { MarkSessionIdle, MarkSessionProcessing } from '../../../hooks/useSessionProtection';
 import type { PendingPermissionRequest } from '../types/types';
 import type { ProjectSession, LLMProvider } from '../../../types/app';
-import type { SessionStore, NormalizedMessage } from '../../../stores/useSessionStore';
+import type { SessionStore, NormalizedMessage, SubagentEventPayload } from '../../../stores/useSessionStore';
+import type { AgentsStoreApi } from '../agents/useAgentsStore';
 
 import { markSessionAborted } from './abort-suppression';
 
@@ -44,6 +45,8 @@ interface UseChatRealtimeHandlersArgs {
   onWebSocketReconnect?: () => void;
   requestLatestMessages: (sessionId: string, allowNetwork?: boolean) => Promise<void>;
   sessionStore: SessionStore;
+  /** Agents 面板状态仓库：子代理生命周期事件与内部消息的归属地 */
+  agentsStore: AgentsStoreApi;
 }
 
 /* ------------------------------------------------------------------ */
@@ -77,6 +80,7 @@ export function useChatRealtimeHandlers({
   onWebSocketReconnect,
   requestLatestMessages,
   sessionStore,
+  agentsStore,
 }: UseChatRealtimeHandlersArgs) {
   // Session switches can send `chat.subscribe` before this effect has a chance
   // to rebind the websocket listener. Read the visible session id from a ref
@@ -174,6 +178,26 @@ export function useChatRealtimeHandlers({
 
         default:
           break;
+      }
+
+      /* -------------------------------------------------------------- */
+      /*  Agents 面板：子代理事件与内部消息不走主聊天管线                 */
+      /* -------------------------------------------------------------- */
+
+      // 生命周期事件（task_started/progress/updated/notification）
+      if (sid && msg.kind === 'subagent_event') {
+        agentsStore.applySubagentEvent(sid, (msg as unknown as NormalizedMessage).subagentEvent as SubagentEventPayload | undefined);
+        return;
+      }
+
+      // 子代理内部消息（带 parent_tool_use_id）：提示词/文本/思考/工具/结果，
+      // 全部归入对应 agent 面板；主聊天不再渲染（顺修原先的散落泄漏）。
+      // 入面板前剥掉 parentToolUseId 标签——面板内部已按 agent 归组，标签只会
+      // 让「主聊天侧过滤」误伤面板自己的渲染。
+      if (sid && typeof msg.parentToolUseId === 'string' && msg.parentToolUseId) {
+        const agentMessage = { ...(msg as unknown as NormalizedMessage), parentToolUseId: undefined };
+        agentsStore.appendAgentMessage(sid, msg.parentToolUseId as string, agentMessage);
+        return;
       }
 
       /* -------------------------------------------------------------- */
@@ -364,5 +388,6 @@ export function useChatRealtimeHandlers({
     onWebSocketReconnect,
     requestLatestMessages,
     sessionStore,
+    agentsStore,
   ]);
 }

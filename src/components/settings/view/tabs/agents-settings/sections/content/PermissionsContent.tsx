@@ -15,6 +15,7 @@ const COMMON_CLAUDE_TOOLS = [
   'Grep',
   'MultiEdit',
   'Task',
+  'Agent',
   'TodoWrite',
   'TodoRead',
   'WebFetch',
