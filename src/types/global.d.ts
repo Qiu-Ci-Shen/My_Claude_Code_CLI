@@ -7,6 +7,10 @@ declare global {
     qiuDesktopFs?: {
       pickFolder?: () => Promise<string | null>;
       openFolder?: (dirPath: string) => Promise<string>;
+      /** 浏览器 File 对象 → 本机磁盘路径；无磁盘来源（如剪贴板）返回空串 */
+      getPathForFile?: (file: File) => string;
+      /** 用系统默认程序打开文件；成功返回空串，失败返回错误描述 */
+      openFile?: (filePath: string) => Promise<string>;
     };
   }
 

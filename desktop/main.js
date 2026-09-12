@@ -361,6 +361,14 @@ if (!gotLock) {
       return shell.openPath(dirPath);
     });
 
+    // 用系统默认程序打开文件（聊天附件：Word/PPT/PDF 等）；成功返回空串，失败返回错误描述
+    ipcMain.handle('qiu-desktop:open-file', async (_event, filePath) => {
+      if (typeof filePath !== 'string' || filePath.trim() === '') {
+        return '无效的文件路径';
+      }
+      return shell.openPath(filePath);
+    });
+
     createWindow();
 
     try {

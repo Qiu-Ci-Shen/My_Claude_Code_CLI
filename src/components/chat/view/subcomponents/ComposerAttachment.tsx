@@ -1,5 +1,16 @@
 import { useEffect, useState } from 'react';
-import { FileIcon, XIcon } from 'lucide-react';
+import {
+  FileArchiveIcon,
+  FileAudioIcon,
+  FileCodeIcon,
+  FileIcon,
+  FileImageIcon,
+  FileSpreadsheetIcon,
+  FileTextIcon,
+  FileVideoIcon,
+  PresentationIcon,
+  XIcon,
+} from 'lucide-react';
 
 import { ImageLightbox } from './ChatMessageImages';
 
@@ -16,10 +27,35 @@ const formatFileSize = (size: number) => {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 };
 
+/** 按类型挑图标与配色，让不同文件一眼可辨 */
+const getFileVisual = (file: File) => {
+  const name = file.name.toLowerCase();
+  const mimeType = file.type;
+  if (mimeType.startsWith('audio/')) return { Icon: FileAudioIcon, className: 'text-pink-500' };
+  if (mimeType.startsWith('video/')) return { Icon: FileVideoIcon, className: 'text-red-400' };
+  if (mimeType.startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp|svg|avif|ico)$/.test(name)) {
+    return { Icon: FileImageIcon, className: 'text-sky-500' };
+  }
+  if (/\.pdf$/.test(name)) return { Icon: FileTextIcon, className: 'text-red-500' };
+  if (/\.(docx?|rtf|odt|pages)$/.test(name)) return { Icon: FileTextIcon, className: 'text-blue-500' };
+  if (/\.(xlsx?|csv|ods|numbers)$/.test(name)) return { Icon: FileSpreadsheetIcon, className: 'text-green-600' };
+  if (/\.(pptx?|odp|key)$/.test(name)) return { Icon: PresentationIcon, className: 'text-orange-500' };
+  if (/\.(zip|rar|7z|tar|gz|bz2)$/.test(name)) return { Icon: FileArchiveIcon, className: 'text-amber-600' };
+  if (/\.(js|jsx|ts|tsx|py|rb|go|rs|java|c|cpp|h|css|html|json|ya?ml|sh|sql|xml|toml|ini)$/.test(name)) {
+    return { Icon: FileCodeIcon, className: 'text-violet-500' };
+  }
+  if (mimeType.startsWith('text/') || /\.(md|txt|log)$/.test(name)) {
+    return { Icon: FileTextIcon, className: 'text-muted-foreground' };
+  }
+  return { Icon: FileIcon, className: 'text-muted-foreground' };
+};
+
 const ComposerAttachment = ({ file, onRemove, uploadProgress, error }: ComposerAttachmentProps) => {
   const [preview, setPreview] = useState<string | undefined>(undefined);
   const [expanded, setExpanded] = useState(false);
   const isImage = file.type.startsWith('image/');
+  const isUploading = uploadProgress !== undefined && uploadProgress < 100;
+  const { Icon, className: iconClassName } = getFileVisual(file);
 
   useEffect(() => {
     if (!isImage) {
@@ -31,50 +67,62 @@ const ComposerAttachment = ({ file, onRemove, uploadProgress, error }: ComposerA
     return () => URL.revokeObjectURL(url);
   }, [file, isImage]);
 
+  // 图片走应用内大图；其余文件优先交给系统默认程序打开（桌面壳桥接），
+  // 浏览器里 PDF 新标签页预览、其他类型触发下载
+  const openFile = () => {
+    if (isImage) {
+      if (preview) setExpanded(true);
+      return;
+    }
+
+    const filePath = window.qiuDesktopFs?.getPathForFile?.(file);
+    if (filePath && window.qiuDesktopFs?.openFile) {
+      void window.qiuDesktopFs.openFile(filePath);
+      return;
+    }
+
+    const url = URL.createObjectURL(file);
+    if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)) {
+      window.open(url, '_blank', 'noopener');
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      return;
+    }
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = file.name;
+    anchor.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  };
+
   return (
-    <div className="group relative max-w-full">
-      {isImage ? (
-        <button
-          type="button"
-          onClick={() => preview && setExpanded(true)}
-          aria-label={`Expand ${file.name}`}
-          className="block overflow-hidden rounded-xl border border-border/50 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/60"
-        >
-          {preview
-            ? <img src={preview} alt={file.name} className="h-20 w-20 cursor-zoom-in object-cover" />
-            : <div className="h-20 w-20 animate-pulse bg-muted" />}
-        </button>
-      ) : (
-        <div className="flex h-20 w-56 max-w-full items-center gap-3 rounded-xl border border-border/50 bg-background/80 px-3 shadow-sm">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <FileIcon className="h-5 w-5" aria-hidden />
-          </div>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-foreground" title={file.name}>{file.name}</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
-          </div>
-        </div>
-      )}
-      {uploadProgress !== undefined && uploadProgress < 100 && (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl bg-black/50">
-          <div className="text-xs text-white">{uploadProgress}%</div>
-        </div>
-      )}
-      {error && (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl bg-red-500/50">
-          <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </div>
-      )}
+    <div className="group/pill relative">
+      <button
+        type="button"
+        onClick={openFile}
+        title={`${file.name} · ${formatFileSize(file.size)}${error ? ` · ${error}` : ''}`}
+        aria-label={`Open ${file.name}`}
+        className={`flex h-7 max-w-[220px] items-center gap-1.5 rounded-lg border py-1 pl-1.5 pr-5 text-xs text-foreground transition-colors ${
+          error
+            ? 'border-red-500/60 bg-red-500/10'
+            : 'border-border/50 bg-muted/60 hover:bg-muted'
+        }`}
+      >
+        <Icon className={`h-4 w-4 shrink-0 ${iconClassName}`} aria-hidden />
+        <span className="truncate">{file.name}</span>
+      </button>
       <button
         type="button"
         onClick={onRemove}
-        className="absolute -right-1.5 -top-1.5 rounded-full border border-border/40 bg-background/90 p-1 text-foreground shadow-sm backdrop-blur transition-opacity hover:bg-background focus:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
         aria-label={`Remove ${file.name}`}
+        className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-muted-foreground transition-opacity hover:bg-background hover:text-foreground focus-visible:opacity-100 sm:opacity-0 sm:group-hover/pill:opacity-100"
       >
         <XIcon className="h-3 w-3" aria-hidden />
       </button>
+      {isUploading && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg bg-background/70 text-[10px] font-medium text-foreground">
+          {uploadProgress}%
+        </div>
+      )}
       {expanded && preview && (
         <ImageLightbox src={preview} alt={file.name} onClose={() => setExpanded(false)} />
       )}

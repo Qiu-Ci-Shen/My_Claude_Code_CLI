@@ -406,19 +406,17 @@ export default function ChatComposer({
           )}
 
           {attachedFiles.length > 0 && (
-            <PromptInputHeader>
-              <div className="rounded-xl bg-muted/40 p-2">
-                <div className="flex flex-wrap gap-2">
-                  {attachedFiles.map((file, index) => (
-                    <ComposerAttachment
-                      key={`${file.name}-${file.lastModified}-${index}`}
-                      file={file}
-                      onRemove={() => onRemoveAttachment(index)}
-                      uploadProgress={uploadingFiles.get(file.name)}
-                      error={fileErrors.get(file.name)}
-                    />
-                  ))}
-                </div>
+            <PromptInputHeader className="px-2.5 pt-2">
+              <div className="flex flex-wrap gap-1.5">
+                {attachedFiles.map((file, index) => (
+                  <ComposerAttachment
+                    key={`${file.name}-${file.lastModified}-${index}`}
+                    file={file}
+                    onRemove={() => onRemoveAttachment(index)}
+                    uploadProgress={uploadingFiles.get(file.name)}
+                    error={fileErrors.get(file.name)}
+                  />
+                ))}
               </div>
             </PromptInputHeader>
           )}
