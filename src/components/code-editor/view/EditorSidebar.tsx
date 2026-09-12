@@ -8,13 +8,11 @@ type EditorSidebarProps = {
   isMobile: boolean;
   editorExpanded: boolean;
   editorWidth: number;
-  hasManualWidth: boolean;
   resizeHandleRef: MutableRefObject<HTMLDivElement | null>;
   onResizeStart: (event: MouseEvent<HTMLDivElement>) => void;
   onCloseEditor: () => void;
   onToggleEditorExpand: () => void;
   projectPath?: string;
-  fillSpace?: boolean;
 };
 
 // Minimum width for the left content (file tree, chat, etc.)
@@ -27,13 +25,11 @@ export default function EditorSidebar({
   isMobile,
   editorExpanded,
   editorWidth,
-  hasManualWidth,
   resizeHandleRef,
   onResizeStart,
   onCloseEditor,
   onToggleEditorExpand,
   projectPath,
-  fillSpace,
 }: EditorSidebarProps) {
   const [poppedOut, setPoppedOut] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -98,8 +94,7 @@ export default function EditorSidebar({
     );
   }
 
-  // In files tab, fill the remaining width unless user has dragged manually.
-  const useFlexLayout = editorExpanded || (fillSpace && !hasManualWidth);
+  const useFlexLayout = editorExpanded;
 
   return (
     <div ref={containerRef} className={`flex h-full min-w-0 ${editorExpanded ? 'flex-1' : ''}`}>

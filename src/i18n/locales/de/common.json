@@ -20,7 +20,6 @@
   "tabs": {
     "chat": "Chat",
     "shell": "Terminal",
-    "files": "Dateien",
     "git": "Quellcodeverwaltung",
     "tasks": "Aufgaben",
     "browser": "Browser",
@@ -77,14 +76,6 @@
     "daysAgo": "vor {{count}} Tagen",
     "yesterday": "Gestern"
   },
-  "fileOperations": {
-    "newFile": "Neue Datei",
-    "newFolder": "Neuer Ordner",
-    "rename": "Umbenennen",
-    "move": "Verschieben",
-    "copyPath": "Pfad kopieren",
-    "openInEditor": "Im Editor öffnen"
-  },
   "mainContent": {
     "loading": "Qiu_Ai_LZ wird geladen",
     "settingUpWorkspace": "Arbeitsbereich wird eingerichtet...",
@@ -93,46 +84,7 @@
     "tip": "Tipp",
     "createProjectMobile": "Tipp oben auf die Menüschaltfläche, um auf Projekte zuzugreifen",
     "createProjectDesktop": "Erstell ein neues Projekt, indem du auf das Ordnersymbol in der Seitenleiste klickst",
-    "newSession": "Neue Sitzung",
-    "untitledSession": "Unbenannte Sitzung",
-    "projectFiles": "Projektdateien"
-  },
-  "fileTree": {
-    "loading": "Dateien werden geladen...",
-    "files": "Dateien",
-    "simpleView": "Einfache Ansicht",
-    "compactView": "Kompakte Ansicht",
-    "detailedView": "Detailansicht",
-    "searchPlaceholder": "Dateien und Ordner durchsuchen...",
-    "clearSearch": "Suche leeren",
-    "name": "Name",
-    "size": "Größe",
-    "modified": "Geändert",
-    "permissions": "Berechtigungen",
-    "noFilesFound": "Keine Dateien gefunden",
-    "checkProjectPath": "Überprüf, ob der Projektpfad zugänglich ist",
-    "noMatchesFound": "Keine Treffer gefunden",
-    "tryDifferentSearch": "Versuch einen anderen Suchbegriff oder leere die Suche",
-    "justNow": "gerade eben",
-    "minAgo": "vor {{count}} Min.",
-    "hoursAgo": "vor {{count}} Std.",
-    "daysAgo": "vor {{count}} Tagen",
-    "newFile": "Neue Datei (Cmd+N)",
-    "newFolder": "Neuer Ordner (Cmd+Shift+N)",
-    "refresh": "Aktualisieren",
-    "collapseAll": "Alle einklappen",
-    "context": {
-      "rename": "Umbenennen",
-      "delete": "Löschen",
-      "copyPath": "Pfad kopieren",
-      "download": "Herunterladen",
-      "newFile": "Neue Datei",
-      "newFolder": "Neuer Ordner",
-      "upload": "Dateien hochladen",
-      "refresh": "Aktualisieren",
-      "menuLabel": "Datei-Kontextmenü",
-      "loading": "Lädt..."
-    }
+    "untitledSession": "Unbenannte Sitzung"
   },
   "projectWizard": {
     "title": "Neues Projekt erstellen",

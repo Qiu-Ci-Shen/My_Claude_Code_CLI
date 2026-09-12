@@ -41,16 +41,6 @@
     "pattern": "パターン:",
     "in": "場所:"
   },
-  "fileOperations": {
-    "updated": "ファイルを更新しました",
-    "created": "ファイルを作成しました",
-    "written": "ファイルを書き込みました",
-    "diff": "差分",
-    "newFile": "新規ファイル",
-    "viewContent": "ファイルの内容を表示",
-    "viewFullOutput": "全出力を表示（{{count}}文字）",
-    "contentDisplayed": "ファイルの内容は上の差分ビューに表示されています"
-  },
   "interactive": {
     "title": "インタラクティブプロンプト",
     "waiting": "CLIでの応答を待っています",

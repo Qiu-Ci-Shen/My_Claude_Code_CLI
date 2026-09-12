@@ -20,7 +20,6 @@
   "tabs": {
     "chat": "聊天",
     "shell": "終端機",
-    "files": "檔案",
     "git": "版本控制",
     "tasks": "任務",
     "browser": "瀏覽器",
@@ -77,14 +76,6 @@
     "daysAgo": "{{count}} 天前",
     "yesterday": "昨天"
   },
-  "fileOperations": {
-    "newFile": "新增檔案",
-    "newFolder": "新增資料夾",
-    "rename": "重新命名",
-    "move": "移動",
-    "copyPath": "複製路徑",
-    "openInEditor": "在編輯器中開啟"
-  },
   "mainContent": {
     "loading": "正在載入 Qiu_Ai_LZ",
     "settingUpWorkspace": "正在設定您的工作區...",
@@ -93,46 +84,7 @@
     "tip": "提示",
     "createProjectMobile": "點擊上方的選單按鈕以存取專案",
     "createProjectDesktop": "點擊側邊欄中的資料夾圖示以建立新專案",
-    "newSession": "新工作階段",
-    "untitledSession": "未命名工作階段",
-    "projectFiles": "專案檔案"
-  },
-  "fileTree": {
-    "loading": "正在載入檔案...",
-    "files": "檔案",
-    "simpleView": "簡易檢視",
-    "compactView": "精簡檢視",
-    "detailedView": "詳細檢視",
-    "searchPlaceholder": "搜尋檔案和資料夾...",
-    "clearSearch": "清除搜尋",
-    "name": "名稱",
-    "size": "大小",
-    "modified": "修改時間",
-    "permissions": "權限",
-    "noFilesFound": "找不到檔案",
-    "checkProjectPath": "請檢查專案路徑是否可存取",
-    "noMatchesFound": "找不到符合項目",
-    "tryDifferentSearch": "嘗試不同的搜尋詞或清除搜尋",
-    "justNow": "剛剛",
-    "minAgo": "{{count}} 分鐘前",
-    "hoursAgo": "{{count}} 小時前",
-    "daysAgo": "{{count}} 天前",
-    "newFile": "新增檔案 (Cmd+N)",
-    "newFolder": "新增資料夾 (Cmd+Shift+N)",
-    "refresh": "重新整理",
-    "collapseAll": "全部收合",
-    "context": {
-      "rename": "重新命名",
-      "delete": "刪除",
-      "copyPath": "複製路徑",
-      "download": "下載",
-      "newFile": "新增檔案",
-      "newFolder": "新增資料夾",
-      "upload": "上傳檔案",
-      "refresh": "重新整理",
-      "menuLabel": "檔案右鍵選單",
-      "loading": "載入中..."
-    }
+    "untitledSession": "未命名工作階段"
   },
   "projectWizard": {
     "title": "建立新專案",

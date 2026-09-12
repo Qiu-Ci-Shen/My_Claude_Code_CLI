@@ -41,16 +41,6 @@
     "pattern": "pattern:",
     "in": "in:"
   },
-  "fileOperations": {
-    "updated": "File aggiornato con successo",
-    "created": "File creato con successo",
-    "written": "File scritto con successo",
-    "diff": "Differenze",
-    "newFile": "Nuovo file",
-    "viewContent": "Vedi contenuto file",
-    "viewFullOutput": "Vedi output completo ({{count}} caratteri)",
-    "contentDisplayed": "Il contenuto del file è visualizzato nella vista differenze sopra"
-  },
   "interactive": {
     "title": "Prompt interattivo",
     "waiting": "In attesa della tua risposta nella CLI",

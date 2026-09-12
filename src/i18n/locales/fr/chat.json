@@ -42,16 +42,6 @@
     "pattern": "motif :",
     "in": "dans :"
   },
-  "fileOperations": {
-    "updated": "Fichier mis à jour avec succès",
-    "created": "Fichier créé avec succès",
-    "written": "Fichier écrit avec succès",
-    "diff": "Diff",
-    "newFile": "Nouveau fichier",
-    "viewContent": "Voir le contenu du fichier",
-    "viewFullOutput": "Voir la sortie complète ({{count}} caractères)",
-    "contentDisplayed": "Le contenu du fichier est affiché dans la vue diff ci-dessus"
-  },
   "interactive": {
     "title": "Invite interactive",
     "waiting": "En attente de votre réponse dans le CLI",

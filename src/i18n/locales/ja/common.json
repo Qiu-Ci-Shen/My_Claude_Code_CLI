@@ -20,7 +20,6 @@
   "tabs": {
     "chat": "チャット",
     "shell": "シェル",
-    "files": "ファイル",
     "git": "ソース管理",
     "tasks": "タスク",
     "browser": "Browser",
@@ -77,14 +76,6 @@
     "daysAgo": "{{count}}日前",
     "yesterday": "昨日"
   },
-  "fileOperations": {
-    "newFile": "新規ファイル",
-    "newFolder": "新規フォルダ",
-    "rename": "名前の変更",
-    "move": "移動",
-    "copyPath": "パスをコピー",
-    "openInEditor": "エディタで開く"
-  },
   "mainContent": {
     "loading": "Qiu_Ai_LZ を読み込んでいます",
     "settingUpWorkspace": "ワークスペースを準備しています...",
@@ -93,46 +84,7 @@
     "tip": "ヒント",
     "createProjectMobile": "上部のメニューボタンからプロジェクトにアクセスできます",
     "createProjectDesktop": "サイドバーのフォルダアイコンをクリックして新しいプロジェクトを作成できます",
-    "newSession": "新しいセッション",
-    "untitledSession": "無題のセッション",
-    "projectFiles": "プロジェクトファイル"
-  },
-  "fileTree": {
-    "loading": "ファイルを読み込んでいます...",
-    "files": "ファイル",
-    "simpleView": "シンプル表示",
-    "compactView": "コンパクト表示",
-    "detailedView": "詳細表示",
-    "searchPlaceholder": "ファイルやフォルダを検索...",
-    "clearSearch": "検索をクリア",
-    "name": "名前",
-    "size": "サイズ",
-    "modified": "更新日時",
-    "permissions": "権限",
-    "noFilesFound": "ファイルが見つかりません",
-    "checkProjectPath": "プロジェクトのパスがアクセス可能か確認してください",
-    "noMatchesFound": "一致するものが見つかりません",
-    "tryDifferentSearch": "別の検索語を試すか、検索をクリアしてください",
-    "justNow": "たった今",
-    "minAgo": "{{count}}分前",
-    "hoursAgo": "{{count}}時間前",
-    "daysAgo": "{{count}}日前",
-    "newFile": "新規ファイル (Cmd+N)",
-    "newFolder": "新規フォルダ (Cmd+Shift+N)",
-    "refresh": "更新",
-    "collapseAll": "すべて折りたたむ",
-    "context": {
-      "rename": "名前を変更",
-      "delete": "削除",
-      "copyPath": "パスをコピー",
-      "download": "ダウンロード",
-      "newFile": "新しいファイル",
-      "newFolder": "新しいフォルダ",
-      "upload": "ファイルをアップロード",
-      "refresh": "更新",
-      "menuLabel": "ファイルのコンテキストメニュー",
-      "loading": "読み込み中..."
-    }
+    "untitledSession": "無題のセッション"
   },
   "projectWizard": {
     "title": "新規プロジェクトを作成",

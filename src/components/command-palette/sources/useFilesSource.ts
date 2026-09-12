@@ -14,7 +14,11 @@ interface FileNode {
   children?: FileNode[];
 }
 
-const MAX_FILES = 500;
+// 面板「Browse all files」渲染上限。500 会按 DFS 序截断（构建产物目录排在
+// 源码前面时把源码挤出列表，实测 D:\Claude_Tools 工作区 1438 个文件里
+// package.json 排在第 1422 位），提高上限让全量进入；仍设上限防止超大
+// 工作区（万级文件）把面板渲染拖垮。
+const MAX_FILES = 1500;
 
 function flatten(nodes: FileNode[], out: FileResult[]): void {
   for (const node of nodes) {

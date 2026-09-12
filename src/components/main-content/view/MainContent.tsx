@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 
 import ChatInterface from '../../chat/view/ChatInterface';
-import FileTree from '../../file-tree/view/FileTree';
 import StandaloneShell from '../../standalone-shell/view/StandaloneShell';
 import GitPanel from '../../git-panel/view/GitPanel';
 import PluginTabContent from '../../plugins/view/PluginTabContent';
@@ -69,7 +68,6 @@ function MainContent({
     editingFile,
     editorWidth,
     editorExpanded,
-    hasManualWidth,
     resizeHandleRef,
     handleFileOpen,
     handleCloseEditor,
@@ -124,9 +122,9 @@ function MainContent({
   }, [shouldShowBrowserTab, activeTab, setActiveTab]);
 
   usePaletteOpsRegister({
+    // 命令面板选文件 = 就地打开编辑器侧栏（原实现会先切到「文件」tab）
     openFile: (filePath: string) => {
-      setActiveTab('files');
-      handleFileOpen(filePath);
+      resolvedFileOpen(filePath);
     },
     // Opens the editor side panel in place, keeping the current tab (e.g. chat).
     openFileInEditor: (filePath: string) => {
@@ -147,8 +145,6 @@ function MainContent({
       <MainContentHeader
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        selectedProject={selectedProject}
-        selectedSession={selectedSession}
         shouldShowTasksTab={shouldShowTasksTab}
         shouldShowBrowserTab={shouldShowBrowserTab}
         isMobile={isMobile}
@@ -182,12 +178,6 @@ function MainContent({
               />
             </ErrorBoundary>
           </div>
-
-          {activeTab === 'files' && (
-            <div className="h-full overflow-hidden">
-              <FileTree selectedProject={selectedProject} onFileOpen={handleFileOpen} />
-            </div>
-          )}
 
           {activeTab === 'shell' && (
             <div className="h-full w-full overflow-hidden">
@@ -236,13 +226,11 @@ function MainContent({
           isMobile={isMobile}
           editorExpanded={editorExpanded}
           editorWidth={editorWidth}
-          hasManualWidth={hasManualWidth}
           resizeHandleRef={resizeHandleRef}
           onResizeStart={handleResizeStart}
           onCloseEditor={handleCloseEditor}
           onToggleEditorExpand={handleToggleEditorExpand}
           projectPath={selectedProject.path}
-          fillSpace={activeTab === 'files'}
         />
       </div>
     </div>

@@ -41,16 +41,6 @@
     "pattern": "Muster:",
     "in": "in:"
   },
-  "fileOperations": {
-    "updated": "Datei erfolgreich aktualisiert",
-    "created": "Datei erfolgreich erstellt",
-    "written": "Datei erfolgreich geschrieben",
-    "diff": "Diff",
-    "newFile": "Neue Datei",
-    "viewContent": "Dateiinhalt anzeigen",
-    "viewFullOutput": "Vollständige Ausgabe anzeigen ({{count}} Zeichen)",
-    "contentDisplayed": "Der Dateiinhalt wird in der Diff-Ansicht oben angezeigt"
-  },
   "interactive": {
     "title": "Interaktive Eingabeaufforderung",
     "waiting": "Warte auf deine Antwort in der CLI",

@@ -20,7 +20,6 @@
   "tabs": {
     "chat": "Chat",
     "shell": "Terminale",
-    "files": "File",
     "git": "Controllo Versione",
     "tasks": "Attività",
     "browser": "Browser",
@@ -77,14 +76,6 @@
     "daysAgo": "{{count}} giorni fa",
     "yesterday": "Ieri"
   },
-  "fileOperations": {
-    "newFile": "Nuovo file",
-    "newFolder": "Nuova cartella",
-    "rename": "Rinomina",
-    "move": "Sposta",
-    "copyPath": "Copia percorso",
-    "openInEditor": "Apri nell'editor"
-  },
   "mainContent": {
     "loading": "Caricamento Qiu_Ai_LZ",
     "settingUpWorkspace": "Preparazione dell'area di lavoro...",
@@ -93,46 +84,7 @@
     "tip": "Suggerimento",
     "createProjectMobile": "Tocca il pulsante menu in alto per accedere ai progetti",
     "createProjectDesktop": "Crea un nuovo progetto cliccando l'icona cartella nella barra laterale",
-    "newSession": "Nuova sessione",
-    "untitledSession": "Sessione senza titolo",
-    "projectFiles": "File del progetto"
-  },
-  "fileTree": {
-    "loading": "Caricamento file...",
-    "files": "File",
-    "simpleView": "Vista semplice",
-    "compactView": "Vista compatta",
-    "detailedView": "Vista dettagliata",
-    "searchPlaceholder": "Cerca file e cartelle...",
-    "clearSearch": "Cancella ricerca",
-    "name": "Nome",
-    "size": "Dimensione",
-    "modified": "Modificato",
-    "permissions": "Permessi",
-    "noFilesFound": "Nessun file trovato",
-    "checkProjectPath": "Verifica che il percorso del progetto sia accessibile",
-    "noMatchesFound": "Nessuna corrispondenza trovata",
-    "tryDifferentSearch": "Prova con un termine di ricerca diverso o cancella la ricerca",
-    "justNow": "adesso",
-    "minAgo": "{{count}} min fa",
-    "hoursAgo": "{{count}} ore fa",
-    "daysAgo": "{{count}} giorni fa",
-    "newFile": "Nuovo file (Cmd+N)",
-    "newFolder": "Nuova cartella (Cmd+Shift+N)",
-    "refresh": "Aggiorna",
-    "collapseAll": "Comprimi tutto",
-    "context": {
-      "rename": "Rinomina",
-      "delete": "Elimina",
-      "copyPath": "Copia percorso",
-      "download": "Scarica",
-      "newFile": "Nuovo file",
-      "newFolder": "Nuova cartella",
-      "upload": "Carica file",
-      "refresh": "Aggiorna",
-      "menuLabel": "Menu contestuale file",
-      "loading": "Caricamento..."
-    }
+    "untitledSession": "Sessione senza titolo"
   },
   "projectWizard": {
     "title": "Crea nuovo progetto",

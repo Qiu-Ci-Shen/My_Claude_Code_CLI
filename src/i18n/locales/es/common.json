@@ -20,7 +20,6 @@
   "tabs": {
     "chat": "Chat",
     "shell": "Shell",
-    "files": "Archivos",
     "git": "Control de versiones",
     "tasks": "Tareas",
     "browser": "Navegador",
@@ -77,14 +76,6 @@
     "daysAgo": "hace {{count}} días",
     "yesterday": "Ayer"
   },
-  "fileOperations": {
-    "newFile": "Archivo nuevo",
-    "newFolder": "Carpeta nueva",
-    "rename": "Renombrar",
-    "move": "Mover",
-    "copyPath": "Copiar ruta",
-    "openInEditor": "Abrir en el editor"
-  },
   "mainContent": {
     "loading": "Cargando Qiu_Ai_LZ",
     "settingUpWorkspace": "Preparando tu espacio de trabajo...",
@@ -93,46 +84,7 @@
     "tip": "Consejo",
     "createProjectMobile": "Toca el botón de menú de arriba para acceder a los proyectos",
     "createProjectDesktop": "Crea un proyecto nuevo haciendo clic en el icono de carpeta de la barra lateral",
-    "newSession": "Nueva sesión",
-    "untitledSession": "Sesión sin título",
-    "projectFiles": "Archivos del proyecto"
-  },
-  "fileTree": {
-    "loading": "Cargando archivos...",
-    "files": "Archivos",
-    "simpleView": "Vista simple",
-    "compactView": "Vista compacta",
-    "detailedView": "Vista detallada",
-    "searchPlaceholder": "Buscar archivos y carpetas...",
-    "clearSearch": "Limpiar búsqueda",
-    "name": "Nombre",
-    "size": "Tamaño",
-    "modified": "Modificado",
-    "permissions": "Permisos",
-    "noFilesFound": "No se encontraron archivos",
-    "checkProjectPath": "Comprueba si la ruta del proyecto es accesible",
-    "noMatchesFound": "No se encontraron coincidencias",
-    "tryDifferentSearch": "Prueba con otro término o limpia la búsqueda",
-    "justNow": "justo ahora",
-    "minAgo": "hace {{count}} min",
-    "hoursAgo": "hace {{count}} horas",
-    "daysAgo": "hace {{count}} días",
-    "newFile": "Archivo nuevo (Cmd+N)",
-    "newFolder": "Carpeta nueva (Cmd+Shift+N)",
-    "refresh": "Actualizar",
-    "collapseAll": "Contraer todo",
-    "context": {
-      "rename": "Renombrar",
-      "delete": "Eliminar",
-      "copyPath": "Copiar ruta",
-      "download": "Descargar",
-      "newFile": "Archivo nuevo",
-      "newFolder": "Carpeta nueva",
-      "upload": "Subir archivos",
-      "refresh": "Actualizar",
-      "menuLabel": "Menú contextual de archivo",
-      "loading": "Cargando..."
-    }
+    "untitledSession": "Sesión sin título"
   },
   "projectWizard": {
     "title": "Crear proyecto nuevo",

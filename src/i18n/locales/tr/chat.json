@@ -41,16 +41,6 @@
     "pattern": "desen:",
     "in": "şurada:"
   },
-  "fileOperations": {
-    "updated": "Dosya başarıyla güncellendi",
-    "created": "Dosya başarıyla oluşturuldu",
-    "written": "Dosya başarıyla yazıldı",
-    "diff": "Diff",
-    "newFile": "Yeni Dosya",
-    "viewContent": "Dosya içeriğini göster",
-    "viewFullOutput": "Tam çıktıyı göster ({{count}} karakter)",
-    "contentDisplayed": "Dosya içeriği yukarıdaki diff görünümünde gösteriliyor"
-  },
   "interactive": {
     "title": "Etkileşimli Prompt",
     "waiting": "CLI'da yanıtın bekleniyor",

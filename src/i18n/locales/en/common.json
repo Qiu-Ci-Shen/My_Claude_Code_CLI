@@ -20,7 +20,6 @@
   "tabs": {
     "chat": "Chat",
     "shell": "Shell",
-    "files": "Files",
     "git": "Source Control",
     "tasks": "Tasks",
     "browser": "Browser",
@@ -83,14 +82,6 @@
     "daysAgo": "{{count}} days ago",
     "yesterday": "Yesterday"
   },
-  "fileOperations": {
-    "newFile": "New File",
-    "newFolder": "New Folder",
-    "rename": "Rename",
-    "move": "Move",
-    "copyPath": "Copy Path",
-    "openInEditor": "Open in Editor"
-  },
   "mainContent": {
     "loading": "Loading Qiu_Ai_LZ",
     "settingUpWorkspace": "Setting up your workspace...",
@@ -99,77 +90,7 @@
     "tip": "Tip",
     "createProjectMobile": "Tap the menu button above to access projects",
     "createProjectDesktop": "Create a new project by clicking the folder icon in the sidebar",
-    "newSession": "New Session",
-    "untitledSession": "Untitled Session",
-    "projectFiles": "Project Files"
-  },
-  "fileTree": {
-    "loading": "Loading files...",
-    "files": "Files",
-    "simpleView": "Simple view",
-    "compactView": "Compact view",
-    "detailedView": "Detailed view",
-    "searchPlaceholder": "Search files and folders...",
-    "clearSearch": "Clear search",
-    "name": "Name",
-    "size": "Size",
-    "modified": "Modified",
-    "permissions": "Permissions",
-    "noFilesFound": "No files found",
-    "checkProjectPath": "Check if the project path is accessible",
-    "loadFailed": "Unable to load files",
-    "noMatchesFound": "No matches found",
-    "tryDifferentSearch": "Try a different search term or clear the search",
-    "justNow": "just now",
-    "minAgo": "{{count}} min ago",
-    "hoursAgo": "{{count}} hours ago",
-    "daysAgo": "{{count}} days ago",
-    "newFile": "New File (Cmd+N)",
-    "newFolder": "New Folder (Cmd+Shift+N)",
-    "refresh": "Refresh",
-    "collapseAll": "Collapse All",
-    "context": {
-      "rename": "Rename",
-      "delete": "Delete",
-      "copyPath": "Copy Path",
-      "download": "Download",
-      "newFile": "New File",
-      "newFolder": "New Folder",
-      "upload": "Upload Files",
-      "refresh": "Refresh",
-      "menuLabel": "File context menu",
-      "loading": "Loading..."
-    },
-    "delete": {
-      "title": "Delete {{type}}",
-      "fileWarning": "This file will be permanently deleted.",
-      "folderWarning": "This folder and all its contents will be permanently deleted.",
-      "confirm": "Delete"
-    },
-    "dropToUpload": "Drop files to upload",
-    "dropToUploadTo": "Drop files to upload to \"{{folder}}\"",
-    "uploadComplete": "Upload complete",
-    "uploadFailed": "Upload failed",
-    "uploadFiles": "Upload files (max {{size}} each)",
-    "uploadToFolder": "Upload files to \"{{folder}}\"",
-    "uploadedCount": "Uploaded {{uploaded}} of {{total}} {{label}}",
-    "uploadingFiles": "Uploading files",
-    "toast": {
-      "copyFailed": "Failed to copy path",
-      "fileCreated": "File created successfully",
-      "fileDeleted": "File deleted",
-      "folderCreated": "Folder created successfully",
-      "folderDeleted": "Folder deleted",
-      "folderDownloaded": "Folder downloaded as ZIP",
-      "pathCopied": "Path copied to clipboard",
-      "renamed": "Renamed successfully"
-    },
-    "validation": {
-      "dotsOnly": "Filename cannot be only dots",
-      "emptyName": "Filename cannot be empty",
-      "invalidChars": "Filename contains invalid characters",
-      "reserved": "Filename is a reserved name"
-    }
+    "untitledSession": "Untitled Session"
   },
   "projectWizard": {
     "title": "Create New Project",

@@ -20,7 +20,6 @@
   "tabs": {
     "chat": "채팅",
     "shell": "Shell",
-    "files": "파일",
     "git": "소스 관리",
     "tasks": "작업",
     "browser": "Browser",
@@ -77,14 +76,6 @@
     "daysAgo": "{{count}}일 전",
     "yesterday": "어제"
   },
-  "fileOperations": {
-    "newFile": "새 파일",
-    "newFolder": "새 폴더",
-    "rename": "이름 변경",
-    "move": "이동",
-    "copyPath": "경로 복사",
-    "openInEditor": "에디터에서 열기"
-  },
   "mainContent": {
     "loading": "Qiu_Ai_LZ 로딩 중",
     "settingUpWorkspace": "워크스페이스 설정 중...",
@@ -93,46 +84,7 @@
     "tip": "팁",
     "createProjectMobile": "위의 메뉴 버튼을 눌러 프로젝트에 접근하세요",
     "createProjectDesktop": "사이드바의 폴더 아이콘을 클릭하여 새 프로젝트를 생성하세요",
-    "newSession": "새 세션",
-    "untitledSession": "제목 없는 세션",
-    "projectFiles": "프로젝트 파일"
-  },
-  "fileTree": {
-    "loading": "파일 로딩 중...",
-    "files": "파일",
-    "simpleView": "간단히 보기",
-    "compactView": "컴팩트 보기",
-    "detailedView": "상세히 보기",
-    "searchPlaceholder": "파일 및 폴더 검색...",
-    "clearSearch": "검색 지우기",
-    "name": "이름",
-    "size": "크기",
-    "modified": "수정일",
-    "permissions": "권한",
-    "noFilesFound": "파일을 찾을 수 없음",
-    "checkProjectPath": "프로젝트 경로가 접근 가능한지 확인하세요",
-    "noMatchesFound": "일치하는 항목 없음",
-    "tryDifferentSearch": "다른 검색어를 시도하거나 검색을 지우세요",
-    "justNow": "방금 전",
-    "minAgo": "{{count}}분 전",
-    "hoursAgo": "{{count}}시간 전",
-    "daysAgo": "{{count}}일 전",
-    "newFile": "새 파일 (Cmd+N)",
-    "newFolder": "새 폴더 (Cmd+Shift+N)",
-    "refresh": "새로고침",
-    "collapseAll": "모두 접기",
-    "context": {
-      "rename": "이름 변경",
-      "delete": "삭제",
-      "copyPath": "경로 복사",
-      "download": "다운로드",
-      "newFile": "새 파일",
-      "newFolder": "새 폴더",
-      "upload": "파일 업로드",
-      "refresh": "새로 고침",
-      "menuLabel": "파일 컨텍스트 메뉴",
-      "loading": "로딩 중..."
-    }
+    "untitledSession": "제목 없는 세션"
   },
   "projectWizard": {
     "title": "새 프로젝트 생성",

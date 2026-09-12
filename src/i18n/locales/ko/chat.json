@@ -42,16 +42,6 @@
     "pattern": "패턴:",
     "in": "위치:"
   },
-  "fileOperations": {
-    "updated": "파일이 업데이트되었습니다",
-    "created": "파일이 생성되었습니다",
-    "written": "파일이 작성되었습니다",
-    "diff": "Diff",
-    "newFile": "새 파일",
-    "viewContent": "파일 내용 보기",
-    "viewFullOutput": "전체 출력 보기 ({{count}}자)",
-    "contentDisplayed": "파일 내용이 위의 Diff 보기에 표시됩니다"
-  },
   "interactive": {
     "title": "대화형 프롬프트",
     "waiting": "CLI에서 응답을 기다리는 중",

@@ -18,7 +18,6 @@ export const useEditorSidebar = ({
   const [editorWidth, setEditorWidth] = useState(initialWidth);
   const [editorExpanded, setEditorExpanded] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
-  const [hasManualWidth, setHasManualWidth] = useState(false);
   const resizeHandleRef = useRef<HTMLDivElement | null>(null);
 
   const handleFileOpen = useCallback(
@@ -54,7 +53,6 @@ export const useEditorSidebar = ({
       }
 
       // After first drag interaction, the editor width is user-controlled.
-      setHasManualWidth(true);
       setIsResizing(true);
       event.preventDefault();
     },
@@ -109,7 +107,6 @@ export const useEditorSidebar = ({
     editingFile,
     editorWidth,
     editorExpanded,
-    hasManualWidth,
     resizeHandleRef,
     handleFileOpen,
     handleCloseEditor,

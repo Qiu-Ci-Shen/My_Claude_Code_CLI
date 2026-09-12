@@ -20,7 +20,6 @@
   "tabs": {
     "chat": "Чат",
     "shell": "Терминал",
-    "files": "Файлы",
     "git": "Система контроля версий",
     "tasks": "Задачи",
     "browser": "Browser",
@@ -77,14 +76,6 @@
     "daysAgo": "{{count}} дн. назад",
     "yesterday": "Вчера"
   },
-  "fileOperations": {
-    "newFile": "Новый файл",
-    "newFolder": "Новая папка",
-    "rename": "Переименовать",
-    "move": "Переместить",
-    "copyPath": "Копировать путь",
-    "openInEditor": "Открыть в редакторе"
-  },
   "mainContent": {
     "loading": "Загрузка Qiu_Ai_LZ",
     "settingUpWorkspace": "Настройка рабочего пространства...",
@@ -93,46 +84,7 @@
     "tip": "Совет",
     "createProjectMobile": "Нажмите кнопку меню выше для доступа к проектам",
     "createProjectDesktop": "Создайте новый проект, нажав на значок папки на боковой панели",
-    "newSession": "Новый сеанс",
-    "untitledSession": "Безымянный сеанс",
-    "projectFiles": "Файлы проекта"
-  },
-  "fileTree": {
-    "loading": "Загрузка файлов...",
-    "files": "Файлы",
-    "simpleView": "Простой вид",
-    "compactView": "Компактный вид",
-    "detailedView": "Подробный вид",
-    "searchPlaceholder": "Поиск файлов и папок...",
-    "clearSearch": "Очистить поиск",
-    "name": "Имя",
-    "size": "Размер",
-    "modified": "Изменено",
-    "permissions": "Права доступа",
-    "noFilesFound": "Файлы не найдены",
-    "checkProjectPath": "Проверьте доступность пути к проекту",
-    "noMatchesFound": "Совпадений не найдено",
-    "tryDifferentSearch": "Попробуйте другой поисковый запрос или очистите поиск",
-    "justNow": "только что",
-    "minAgo": "{{count}} мин. назад",
-    "hoursAgo": "{{count}} ч. назад",
-    "daysAgo": "{{count}} дн. назад",
-    "newFile": "Новый файл (Cmd+N)",
-    "newFolder": "Новая папка (Cmd+Shift+N)",
-    "refresh": "Обновить",
-    "collapseAll": "Свернуть все",
-    "context": {
-      "rename": "Переименовать",
-      "delete": "Удалить",
-      "copyPath": "Копировать путь",
-      "download": "Скачать",
-      "newFile": "Новый файл",
-      "newFolder": "Новая папка",
-      "upload": "Загрузить файлы",
-      "refresh": "Обновить",
-      "menuLabel": "Контекстное меню файла",
-      "loading": "Загрузка..."
-    }
+    "untitledSession": "Безымянный сеанс"
   },
   "projectWizard": {
     "title": "Создать новый проект",

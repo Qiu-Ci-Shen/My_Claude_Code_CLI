@@ -20,7 +20,6 @@
   "tabs": {
     "chat": "Sohbet",
     "shell": "Shell",
-    "files": "Dosyalar",
     "git": "Kaynak Kontrolü",
     "tasks": "Görevler",
     "browser": "Browser",
@@ -77,14 +76,6 @@
     "daysAgo": "{{count}} gün önce",
     "yesterday": "Dün"
   },
-  "fileOperations": {
-    "newFile": "Yeni Dosya",
-    "newFolder": "Yeni Klasör",
-    "rename": "Yeniden Adlandır",
-    "move": "Taşı",
-    "copyPath": "Yolu Kopyala",
-    "openInEditor": "Editörde Aç"
-  },
   "mainContent": {
     "loading": "Qiu_Ai_LZ Yükleniyor",
     "settingUpWorkspace": "Çalışma alanın hazırlanıyor...",
@@ -93,46 +84,7 @@
     "tip": "İpucu",
     "createProjectMobile": "Projelere erişmek için yukarıdaki menü düğmesine dokun",
     "createProjectDesktop": "Kenar çubuğundaki klasör simgesine tıklayarak yeni bir proje oluştur",
-    "newSession": "Yeni Oturum",
-    "untitledSession": "Adsız Oturum",
-    "projectFiles": "Proje Dosyaları"
-  },
-  "fileTree": {
-    "loading": "Dosyalar yükleniyor...",
-    "files": "Dosyalar",
-    "simpleView": "Basit görünüm",
-    "compactView": "Kompakt görünüm",
-    "detailedView": "Detaylı görünüm",
-    "searchPlaceholder": "Dosya ve klasörlerde ara...",
-    "clearSearch": "Aramayı temizle",
-    "name": "İsim",
-    "size": "Boyut",
-    "modified": "Değiştirilme",
-    "permissions": "İzinler",
-    "noFilesFound": "Dosya bulunamadı",
-    "checkProjectPath": "Proje yolunun erişilebilir olduğunu kontrol et",
-    "noMatchesFound": "Eşleşme bulunamadı",
-    "tryDifferentSearch": "Farklı bir arama terimi dene veya aramayı temizle",
-    "justNow": "az önce",
-    "minAgo": "{{count}} dakika önce",
-    "hoursAgo": "{{count}} saat önce",
-    "daysAgo": "{{count}} gün önce",
-    "newFile": "Yeni Dosya (Cmd+N)",
-    "newFolder": "Yeni Klasör (Cmd+Shift+N)",
-    "refresh": "Yenile",
-    "collapseAll": "Tümünü Daralt",
-    "context": {
-      "rename": "Yeniden Adlandır",
-      "delete": "Sil",
-      "copyPath": "Yolu Kopyala",
-      "download": "İndir",
-      "newFile": "Yeni Dosya",
-      "newFolder": "Yeni Klasör",
-      "upload": "Dosya Yükle",
-      "refresh": "Yenile",
-      "menuLabel": "Dosya bağlam menüsü",
-      "loading": "Yükleniyor..."
-    }
+    "untitledSession": "Adsız Oturum"
   },
   "projectWizard": {
     "title": "Yeni Proje Oluştur",

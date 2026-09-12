@@ -44,16 +44,6 @@
     "pattern": "模式：",
     "in": "在："
   },
-  "fileOperations": {
-    "updated": "文件更新成功",
-    "created": "文件创建成功",
-    "written": "文件写入成功",
-    "diff": "差异",
-    "newFile": "新文件",
-    "viewContent": "查看文件内容",
-    "viewFullOutput": "查看完整输出（{{count}} 个字符）",
-    "contentDisplayed": "文件内容显示在上面的差异视图中"
-  },
   "interactive": {
     "title": "交互式提示",
     "waiting": "等待您在 CLI 中响应",
