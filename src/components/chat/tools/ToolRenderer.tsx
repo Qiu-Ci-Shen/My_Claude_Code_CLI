@@ -4,7 +4,7 @@ import type { Project } from '../../../types/app';
 import type { SubagentChildTool } from '../types/types';
 
 import { getToolConfig } from './configs/toolConfigs';
-import { OneLineDisplay, BashCommandDisplay, CollapsibleDisplay, ToolDiffViewer, MarkdownContent, FileListContent, TodoListContent, TaskListContent, TextContent, QuestionAnswerContent, SubagentContainer } from './components';
+import { OneLineDisplay, BashCommandDisplay, CollapsibleDisplay, ToolDiffViewer, MarkdownContent, FileListContent, TodoListContent, TaskListContent, TextContent, QuestionAnswerContent, SubagentContainer, ToolResultImages } from './components';
 import { PlanDisplay } from './components/PlanDisplay';
 import { ToolStatusBadge } from './components/ToolStatusBadge';
 import type { ToolStatus } from './components/ToolStatusBadge';
@@ -212,9 +212,19 @@ export const ToolRenderer: React.FC<ToolRendererProps> = memo(({
       ? displayConfig.title(parsedData)
       : displayConfig.title || 'Details';
 
-    const defaultOpen = displayConfig.defaultOpen !== undefined
-      ? displayConfig.defaultOpen
-      : false;
+    // Tool results can carry inline images (e.g. Browser screenshots). They
+    // render above the text content and force the section open so the picture
+    // is visible without an extra click.
+    const resultImages = mode === 'result' && Array.isArray(toolResult?.images)
+      ? (toolResult.images as Array<{ data?: string }>)
+      : [];
+    const hasResultImages = resultImages.length > 0;
+
+    const defaultOpen = hasResultImages
+      ? true
+      : displayConfig.defaultOpen !== undefined
+        ? displayConfig.defaultOpen
+        : false;
 
     const contentProps = displayConfig.getContentProps?.(parsedData, {
       selectedProject,
@@ -296,6 +306,15 @@ export const ToolRenderer: React.FC<ToolRendererProps> = memo(({
         );
         break;
       }
+    }
+
+    if (hasResultImages) {
+      contentComponent = (
+        <div className="space-y-3">
+          <ToolResultImages images={resultImages} />
+          {contentComponent}
+        </div>
+      );
     }
 
     const handleTitleClick = (toolName === 'Edit' || toolName === 'Write' || toolName === 'ApplyPatch') && contentProps.filePath && onFileOpen

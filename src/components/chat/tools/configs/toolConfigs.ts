@@ -524,6 +524,34 @@ export const TOOL_CONFIGS: Record<string, ToolDisplayConfig> = {
   },
 
   // ============================================================================
+  // BROWSER MCP (qiu-browser)
+  // ============================================================================
+
+  // The screenshot tool returns an image plus a one-line caption; rendering the
+  // caption as markdown turns the page URL into a clickable link (external
+  // links open in the system browser via the Electron shell bridge).
+  'mcp__qiu-browser__browser_take_screenshot': {
+    input: {
+      type: 'collapsible',
+      title: 'Parameters',
+      defaultOpen: false,
+      contentType: 'text',
+      getContentProps: (input) => ({
+        content: typeof input === 'string' ? input : JSON.stringify(input, null, 2),
+        format: 'code'
+      })
+    },
+    result: {
+      type: 'collapsible',
+      title: 'Screenshot',
+      contentType: 'markdown',
+      getContentProps: (result) => ({
+        content: String(result?.content || '')
+      })
+    }
+  },
+
+  // ============================================================================
   // DEFAULT FALLBACK
   // ============================================================================
 

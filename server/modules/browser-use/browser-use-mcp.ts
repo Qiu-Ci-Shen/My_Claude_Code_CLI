@@ -22,6 +22,66 @@ const textResponse = (text: string) => ({
 
 const jsonResponse = (value: unknown) => textResponse(JSON.stringify(value, null, 2));
 
+const SCREENSHOT_DATA_URL_RE = /^data:(image\/[\w.+-]+);base64,(.+)$/s;
+
+/**
+ * Builds an MCP result for a Browser session payload. The screenshot data URL
+ * is lifted out of the JSON text into a standard `image` content block so
+ * clients can render the actual picture; leaving it inside the text JSON would
+ * force every consumer to carry a multi-hundred-KB base64 blob as a string.
+ *
+ * @param options.captionOnly - Replaces the JSON metadata dump with a one-line
+ *   human-readable caption and drops the visible page text. Screenshots answer
+ *   "what does the page look like" — the raw session JSON and 25KB of page
+ *   prose are `browser_snapshot`'s job, and in a chat card they just bury the
+ *   picture.
+ */
+function imageResponse(value: unknown, options: { captionOnly?: boolean } = {}) {
+  const root: Record<string, unknown> = typeof value === 'object' && value !== null
+    ? { ...(value as Record<string, unknown>) }
+    : {};
+
+  let screenshotDataUrl: string | undefined;
+  const takeScreenshot = (holder: Record<string, unknown>) => {
+    if (typeof holder.screenshotDataUrl === 'string') {
+      screenshotDataUrl = holder.screenshotDataUrl;
+      delete holder.screenshotDataUrl;
+    }
+  };
+  takeScreenshot(root);
+  if (typeof root.session === 'object' && root.session !== null) {
+    root.session = { ...(root.session as Record<string, unknown>) };
+    takeScreenshot(root.session as Record<string, unknown>);
+  }
+
+  let summary: string;
+  if (options.captionOnly) {
+    delete root.text;
+    const session = (typeof root.session === 'object' && root.session !== null
+      ? root.session
+      : root) as Record<string, unknown>;
+    const url = typeof session.url === 'string' ? session.url : '';
+    const title = typeof session.title === 'string' ? session.title.trim() : '';
+    const clippedTitle = title.length > 100 ? `${title.slice(0, 100)}…` : title;
+    summary = clippedTitle
+      ? `Screenshot of "${clippedTitle}"${url ? ` — ${url}` : ''}`
+      : url
+        ? `Screenshot of ${url}`
+        : 'Screenshot captured.';
+  } else {
+    summary = JSON.stringify(root, null, 2);
+  }
+
+  const content: Array<Record<string, unknown>> = [
+    { type: 'text', text: summary },
+  ];
+  const match = screenshotDataUrl ? SCREENSHOT_DATA_URL_RE.exec(screenshotDataUrl) : null;
+  if (match) {
+    content.push({ type: 'image', data: match[2], mimeType: match[1] });
+  }
+  return { content };
+}
+
 const readString = (value: unknown, name: string): string => {
   if (typeof value !== 'string' || value.trim() === '') {
     throw new Error(`${name} is required.`);
@@ -91,7 +151,7 @@ const tools: ToolDefinition[] = [
   },
   {
     name: 'browser_take_screenshot',
-    description: 'Capture the latest screenshot for a Browser session.',
+    description: 'Capture the latest screenshot for a Browser session and return it as an image (no page text; use browser_snapshot when you also need the text).',
     inputSchema: sessionIdSchema,
   },
   {
@@ -226,9 +286,12 @@ async function callTool(name: string, args: Record<string, unknown>) {
     case 'browser_list_sessions':
       return jsonResponse(await callBrowserUseApi(name, {}));
     case 'browser_snapshot':
-      return jsonResponse(await callBrowserUseApi(name, { sessionId: readString(args.sessionId, 'sessionId') }));
+      return imageResponse(await callBrowserUseApi(name, { sessionId: readString(args.sessionId, 'sessionId') }));
     case 'browser_take_screenshot': {
-      return jsonResponse(await callBrowserUseApi(name, { sessionId: readString(args.sessionId, 'sessionId') }));
+      return imageResponse(
+        await callBrowserUseApi(name, { sessionId: readString(args.sessionId, 'sessionId') }),
+        { captionOnly: true },
+      );
     }
     case 'browser_navigate':
       return jsonResponse(await callBrowserUseApi(name, {

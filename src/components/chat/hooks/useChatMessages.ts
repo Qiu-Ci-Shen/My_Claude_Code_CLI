@@ -159,11 +159,17 @@ export function normalizedToChatMessages(messages: NormalizedMessage[]): ChatMes
           }
         }
 
+        const rawImages = tr ? (tr as { images?: unknown }).images : undefined;
+        const toolResultImages = Array.isArray(rawImages) && rawImages.length > 0
+          ? (rawImages as Array<{ path?: string; data?: string; name?: string }>)
+          : undefined;
+
         const toolResult = tr
           ? {
               content: formatToolResultContent(tr.content),
               isError: Boolean(tr.isError),
               toolUseResult: (tr as any).toolUseResult,
+              images: toolResultImages,
             }
           : null;
 

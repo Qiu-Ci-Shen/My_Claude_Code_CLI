@@ -382,6 +382,54 @@ function stripAnsiFormatting(text: string): string {
   return text.replace(/\u001B\[[0-9;?]*[ -/]*[@-~]/g, '');
 }
 
+/**
+ * Extracts the display text of a tool_result content payload. Text blocks are
+ * joined; payloads without text fall back to JSON so nothing is silently lost.
+ */
+export function toolResultText(content: unknown): string {
+  if (typeof content === 'string') {
+    return content;
+  }
+  if (Array.isArray(content)) {
+    const textParts = (content as AnyRecord[])
+      .filter((part) => part?.type === 'text' && part.text)
+      .map((part) => String(part.text));
+    if (textParts.length > 0) {
+      return textParts.join('\n');
+    }
+  }
+  return JSON.stringify(content);
+}
+
+/**
+ * Extracts inline images from a tool_result content payload as data URLs.
+ *
+ * MCP tools can return `image` blocks next to text (e.g. the Browser MCP
+ * screenshot tools); the chat renders them as pictures, so they must survive
+ * normalization instead of being flattened into the text content.
+ */
+export function extractToolResultImages(content: unknown): Array<{ data: string }> | undefined {
+  if (!Array.isArray(content)) {
+    return undefined;
+  }
+  const images: Array<{ data: string }> = [];
+  for (const part of content as AnyRecord[]) {
+    if (part?.type !== 'image') {
+      continue;
+    }
+    const source = part.source as AnyRecord | undefined;
+    if (source?.type === 'base64' && typeof source.data === 'string') {
+      const mediaType = typeof source.media_type === 'string' ? source.media_type : 'image/png';
+      images.push({ data: `data:${mediaType};base64,${source.data}` });
+    } else if (typeof part.data === 'string') {
+      // Tolerate flat `{ type: 'image', data, mimeType }` blocks.
+      const mediaType = typeof part.mimeType === 'string' ? part.mimeType : 'image/png';
+      images.push({ data: `data:${mediaType};base64,${part.data}` });
+    }
+  }
+  return images.length > 0 ? images : undefined;
+}
+
 export class ClaudeSessionsProvider implements IProviderSessions {
   /**
    * Normalizes one Claude JSONL entry or live SDK stream event into the shared
@@ -429,7 +477,8 @@ export class ClaudeSessionsProvider implements IProviderSessions {
               provider: PROVIDER,
               kind: 'tool_result',
               toolId: part.tool_use_id,
-              content: typeof part.content === 'string' ? part.content : JSON.stringify(part.content),
+              content: toolResultText(part.content),
+              images: extractToolResultImages(part.content),
               isError: Boolean(part.is_error),
               subagentTools: raw.subagentTools,
               toolUseResult: raw.toolUseResult,
@@ -773,10 +822,9 @@ export class ClaudeSessionsProvider implements IProviderSessions {
         }
 
         msg.toolResult = {
-          content: typeof toolResult.content === 'string'
-            ? toolResult.content
-            : JSON.stringify(toolResult.content),
+          content: toolResultText(toolResult.content),
           isError: toolResult.isError,
+          images: extractToolResultImages(toolResult.content),
           toolUseResult: toolResult.toolUseResult,
         };
         msg.subagentTools = toolResult.subagentTools;

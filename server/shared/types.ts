@@ -260,6 +260,8 @@ export type NormalizedMessage = {
   toolResult?: {
     content?: string;
     isError?: boolean;
+    /** Inline images extracted from the tool result, as data URLs. */
+    images?: unknown;
     toolUseResult?: unknown;
   };
   isError?: boolean;
