@@ -28,6 +28,7 @@ import {
 } from '@/shared/image-attachments.js';
 import { CLAUDE_PREDEFINED_MODELS } from '@/modules/providers/list/claude/claude-models.provider.js';
 import { markAbortedTurn } from '@/modules/providers/list/claude/aborted-turns.js';
+import { createBackgroundWorkTracker } from '@/modules/providers/list/claude/background-work.js';
 import { readClaudeSettingsContextWindow } from '@/shared/claude-context-window.js';
 import { resolveClaudeCodeExecutablePath } from '@/shared/claude-cli-path.js';
 import {
@@ -77,10 +78,11 @@ const INTERRUPT_SETTLE_TIMEOUT_MS = 4000;
 //     scheduled wake-ups).
 //
 // The hold normally ends long before this: a turn with nothing outstanding closes
-// stdin immediately, background work releases it as soon as it reports back, and a
-// new turn supersedes the previous hold. This ceiling only catches background work
-// that never reports at all, so an abandoned session cannot leak a CLI process
-// forever. The timer resets on every message, so it measures silence, not total time.
+// stdin immediately, background work releases it as soon as it reports back or is
+// stopped via TaskStop (the lifecycle tracker sees both), and a new turn supersedes
+// the previous hold. This ceiling only catches background work that never reports
+// at all, so an abandoned session cannot leak a CLI process forever. The timer
+// resets on every message, so it measures silence, not total time.
 const BG_WAIT_CEILING_MS = 30 * 60 * 1000;
 
 const TOOLS_REQUIRING_INTERACTION = new Set(['AskUserQuestion', 'ExitPlanMode']);
@@ -703,36 +705,6 @@ function extractCompactTokenBudget(sdkMessage) {
   };
 }
 
-// Tool calls that leave work running past the end of a turn. Bash only counts
-// when it is explicitly backgrounded; the rest defer or watch work by nature.
-const DEFERRED_WORK_TOOLS = new Set(['Monitor', 'ScheduleWakeup', 'CronCreate', 'TaskCreate']);
-
-/**
- * Detects tool calls that keep working after the turn's `result` arrives.
- *
- * Only turns that start background work need their CLI process held open; every
- * other turn can let it exit immediately, as it did before the hold existed.
- *
- * @param {Object} sdkMessage - SDK stream message
- * @returns {boolean} True when the message launches work that outlives the turn
- */
-function startsBackgroundWork(sdkMessage) {
-  const content = sdkMessage?.message?.content;
-  if (!Array.isArray(content)) {
-    return false;
-  }
-
-  return content.some((block) => {
-    if (block?.type !== 'tool_use') {
-      return false;
-    }
-    if (block.name === 'Bash') {
-      return block.input?.run_in_background === true;
-    }
-    return DEFERRED_WORK_TOOLS.has(block.name);
-  });
-}
-
 /**
  * Builds the SDK user messages for one turn.
  *
@@ -892,6 +864,11 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
   // `result` can be recognised as that work reporting back.
   let heldForBackgroundWork = false;
 
+  // Follows the background tasks this run started (start tool_use → task id in
+  // the tool_result → TaskStop results) so the result branch below only keeps
+  // the process held open while something can actually still report back.
+  const backgroundWork = createBackgroundWorkTracker();
+
   // A new turn supersedes any earlier one still holding this session's process
   // open, so held runs cannot stack up across a conversation.
   if (sessionKey()) {
@@ -906,6 +883,14 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
     }
     idleReleaseTimer = setTimeout(() => {
       idleReleaseTimer = null;
+      // 后台工作静默达上限：CLI 即将放行。若主回合的 complete 已发（带
+      // backgroundHold、未终结 run），先补发一次收尾 complete——否则客户端
+      // 的「Background task running」指示会永久残留（CLI 退出时的尾部兜底
+      // 因 turnCompleteSent 已置位而不会再补）。
+      if (heldForBackgroundWork && turnCompleteSent) {
+        heldForBackgroundWork = false;
+        ws.send(createCompleteMessage({ provider: 'claude', sessionId: capturedSessionId || sessionId || null, exitCode: 0 }));
+      }
       releasePromptStream();
     }, BG_WAIT_CEILING_MS);
     // Never let the hold keep the server process alive on its own.
@@ -1180,16 +1165,34 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
         ws.send(createNormalizedMessage({ kind: 'status', text: 'token_budget', tokenBudget: tokenBudgetData, sessionId: capturedSessionId || sessionId || null, provider: 'claude' }));
       }
 
-      if (startsBackgroundWork(message)) {
+      // Every message feeds the tracker: starts arrive as tool_use blocks,
+      // task ids and TaskStop outcomes as the later tool_results.
+      if (backgroundWork.track(message)) {
         backgroundWorkPending = true;
       }
 
       if (message.type === 'result') {
-        // The turn is done as far as the client is concerned.
         const abortPending = sessionKey() ? abortedSessionIds.has(sessionKey()) : false;
         if (!turnCompleteSent && !abortPending) {
           turnCompleteSent = true;
-          ws.send(createCompleteMessage({ provider: 'claude', sessionId: capturedSessionId || sessionId || null, exitCode: 0 }));
+          // 回合的主回复结束：complete 照旧立即发出（完成通知不等待后台），
+          // 但若本回合启动了后台工作（进程将被保留、CLI 稍后还会推 follow-up
+          // 输出），带上 backgroundHold 标记——registry 借此保持 run 为
+          // running，客户端随即收到 status 事件把活动指示重新立起，避免
+          // 「仍在输出但指示器已消失」的空窗。
+          ws.send({
+            ...createCompleteMessage({ provider: 'claude', sessionId: capturedSessionId || sessionId || null, exitCode: 0 }),
+            ...(backgroundWorkPending ? { backgroundHold: true } : {}),
+          });
+          if (backgroundWorkPending) {
+            ws.send(createNormalizedMessage({
+              kind: 'status',
+              text: 'Background task running',
+              canInterrupt: true,
+              sessionId: capturedSessionId || sessionId || null,
+              provider: 'claude',
+            }));
+          }
           notifyRunStopped({
             userId: ws?.userId || null,
             provider: 'claude',
@@ -1200,12 +1203,23 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
         } else if (heldForBackgroundWork && !abortPending) {
           // A result after the turn already reported complete means the work we
           // held the process open for has finished and pushed a follow-up turn.
+          // 真正的收尾：补发一次无标记的 complete——客户端活动指示落下、
+          // registry 翻 completed（此前主回合的 complete 带 backgroundHold，
+          // 未被去重、也未终结 run）。
+          ws.send(createCompleteMessage({ provider: 'claude', sessionId: capturedSessionId || sessionId || null, exitCode: 0 }));
           notifyBackgroundWorkCompleted({
             userId: ws?.userId || null,
             provider: 'claude',
             sessionId: sessionId || capturedSessionId || null,
             sessionName: sessionSummary
           });
+        }
+        if (backgroundWorkPending && !backgroundWork.hasLiveWork()) {
+          // Everything the turn backgrounded was already retired (TaskStop) or
+          // never started — nothing will ever report back, and holding would
+          // strand the "Background task running" indicator until the ceiling.
+          // Release immediately instead.
+          backgroundWorkPending = false;
         }
         if (backgroundWorkPending) {
           // Work started during this turn is still running. Hold the process

@@ -147,9 +147,17 @@ function decorateAndRecordEvent(run: ChatRun, message: NormalizedMessage): Norma
     // The provider may report its own id here; the frontend only ever knows
     // the app id, so the "actual" id is by definition the app id as well.
     outbound.actualSessionId = run.appSessionId;
-    run.status = 'completed';
-    run.completedAt = Date.now();
-    evictRunLater(run.appSessionId);
+    // A complete flagged `backgroundHold` means the turn's main reply finished
+    // but the runtime keeps the CLI open for background work that will still
+    // push follow-up output. The run must stay `running`: the client keeps its
+    // activity indicator up and the 5s running-sessions sync must not evict it.
+    // Only the unflagged (truly final) complete flips the status and schedules
+    // the retention eviction.
+    if (!(message as { backgroundHold?: boolean }).backgroundHold) {
+      run.status = 'completed';
+      run.completedAt = Date.now();
+      evictRunLater(run.appSessionId);
+    }
   }
 
   run.events.push(outbound);

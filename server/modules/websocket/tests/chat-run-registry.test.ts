@@ -280,3 +280,47 @@ test('startRun rejects a second concurrent run for the same session', async () =
     assert.ok(third);
   });
 });
+
+test('backgroundHold complete 保持 run 运行态，收尾 complete 才终结（后台工作指示器链路）', async () => {
+  await withIsolatedDatabase(() => {
+    sessionsDb.createAppSession('app-bg-1', 'claude', '/workspace/demo');
+    const connection = new FakeConnection();
+    const run = chatRunRegistry.startRun({
+      appSessionId: 'app-bg-1',
+      provider: 'claude',
+      providerSessionId: null,
+      connection,
+      userId: null,
+    });
+    assert.ok(run);
+
+    // 主回合 complete 带 backgroundHold：照常转发给客户端（触发回合完成），
+    // 但不终结 run——进程仍为后台工作保留，running 列表保持（5s 同步不会
+    // 误删客户端刚恢复的活动指示）。
+    run.writer.send({ kind: 'complete', provider: 'claude', sessionId: 'native-bg', exitCode: 0, backgroundHold: true });
+    const afterHoldComplete = connection.frames.filter((frame) => frame.kind === 'complete');
+    assert.equal(afterHoldComplete.length, 1);
+    assert.equal(afterHoldComplete[0]?.backgroundHold, true);
+    assert.equal(chatRunRegistry.isProcessing('app-bg-1'), true, 'hold 期间 run 仍视为运行中');
+    assert.equal(
+      chatRunRegistry.listRunningRuns().some((entry) => entry.sessionId === 'app-bg-1'),
+      true,
+      'running 列表仍包含该会话',
+    );
+
+    // 后台跟进的输出照常转发（每条都分配 seq）。
+    run.writer.send({ kind: 'text', provider: 'claude', sessionId: 'native-bg', content: '后台任务完成汇报' });
+    const texts = connection.frames.filter((frame) => frame.kind === 'text');
+    assert.equal(texts.length, 1);
+    assert.equal(typeof texts[0]?.seq, 'number');
+
+    // 收尾 complete（无标记）：被去重逻辑放行、终结 run。
+    run.writer.send({ kind: 'complete', provider: 'claude', sessionId: 'native-bg', exitCode: 0 });
+    assert.equal(connection.frames.filter((frame) => frame.kind === 'complete').length, 2, '收尾 complete 未被误去重');
+    assert.equal(chatRunRegistry.isProcessing('app-bg-1'), false, '收尾后 run 已结束');
+
+    // 终结之后再来的重复 complete（killed runtime 迟到帧）照旧被丢弃。
+    run.writer.send({ kind: 'complete', provider: 'claude', sessionId: 'native-bg', exitCode: 1 });
+    assert.equal(connection.frames.filter((frame) => frame.kind === 'complete').length, 2);
+  });
+});
