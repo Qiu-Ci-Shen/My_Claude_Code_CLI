@@ -52,6 +52,10 @@ export type AgentsSessionState = {
   panelOpen: boolean;
   /** 本「运行轮」用户手动关过面板：不自动重开，直到全部 agent 落定 */
   userClosed: boolean;
+  /** 空闲时用户主动关闭浮动胶囊；运行中不允许关闭，新 started 会恢复显示 */
+  pillHidden: boolean;
+  /** 用户删除过的条目（防历史刷新带回）；同 taskId 实时事件到达时清除 */
+  dismissed: Record<string, true>;
   selectedTaskId: string | null;
   historyLoaded: boolean;
   historyLoading: boolean;

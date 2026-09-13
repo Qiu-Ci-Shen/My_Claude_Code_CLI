@@ -6,6 +6,7 @@
  *   - 历史：列表合并「实时优先，只补空字段」；状态仅在本地未见实时时采纳
  *   - 面板自动打开 / 用户手动关闭封印 / 全部落定后解除
  *   - 子消息按 toolUseId 归组；task_started 未到时先进 orphan 暂存
+ *   - 视图语义：运行中胶囊钉死不可关；删除已停止条目并防历史刷新带回（2026-09-13）
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,6 +18,8 @@ import {
   applyHistoryConversation,
   applySubagentEvent,
   createSessionState,
+  dismissAgent,
+  hidePill,
   mergeHistory,
   selectAgent,
   setPanelOpen,
@@ -208,4 +211,55 @@ test('选中态：selectAgent 设置与清除', () => {
   assert.equal(state.selectedTaskId, 't1');
   state = selectAgent(state, null);
   assert.equal(state.selectedTaskId, null);
+});
+
+test('删除条目：运行中拒绝；停止后删除并记入 dismissed', () => {
+  let state = createSessionState();
+  state = applySubagentEvent(state, event({ event: 'started', taskId: 't1' }));
+  assert.equal(dismissAgent(state, 't1', false), state); // 运行中不可删
+
+  state = applySubagentEvent(state, event({ event: 'finished', taskId: 't1', status: 'stopped' }));
+  state = dismissAgent(state, 't1', false);
+  assert.equal(state.agents.t1, undefined);
+  assert.equal(state.order.length, 0);
+  assert.equal(state.dismissed.t1, true);
+});
+
+test('删除后同 taskId 再次出现：实时事件复活并清除 dismissed', () => {
+  let state = createSessionState();
+  state = applySubagentEvent(state, event({ event: 'started', taskId: 't1', toolUseId: 'call_1' }));
+  state = applySubagentEvent(state, event({ event: 'finished', taskId: 't1', status: 'completed' }));
+  state = dismissAgent(state, 't1', false);
+  assert.equal(state.order.length, 0);
+
+  state = applySubagentEvent(state, event({ event: 'started', taskId: 't1', toolUseId: 'call_1' }));
+  assert.equal(state.dismissed.t1, undefined);
+  assert.equal(state.order.includes('t1'), true);
+  assert.equal(state.agents.t1!.status, 'running');
+});
+
+test('历史合并跳过已删除条目（刷新不复活）', () => {
+  let state = createSessionState();
+  state = applySubagentEvent(state, event({ event: 'finished', taskId: 't1', status: 'completed' }));
+  state = dismissAgent(state, 't1', false);
+  state = mergeHistory(state, [
+    summary({ taskId: 't1', status: 'completed' }),
+    summary({ taskId: 't2', status: 'running' }),
+  ]);
+  assert.equal(state.agents.t1, undefined);
+  assert.ok(state.agents.t2);
+  assert.equal(state.agents.t2!.status, 'running');
+});
+
+test('浮动胶囊：运行中拒绝隐藏；空闲隐藏后新 started 恢复显示', () => {
+  let state = createSessionState();
+  state = applySubagentEvent(state, event({ event: 'started', taskId: 't1' }));
+  assert.equal(hidePill(state, false), state); // 运行中不可关
+
+  state = applySubagentEvent(state, event({ event: 'finished', taskId: 't1', status: 'completed' }));
+  state = hidePill(state, false);
+  assert.equal(state.pillHidden, true);
+
+  state = applySubagentEvent(state, event({ event: 'started', taskId: 't2' }));
+  assert.equal(state.pillHidden, false);
 });

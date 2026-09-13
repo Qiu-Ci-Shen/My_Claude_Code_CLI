@@ -8,7 +8,7 @@ import type { Project, ProjectSession, LLMProvider } from '../../../../types/app
 import { api } from '../../../../utils/api';
 import { copyTextToClipboard } from '../../../../utils/clipboard';
 import type { SessionWithProvider } from '../../types/types';
-import { createSessionViewModel, formatCompactAge } from '../../utils/utils';
+import { createSessionViewModel, formatCompactAge, markSessionSeen, readSessionLastSeen } from '../../utils/utils';
 import LLMProviderLogo from '../../../llm-provider-logo/LLMProviderLogo';
 
 type SidebarSessionItemProps = {
@@ -71,7 +71,21 @@ export default function SidebarSessionItem({
   const [providerSessionId, setProviderSessionId] = useState<string | null>(null);
   const providerIdRequestRef = useRef(0);
   const showAttentionIndicator = needsAttention && !isSelected;
-  const showRecentIndicator = !showAttentionIndicator && !isProcessing && sessionView.isActive;
+  const sessionUpdatedAt = Date.parse(sessionView.sessionTime) || 0;
+  const [lastSeenAt, setLastSeenAt] = useState(() => readSessionLastSeen(session.id));
+
+  // Viewing a session marks its latest activity as seen, so the recent dot
+  // clears on entry and stays cleared until newer activity arrives.
+  useEffect(() => {
+    if (isSelected && sessionUpdatedAt > lastSeenAt) {
+      markSessionSeen(session.id, sessionUpdatedAt);
+      setLastSeenAt(sessionUpdatedAt);
+    }
+  }, [isSelected, session.id, sessionUpdatedAt, lastSeenAt]);
+
+  const hasUnseenActivity = sessionUpdatedAt > lastSeenAt;
+  const showRecentIndicator =
+    !showAttentionIndicator && !isProcessing && !isSelected && hasUnseenActivity && sessionView.isActive;
   const providerLabel = PROVIDER_LABELS[session.__provider];
 
   // While editing, dismiss only when the user clicks outside the inline rename panel

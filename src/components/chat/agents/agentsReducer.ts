@@ -2,6 +2,7 @@ import type { NormalizedMessage, SubagentEventPayload } from '../../../stores/us
 
 import {
   AGENT_MESSAGE_LIMIT,
+  resolveDisplayStatus,
   type AgentRuntime,
   type AgentStatus,
   type AgentSummaryDto,
@@ -21,6 +22,8 @@ export function createSessionState(): AgentsSessionState {
     orphans: {},
     panelOpen: false,
     userClosed: false,
+    pillHidden: false,
+    dismissed: {},
     selectedTaskId: null,
     historyLoaded: false,
     historyLoading: false,
@@ -136,6 +139,18 @@ export function applySubagentEvent(
   }
   const nowIso = new Date().toISOString();
 
+  // 已删除条目复活：同 taskId 再次收到实时事件（如恢复运行）时清除删除标记；
+  // 新一轮 started 同时恢复被用户关闭的浮动胶囊。
+  if (state.dismissed[taskId] || (payload.event === 'started' && state.pillHidden)) {
+    const dismissed = { ...state.dismissed };
+    delete dismissed[taskId];
+    state = {
+      ...state,
+      dismissed,
+      ...(payload.event === 'started' ? { pillHidden: false } : {}),
+    };
+  }
+
   switch (payload.event) {
     case 'started': {
       let next = patchAgent(state, taskId, {
@@ -241,6 +256,9 @@ export function mergeHistory(state: AgentsSessionState, summaries: AgentSummaryD
 
   for (const summary of summaries) {
     const taskId = summary.taskId;
+    if (state.dismissed[taskId]) {
+      continue;
+    }
     const existing = agents[taskId];
 
     if (existing) {
@@ -306,6 +324,39 @@ export function applyHistoryConversation(
       },
     },
   };
+}
+
+/** 删除一个非运行中的条目：移出列表并记入 dismissed（历史刷新不再带回） */
+export function dismissAgent(
+  state: AgentsSessionState,
+  taskId: string,
+  sessionActive: boolean,
+): AgentsSessionState {
+  const agent = state.agents[taskId];
+  if (!agent || resolveDisplayStatus(agent, sessionActive) === 'running') {
+    return state;
+  }
+  const agents = { ...state.agents };
+  delete agents[taskId];
+  return {
+    ...state,
+    agents,
+    order: state.order.filter((id) => id !== taskId),
+    dismissed: { ...state.dismissed, [taskId]: true },
+    selectedTaskId: state.selectedTaskId === taskId ? null : state.selectedTaskId,
+  };
+}
+
+/** 空闲时用户关闭浮动胶囊；只要还有「运行中」的条目就拒绝（运行中不可关闭） */
+export function hidePill(state: AgentsSessionState, sessionActive: boolean): AgentsSessionState {
+  if (state.pillHidden) {
+    return state;
+  }
+  const anyRunning = state.order.some((taskId) => {
+    const agent = state.agents[taskId];
+    return agent ? resolveDisplayStatus(agent, sessionActive) === 'running' : false;
+  });
+  return anyRunning ? state : { ...state, pillHidden: true };
 }
 
 export function setPanelOpen(state: AgentsSessionState, open: boolean): AgentsSessionState {

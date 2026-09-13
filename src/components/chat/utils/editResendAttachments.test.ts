@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { dataUrlToFile, resolveEditResendAttachments } from './editResendAttachments';
+import { dataUrlToFile, restoreEditAttachmentsToFiles } from './editResendAttachments';
 
 // 1x1 透明 PNG
 const PNG_BASE64 =
@@ -32,44 +32,62 @@ test('dataUrlToFile 无法解析时返回 null 而不是抛错', () => {
   assert.equal(dataUrlToFile({ data: 'data:image/png;base64' }, 0), null);
 });
 
-test('带存储路径的附件直接透传，不触发上传', async () => {
-  const attachments = [
-    { path: 'C:/assets/a.png', name: 'a.png', mimeType: 'image/png' },
-    { path: 'C:/assets/b.pdf', name: 'b.pdf' },
-  ];
-  let uploadCalls = 0;
-  const resolved = await resolveEditResendAttachments(attachments, async (files) => {
-    uploadCalls += 1;
-    return files;
-  });
-  assert.deepEqual(resolved, attachments);
-  assert.equal(uploadCalls, 0);
-});
-
-test('仅剩 base64 的图片经重新上传换回存储路径', async () => {
-  const uploaded: File[][] = [];
-  const resolved = await resolveEditResendAttachments(
-    [
-      { path: 'C:/assets/keep.pdf', name: 'keep.pdf' },
-      { data: `data:image/png;base64,${PNG_BASE64}` },
-    ],
-    async (files) => {
-      uploaded.push(files);
-      return files.map((file) => ({ path: `C:/assets/${file.name}`, name: file.name }));
+test('base64 图片直接解码，不触发下载', async () => {
+  let downloadCalls = 0;
+  const files = await restoreEditAttachmentsToFiles(
+    [{ data: `data:image/png;base64,${PNG_BASE64}`, name: 'shot.png' }],
+    async () => {
+      downloadCalls += 1;
+      return null;
     },
   );
-  assert.equal(uploaded.length, 1);
-  assert.equal(uploaded[0].length, 1);
-  assert.equal(uploaded[0][0].type, 'image/png');
-  assert.deepEqual(resolved, [
-    { path: 'C:/assets/keep.pdf', name: 'keep.pdf' },
-    { path: 'C:/assets/edited-image-2.png', name: 'edited-image-2.png' },
-  ]);
+  assert.equal(downloadCalls, 0);
+  assert.equal(files.length, 1);
+  assert.equal(files[0].name, 'shot.png');
+  assert.equal(files[0].type, 'image/png');
 });
 
-test('既无路径也非可解析 data 的附件被丢弃', async () => {
-  const resolved = await resolveEditResendAttachments([{ name: 'broken.png' }], async () => {
-    throw new Error('should not upload');
+test('带存储路径的附件经下载还原为 File，保持原顺序', async () => {
+  const downloaded: string[] = [];
+  const files = await restoreEditAttachmentsToFiles(
+    [
+      { path: 'C:/assets/1-a.png', name: 'a.png', mimeType: 'image/png' },
+      { path: 'C:/assets/2-b.docx', name: 'b.docx' },
+    ],
+    async (attachment) => {
+      downloaded.push(attachment.path as string);
+      return new File(['x'], attachment.name as string, { type: attachment.mimeType || 'application/octet-stream' });
+    },
+  );
+  assert.deepEqual(downloaded, ['C:/assets/1-a.png', 'C:/assets/2-b.docx']);
+  assert.deepEqual(files.map((file) => file.name), ['a.png', 'b.docx']);
+  assert.equal(files[0].type, 'image/png');
+  assert.equal(files[1].type, 'application/octet-stream');
+});
+
+test('下载失败或不可用的附件被丢弃，其余保留', async () => {
+  const files = await restoreEditAttachmentsToFiles(
+    [
+      { path: 'C:/assets/gone.pdf', name: 'gone.pdf' },
+      { path: 'C:/assets/boom.pdf', name: 'boom.pdf' },
+      { data: `data:image/png;base64,${PNG_BASE64}`, name: 'ok.png' },
+    ],
+    async (attachment) => {
+      if (attachment.name === 'boom.pdf') {
+        throw new Error('network down');
+      }
+      return null;
+    },
+  );
+  assert.deepEqual(files.map((file) => file.name), ['ok.png']);
+});
+
+test('既无路径也非可解析 data 的附件被丢弃，不触发下载', async () => {
+  let downloadCalls = 0;
+  const files = await restoreEditAttachmentsToFiles([{ name: 'broken.png' }], async () => {
+    downloadCalls += 1;
+    return null;
   });
-  assert.deepEqual(resolved, []);
+  assert.equal(downloadCalls, 0);
+  assert.deepEqual(files, []);
 });

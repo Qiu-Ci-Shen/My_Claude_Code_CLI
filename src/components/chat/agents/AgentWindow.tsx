@@ -131,7 +131,7 @@ function buildMiniRows(messages: ChatMessage[]): MiniRow[] {
 }
 
 /** 小窗里的实时对话尾巴（始终贴底，像一块正在滚动的监视器） */
-function MiniPreview({ agent }: { agent: AgentRuntime }) {
+function MiniPreview({ agent, displayStatus }: { agent: AgentRuntime; displayStatus: AgentDisplayStatus }) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const chatMessages = useMemo(() => normalizedToChatMessages(agent.messages), [agent.messages]);
   const rows = useMemo(() => buildMiniRows(chatMessages), [chatMessages]);
@@ -143,7 +143,7 @@ function MiniPreview({ agent }: { agent: AgentRuntime }) {
     }
   }, [rows.length]);
 
-  const fallback = agent.activity || agent.summary || (agent.status === 'running' ? '思考中…' : null);
+  const fallback = agent.activity || agent.summary || (displayStatus === 'running' ? '思考中…' : null);
 
   return (
     <div ref={scrollRef} className="h-[74px] space-y-1 overflow-y-auto px-2 py-1.5">
@@ -189,6 +189,8 @@ type AgentWindowProps = {
   onCollapse: () => void;
   onStop: (agent: AgentRuntime) => void;
   onRelay: (agent: AgentRuntime, text: string) => void;
+  /** 删除该条记录（仅非运行中卡片可见按钮） */
+  onDismiss: (taskId: string) => void;
   onRequestConversation: (taskId: string) => void;
 };
 
@@ -206,6 +208,7 @@ export default function AgentWindow({
   onCollapse,
   onStop,
   onRelay,
+  onDismiss,
   onRequestConversation,
 }: AgentWindowProps) {
   const usage = agent.usage;
@@ -213,13 +216,22 @@ export default function AgentWindow({
   const duration = formatDurationMs(
     displayStatus === 'running'
       ? elapsedSince(agent.startedAt, null, now)
-      : (usage?.durationMs || elapsedSince(agent.startedAt, agent.endedAt, now)),
+      : (usage?.durationMs || (agent.endedAt ? elapsedSince(agent.startedAt, agent.endedAt, now) : 0)),
   );
 
   const [stopping, setStopping] = useState(false);
   useEffect(() => {
     setStopping(false);
   }, [agent.taskId, agent.status]);
+
+  // 停止无回执（服务端失败/任务已死）时不能卡在「…」——超时兜底复位
+  useEffect(() => {
+    if (!stopping) {
+      return;
+    }
+    const timer = window.setTimeout(() => setStopping(false), 8000);
+    return () => window.clearTimeout(timer);
+  }, [stopping]);
 
   const handleStop = (event?: { stopPropagation: () => void }) => {
     event?.stopPropagation();
@@ -263,7 +275,20 @@ export default function AgentWindow({
             >
               {stopping ? '…' : '■'}
             </button>
-          ) : null}
+          ) : (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onDismiss(agent.taskId);
+              }}
+              className="flex-shrink-0 rounded px-1 text-[10px] leading-4 text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-500"
+              aria-label="删除该子代理记录"
+              title="删除该记录"
+            >
+              ✕
+            </button>
+          )}
         </div>
         <div className="flex min-w-0 items-center gap-2 px-2 text-[10.5px] text-muted-foreground">
           <span className="truncate">
@@ -275,7 +300,7 @@ export default function AgentWindow({
             {duration ? <span>{duration}</span> : null}
           </span>
         </div>
-        <MiniPreview agent={agent} />
+        <MiniPreview agent={agent} displayStatus={displayStatus} />
       </div>
     );
   }
@@ -290,6 +315,7 @@ export default function AgentWindow({
       onStop={handleStop}
       onCollapse={onCollapse}
       onRelay={onRelay}
+      onDismiss={() => onDismiss(agent.taskId)}
       onRequestConversation={onRequestConversation}
     />
   );
@@ -304,6 +330,7 @@ type ExpandedWindowProps = {
   onStop: () => void;
   onCollapse: () => void;
   onRelay: (agent: AgentRuntime, text: string) => void;
+  onDismiss: () => void;
   onRequestConversation: (taskId: string) => void;
 };
 
@@ -317,6 +344,7 @@ function ExpandedWindow({
   onStop,
   onCollapse,
   onRelay,
+  onDismiss,
   onRequestConversation,
 }: ExpandedWindowProps) {
   const [relayText, setRelayText] = useState('');
@@ -392,7 +420,16 @@ function ExpandedWindow({
           >
             {stopping ? '停止中…' : '停止'}
           </button>
-        ) : null}
+        ) : (
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="flex-shrink-0 rounded-md border border-border px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-red-400/60 hover:text-red-500"
+            title="删除该记录"
+          >
+            删除
+          </button>
+        )}
       </div>
 
       <div ref={scrollRef} className="max-h-[52vh] min-h-[36vh] space-y-2 overflow-y-auto px-2.5 py-2">

@@ -20,6 +20,35 @@ export const formatCompactAge = (
   return hours < 24 ? `${hours}hr` : `${Math.floor(hours / 24)}d`;
 };
 
+// Per-session "seen" watermarks for the recent-activity dot: the dot behaves
+// like an unread badge — it hides once the session's latest activity has been
+// viewed and only reappears when newer activity lands.
+const SESSION_LAST_SEEN_STORAGE_KEY = 'claude-session-last-seen';
+
+const readSessionLastSeenMap = (): Record<string, number> => {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(SESSION_LAST_SEEN_STORAGE_KEY) || '{}') as unknown;
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, number>) : {};
+  } catch {
+    return {};
+  }
+};
+
+export const readSessionLastSeen = (sessionId: string): number => {
+  const value = readSessionLastSeenMap()[sessionId];
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+};
+
+export const markSessionSeen = (sessionId: string, timestamp: number): void => {
+  try {
+    const map = readSessionLastSeenMap();
+    map[sessionId] = timestamp;
+    localStorage.setItem(SESSION_LAST_SEEN_STORAGE_KEY, JSON.stringify(map));
+  } catch {
+    // Storage unavailable (private mode, quota): fall back to the time window only.
+  }
+};
+
 export const readProjectSortOrder = (): ProjectSortOrder => {
   try {
     const rawSettings = localStorage.getItem('claude-settings');

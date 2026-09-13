@@ -306,7 +306,9 @@ export default function ChatComposer({
   const hasActivityIndicator = Boolean(activity && !hasPendingPermissions);
 
   const hasQueuedDraft = Boolean(queuedDraft);
-  const canQueueDraft = isLoading && Boolean(input.trim() || attachedFiles.length > 0);
+  // 编辑模式下主按钮必须是「提交编辑重发」：加载中也不得退化成「停止」，
+  // 否则「点编辑 → 加附件 → 发送」会被静默吞成一次 abort。
+  const canQueueDraft = isLoading && Boolean(isEditingMessage || input.trim() || attachedFiles.length > 0);
   const submitHint = canQueueDraft
     ? hasQueuedDraft
       ? t('input.hintText.updateQueued', { defaultValue: 'Enter to update queued message' })

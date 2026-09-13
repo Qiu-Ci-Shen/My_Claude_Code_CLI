@@ -14,10 +14,10 @@ import { useDropzone } from 'react-dropzone';
 import { useWebSocket } from '../../../contexts/WebSocketContext';
 
 import { authenticatedFetch } from '../../../utils/api';
-import { rewindExecute, type EditMessageTarget } from '../../../lib/rewindRpc';
+import { rewindExecute, type EditMessageAttachment, type EditMessageTarget } from '../../../lib/rewindRpc';
 import type { MarkSessionProcessing, SessionActivityMap } from '../../../hooks/useSessionProtection';
 import { grantClaudeToolPermission } from '../utils/chatPermissions';
-import { resolveEditResendAttachments } from '../utils/editResendAttachments';
+import { restoreEditAttachmentsToFiles } from '../utils/editResendAttachments';
 import {
   clearQueuedMessage,
   readQueuedMessage,
@@ -194,6 +194,27 @@ const uploadAttachmentFiles = async (files: File[]): Promise<unknown[]> => {
   return result.attachments;
 };
 
+/**
+ * 编辑回填：把存储路径附件从全局 assets 目录下载回一个浏览器 File，
+ * 供输入框预览/删除/重发（下载路由只放行 assets 目录内的文件）。
+ */
+const downloadAttachmentAsFile = async (attachment: EditMessageAttachment): Promise<File | null> => {
+  const storedName = attachment.path?.split(/[\\/]/).pop();
+  if (!storedName) {
+    return null;
+  }
+
+  const response = await authenticatedFetch(`/api/assets/files/${encodeURIComponent(storedName)}`);
+  if (!response.ok) {
+    return null;
+  }
+
+  const blob = await response.blob();
+  return new File([blob], attachment.name || storedName, {
+    type: attachment.mimeType || blob.type || 'application/octet-stream',
+  });
+};
+
 export type QueuedDraft = {
   content: string;
   /** Browser files retained while this composer stays mounted, for editing. */
@@ -302,6 +323,9 @@ export function useChatComposerState({
     ) => Promise<void>) | null
   >(null);
   const inputValueRef = useRef(input);
+  // 进入编辑前的草稿快照（文本+附件）：取消编辑时恢复；提交重发时置空，
+  // 退出效果器不得把草稿再灌回输入框。
+  const draftBeforeEditRef = useRef<{ text: string; attachments: File[] } | null>(null);
   const selectedProjectId = selectedProject?.projectId;
   // Prefer the stable backend-allocated id (selectedSession.id) but fall back
   // to currentSessionId for a just-established session that hasn't been
@@ -696,26 +720,30 @@ export function useChatComposerState({
       }
 
       // ── 编辑模式（ZCode 同款）：提交 = 截断这条消息及其后的对话，再用
-      // 输入框里的新文本立即重发。不整页刷新——截断后清槽重建视图，更早
-      // 轮次从服务端静默回填。──
+      // 输入框里的新文本 + 当前附件（回填的原附件 + 新添加的）立即重发。
+      // 不整页刷新——截断后清槽重建视图，更早轮次从服务端静默回填。──
       if (editTarget) {
         const sessionId = editTarget.sessionId;
         const editedText = inputValueRef.current;
-        if (!sessionId || !editedText.trim()) {
-          // 空文本视同取消编辑
+        const editAttachments = attachedFiles;
+        if (!sessionId || (!editedText.trim() && editAttachments.length === 0)) {
+          // 文本与附件都空视同取消编辑
           onClearEditTarget?.();
           return;
         }
+        // 提交路径主动丢弃草稿快照：退出效果器恢复的只能是「取消编辑」的草稿
+        draftBeforeEditRef.current = null;
         onClearEditTarget?.();
         setInput(''); // 用户视角：消息已发出
         inputValueRef.current = '';
+        setAttachedFiles([]);
+        setUploadingFiles(new Map());
+        setFileErrors(new Map());
         void (async () => {
           try {
-            // 原消息附件先恢复成可重发描述符再截断——上传失败时旧对话尚未被破坏
-            const resendAttachments = await resolveEditResendAttachments(
-              editTarget.attachments ?? [],
-              uploadAttachmentFiles,
-            );
+            // 附件先上传换取存储描述符再截断——上传失败时旧对话尚未被破坏
+            const resendAttachments =
+              editAttachments.length > 0 ? await uploadAttachmentFiles(editAttachments) : [];
 
             sendMessage({ type: 'chat.abort', sessionId });
 
@@ -770,6 +798,7 @@ export function useChatComposerState({
               timestamp: new Date(),
             });
             setInput(editedText); // 失败恢复输入，草稿不丢
+            setAttachedFiles(editAttachments);
           }
         })();
         return;
@@ -1415,22 +1444,33 @@ export function useChatComposerState({
     [onInputFocusChange],
   );
 
-  // ── 编辑模式（ZCode 同款）：✎ 上抛目标后，把原文载入输入框并聚焦；
-  // 取消编辑时恢复进入编辑前的草稿。切到别的会话则自动退出编辑。──
-  const draftBeforeEditRef = useRef<string | null>(null);
+  // ── 编辑模式（ZCode 同款）：✎ 上抛目标后，把原文连同原附件一起回填输入框
+  // 并聚焦（附件下载还原成 File，晚到的用户新增文件保留在其后）；取消编辑
+  // 时恢复进入编辑前的草稿。切到别的会话则自动退出编辑。──
   useEffect(() => {
     if (editTarget) {
-      draftBeforeEditRef.current = input;
+      draftBeforeEditRef.current = { text: input, attachments: attachedFiles };
       setInput(editTarget.content);
       inputValueRef.current = editTarget.content;
+      setAttachedFiles([]);
+      let cancelled = false;
+      if (editTarget.attachments?.length) {
+        void restoreEditAttachmentsToFiles(editTarget.attachments, downloadAttachmentAsFile).then((files) => {
+          if (cancelled || files.length === 0) return;
+          setAttachedFiles((previous) => [...files, ...previous].slice(0, MAX_ATTACHMENT_COUNT));
+        });
+      }
       requestAnimationFrame(() => textareaRef.current?.focus());
-      return;
+      return () => {
+        cancelled = true;
+      };
     }
     if (draftBeforeEditRef.current !== null) {
       const draft = draftBeforeEditRef.current;
       draftBeforeEditRef.current = null;
-      setInput(draft);
-      inputValueRef.current = draft;
+      setInput(draft.text);
+      inputValueRef.current = draft.text;
+      setAttachedFiles(draft.attachments);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editTarget]);

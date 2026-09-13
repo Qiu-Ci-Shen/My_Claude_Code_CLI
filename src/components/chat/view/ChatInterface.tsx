@@ -14,6 +14,7 @@ import { useChatComposerState } from '../hooks/useChatComposerState';
 import { useSessionStore } from '../../../stores/useSessionStore';
 import { useAgentsStore } from '../agents/useAgentsStore';
 import AgentsPanel from '../agents/AgentsPanel';
+import { resolveDisplayStatus } from '../agents/types';
 import type { AgentRuntime } from '../agents/types';
 import { useDeviceSettings } from '../../../hooks/useDeviceSettings';
 import { rewindExecute, type EditMessageTarget } from '../../../lib/rewindRpc';
@@ -450,11 +451,13 @@ function ChatInterface({
 
   // ── Agents 面板：派生状态与动作 ─────────────────────────────────────
   const agentsState = agentsStore.getSessionState(agentsSessionKey);
-  const agentsRunningCount = agentsState.order.reduce(
-    (count, taskId) => count + (agentsState.agents[taskId]?.status === 'running' ? 1 : 0),
-    0,
-  );
-  const showAgentsButton = provider === 'claude' && agentsState.order.length > 0 && !agentsState.panelOpen;
+  const agentsRunningCount = agentsState.order.reduce((count, taskId) => {
+    const agent = agentsState.agents[taskId];
+    return count + (agent && resolveDisplayStatus(agent, isProcessing) === 'running' ? 1 : 0);
+  }, 0);
+  // 三态（少爷定稿）：运行中 → 钉死必显（不可关）；空闲 → 可手动关（关了不再出现）；
+  // 新 agent 开跑 → 胶囊无条件回来。
+  const showAgentsButton = provider === 'claude' && agentsState.order.length > 0 && !agentsState.panelOpen && (agentsRunningCount > 0 || !agentsState.pillHidden);
   const showAgentsPanel = provider === 'claude' && agentsState.panelOpen;
 
   const handleAgentsOpen = useCallback(() => {
@@ -468,6 +471,18 @@ function ChatInterface({
       agentsStore.setPanelOpen(agentsSessionKey, false);
     }
   }, [agentsSessionKey, agentsStore]);
+
+  const handleAgentsHidePill = useCallback(() => {
+    if (agentsSessionKey) {
+      agentsStore.hidePill(agentsSessionKey, isProcessing);
+    }
+  }, [agentsSessionKey, agentsStore, isProcessing]);
+
+  const handleDismissAgent = useCallback((taskId: string) => {
+    if (agentsSessionKey) {
+      agentsStore.dismissAgent(agentsSessionKey, taskId, isProcessing);
+    }
+  }, [agentsSessionKey, agentsStore, isProcessing]);
 
   const handleAgentsSelect = useCallback((taskId: string | null) => {
     if (agentsSessionKey) {
@@ -531,16 +546,37 @@ function ChatInterface({
         <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
           <div className="relative flex min-h-0 flex-1 flex-col">
           {showAgentsButton && (
-            <button
-              type="button"
+            <div
+              role="button"
+              tabIndex={0}
               onClick={handleAgentsOpen}
-              className="absolute right-3 top-2 z-20 flex items-center gap-1.5 rounded-full border border-purple-400/50 bg-background/95 px-2.5 py-1 text-[11.5px] text-purple-600 shadow-sm transition-colors hover:bg-purple-500/10 dark:border-purple-500/40 dark:text-purple-300"
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  handleAgentsOpen();
+                }
+              }}
+              className="absolute right-14 top-3 z-20 flex cursor-pointer items-center gap-1.5 rounded-full border border-purple-400/50 bg-background/95 px-2.5 py-1 text-[11.5px] text-purple-600 shadow-sm transition-colors hover:bg-purple-500/10 dark:border-purple-500/40 dark:text-purple-300"
               title="打开 Agents 面板"
             >
               <span className={`h-1.5 w-1.5 rounded-full bg-purple-500 dark:bg-purple-400${agentsRunningCount > 0 ? ' animate-pulse' : ''}`} />
               <span>Agents</span>
-              <span>{agentsRunningCount > 0 ? agentsRunningCount : agentsState.order.length}</span>
-            </button>
+              {agentsRunningCount > 0 ? <span>{agentsRunningCount}</span> : null}
+              {agentsRunningCount === 0 ? (
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleAgentsHidePill();
+                  }}
+                  className="ml-0.5 rounded px-0.5 text-[10px] leading-none text-muted-foreground transition-colors hover:text-red-500"
+                  aria-label="关闭 Agents 按钮"
+                  title="关闭"
+                >
+                  ✕
+                </button>
+              ) : null}
+            </div>
           )}
           <ChatMessagesPane
           scrollContainerRef={scrollContainerRef}
@@ -605,13 +641,7 @@ function ChatInterface({
           {editTarget && (
             <div className="pointer-events-none absolute left-1/2 top-2 z-30 -translate-x-1/2">
               <div className="flex items-center gap-2 rounded-full border border-primary/40 bg-popover px-3 py-1 text-xs text-foreground shadow-md">
-                <span>
-                  正在编辑消息
-                  {editTarget.attachments?.length
-                    ? `（连同 ${editTarget.attachments.length} 个附件重发）`
-                    : ''}
-                  ，Esc 取消
-                </span>
+                <span>正在编辑，点击 Esc 取消</span>
                 <button
                   type="button"
                   onClick={() => setEditTarget(null)}
@@ -779,6 +809,7 @@ function ChatInterface({
             onSelect={handleAgentsSelect}
             onStop={handleStopAgent}
             onRelay={handleRelayAgent}
+            onDismiss={handleDismissAgent}
             onRequestConversation={handleAgentsRequestConversation}
           />
         )}

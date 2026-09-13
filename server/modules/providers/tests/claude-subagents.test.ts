@@ -4,6 +4,7 @@
  * 覆盖：
  *  - 新布局（<sessionId>/subagents/）与旧布局（项目根目录）的转录定位
  *  - 后台任务的 task-notification 完成通知（状态/结束时间来源）
+ *    · 两种投递形式：queued_command attachment（旧）与用户消息字符串（现，2026-09-13 实案）
  *  - 对话归一化（提示词/文本/思考/工具/工具结果配对）
  *  - taskId 路径白名单与缺文件空返回
  *  - mapTaskEventToSubagentEvent 四种事件映射 + ambient 透传
@@ -74,7 +75,11 @@ const agentTranscriptLines = (): string[] => [
   '{not json',
 ];
 
-const mainTranscriptLines = (providerSessionId: string, cwd: string): string[] => [
+const mainTranscriptLines = (
+  providerSessionId: string,
+  cwd: string,
+  notificationForm: 'attachment' | 'user-message' = 'attachment',
+): string[] => [
   JSON.stringify({
     sessionId: providerSessionId, cwd, type: 'user', uuid: 'm1',
     timestamp: '2026-09-12T00:59:59.000Z',
@@ -98,20 +103,29 @@ const mainTranscriptLines = (providerSessionId: string, cwd: string): string[] =
     toolUseResult: { isAsync: true, status: 'async_launched', agentId: AGENT_ID },
     message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: CALL_ID, content: `agentId: ${AGENT_ID}` }] },
   }),
-  // 完成通知：后台任务的权威完成信号
-  JSON.stringify({
-    sessionId: providerSessionId, cwd, type: 'attachment', uuid: 'm4',
-    timestamp: '2026-09-12T01:05:00.000Z',
-    attachment: {
-      type: 'queued_command',
-      commandMode: 'task-notification',
-      prompt: `<task-notification>\n<task-id>${AGENT_ID}</task-id>\n<tool-use-id>${CALL_ID}</tool-use-id>\n<status>completed</status>\n<summary>Agent "检查 src" finished</summary>\n</task-notification>`,
-    },
-  }),
+  // 完成通知：后台任务的权威完成信号（两种投递形式按开关生成）
+  notificationForm === 'attachment'
+    ? JSON.stringify({
+        sessionId: providerSessionId, cwd, type: 'attachment', uuid: 'm4',
+        timestamp: '2026-09-12T01:05:00.000Z',
+        attachment: {
+          type: 'queued_command',
+          commandMode: 'task-notification',
+          prompt: `<task-notification>\n<task-id>${AGENT_ID}</task-id>\n<tool-use-id>${CALL_ID}</tool-use-id>\n<status>completed</status>\n<summary>Agent "检查 src" finished</summary>\n</task-notification>`,
+        },
+      })
+    : JSON.stringify({
+        sessionId: providerSessionId, cwd, type: 'user', uuid: 'm4',
+        timestamp: '2026-09-12T01:05:00.000Z',
+        message: {
+          role: 'user',
+          content: `<task-notification>\n<task-id>${AGENT_ID}</task-id>\n<tool-use-id>${CALL_ID}</tool-use-id>\n<status>completed</status>\n<usage><total_tokens>2100</total_tokens><tool_uses>3</tool_uses><duration_ms>300000</duration_ms></usage>\n<summary>Agent "检查 src" finished</summary>\n</task-notification>`,
+        },
+      }),
 ];
 
 /** 建一套夹具：主转录 + 子代理转录 + meta，并入库。layout: 'nested' | 'legacy' */
-async function setupSession(options: { layout: 'nested' | 'legacy' }): Promise<{
+async function setupSession(options: { layout: 'nested' | 'legacy'; notificationForm?: 'attachment' | 'user-message' }): Promise<{
   providerSessionId: string;
   projectDir: string;
   cleanup: () => Promise<void>;
@@ -125,7 +139,7 @@ async function setupSession(options: { layout: 'nested' | 'legacy' }): Promise<{
   await mkdir(agentDir, { recursive: true });
 
   const mainPath = path.join(projectDir, `${providerSessionId}.jsonl`);
-  await writeFile(mainPath, mainTranscriptLines(providerSessionId, projectDir).join('\n'));
+  await writeFile(mainPath, mainTranscriptLines(providerSessionId, projectDir, options.notificationForm ?? 'attachment').join('\n'));
   await writeFile(path.join(agentDir, `agent-${AGENT_ID}.jsonl`), agentTranscriptLines().join('\n'));
   await writeFile(
     path.join(agentDir, `agent-${AGENT_ID}.meta.json`),
@@ -161,6 +175,24 @@ test('子代理列表：新布局 + 后台通知给出真实完成状态与时�
       // 结束时间来自 task-notification（async 回执时刻不能算完成）
       assert.equal(agent.endedAt, '2026-09-12T01:05:00.000Z');
       assert.equal(agent.hasConversation, true);
+    } finally {
+      await cleanup();
+    }
+  });
+});
+
+test('子代理列表：用户消息形式的完成通知同样判为 completed（2026-09-13 实案）', async () => {
+  await withIsolatedDatabase(async () => {
+    const { providerSessionId, cleanup } = await setupSession({ layout: 'nested', notificationForm: 'user-message' });
+    try {
+      const provider = new ClaudeSessionsProvider();
+      const list = await provider.listSubagents(providerSessionId);
+
+      assert.equal(list.length, 1);
+      const agent = list[0]!;
+      assert.equal(agent.status, 'completed');
+      assert.equal(agent.endedAt, '2026-09-12T01:05:00.000Z');
+      assert.deepEqual(agent.usage, { totalTokens: 2100, toolUses: 3, durationMs: 300000 });
     } finally {
       await cleanup();
     }

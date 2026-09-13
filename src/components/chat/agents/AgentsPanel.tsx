@@ -12,6 +12,7 @@ type AgentsPanelProps = {
   onSelect: (taskId: string | null) => void;
   onStop: (agent: AgentRuntime) => void;
   onRelay: (agent: AgentRuntime, text: string) => void;
+  onDismiss: (taskId: string) => void;
   onRequestConversation: (taskId: string) => void;
 };
 
@@ -28,12 +29,13 @@ export default function AgentsPanel({
   onSelect,
   onStop,
   onRelay,
+  onDismiss,
   onRequestConversation,
 }: AgentsPanelProps) {
   const agents = state.order
     .map((taskId) => state.agents[taskId])
     .filter((agent): agent is AgentRuntime => Boolean(agent));
-  const runningCount = agents.filter((agent) => agent.status === 'running').length;
+  const runningCount = agents.filter((agent) => resolveDisplayStatus(agent, sessionActive) === 'running').length;
 
   // 心跳：有运行中的 agent 时每秒刷新耗时显示
   const [now, setNow] = useState(() => Date.now());
@@ -58,6 +60,7 @@ export default function AgentsPanel({
           onCollapse={() => onSelect(null)}
           onStop={onStop}
           onRelay={onRelay}
+          onDismiss={onDismiss}
           onRequestConversation={onRequestConversation}
         />
       ))}

@@ -55,7 +55,7 @@
     "removeFromFavorites": "Remove from favorites",
     "editSessionName": "Manually edit session name",
     "deleteSession": "Delete this session permanently",
-    "activeSessionIndicator": "Recently active session (last 10 minutes)",
+    "activeSessionIndicator": "Session has unseen activity",
     "save": "Save",
     "cancel": "Cancel",
     "clearSearch": "Clear search",

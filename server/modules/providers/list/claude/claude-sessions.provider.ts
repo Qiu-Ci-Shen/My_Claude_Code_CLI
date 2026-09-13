@@ -357,7 +357,9 @@ function readSubagentUsageFromToolResult(toolUseResult: unknown): SubagentSummar
 
 /**
  * Background tasks report completion through `<task-notification>` XML carried
- * by `queued_command` attachment entries (commandMode 'task-notification').
+ * by the `queued_command` attachment form (commandMode 'task-notification', the
+ * older layout) or by a delivered user message carrying the same
+ * `<task-notification>` tags (the current layout; 2026-09-13 实案).
  * Those are the authoritative completion signal for background agents — their
  * Agent tool_result is only the immediate `async_launched` ack.
  */
@@ -369,12 +371,8 @@ type AgentNotification = {
   usage: SubagentSummary['usage'];
 };
 
-function parseAgentNotificationAttachment(entry: AnyRecord): AgentNotification | null {
-  const attachment = entry.attachment as AnyRecord | undefined;
-  if (!attachment || attachment.type !== 'queued_command' || attachment.commandMode !== 'task-notification') {
-    return null;
-  }
-  const prompt = typeof attachment.prompt === 'string' ? attachment.prompt : '';
+/** `<task-notification>` 文本块 → AgentNotification；attachment 与用户消息两种投递形式共用 */
+function parseAgentNotificationText(prompt: string, timestamp: string | null): AgentNotification | null {
   if (!prompt.includes('<task-notification>')) {
     return null;
   }
@@ -403,11 +401,41 @@ function parseAgentNotificationAttachment(entry: AnyRecord): AgentNotification |
     taskId: readTag('task-id'),
     toolUseId: readTag('tool-use-id'),
     status: readTag('status'),
-    timestamp: typeof entry.timestamp === 'string'
-      ? entry.timestamp
-      : (typeof attachment.timestamp === 'string' ? attachment.timestamp : null),
+    timestamp,
     usage,
   };
+}
+
+/** 旧布局：queued_command attachment 投递形式 */
+function parseAgentNotificationAttachment(entry: AnyRecord): AgentNotification | null {
+  const attachment = entry.attachment as AnyRecord | undefined;
+  if (!attachment || attachment.type !== 'queued_command' || attachment.commandMode !== 'task-notification') {
+    return null;
+  }
+  const prompt = typeof attachment.prompt === 'string' ? attachment.prompt : '';
+  const timestamp = typeof entry.timestamp === 'string'
+    ? entry.timestamp
+    : (typeof attachment.timestamp === 'string' ? attachment.timestamp : null);
+  return parseAgentNotificationText(prompt, timestamp);
+}
+
+/** 现布局：完成通知以用户消息（字符串内容）投递（2026-09-13 实案） */
+function extractNotificationTextFromUserEntry(entry: AnyRecord): string | null {
+  if (entry.message?.role !== 'user') {
+    return null;
+  }
+  const content = entry.message?.content;
+  if (typeof content === 'string') {
+    return content.includes('<task-notification>') ? content : null;
+  }
+  if (Array.isArray(content)) {
+    const text = (content as AnyRecord[])
+      .filter((part) => part?.type === 'text' && typeof part.text === 'string')
+      .map((part) => String(part.text))
+      .join('\n');
+    return text.includes('<task-notification>') ? text : null;
+  }
+  return null;
 }
 
 function mapNotificationStatus(status: string | null): SubagentSummary['status'] | null {
@@ -481,6 +509,18 @@ async function listSubagentsForSession(jsonlPath: string, providerSessionId: str
   const notificationsByToolUseId = new Map<string, AgentNotification>();
   const notificationsByTaskId = new Map<string, AgentNotification>();
 
+  const registerNotification = (notification: AgentNotification | null): void => {
+    if (!notification) {
+      return;
+    }
+    if (notification.toolUseId) {
+      notificationsByToolUseId.set(notification.toolUseId, notification);
+    }
+    if (notification.taskId) {
+      notificationsByTaskId.set(notification.taskId, notification);
+    }
+  };
+
   try {
     const entries = await readTranscriptEntries(jsonlPath);
     for (const entry of entries) {
@@ -488,6 +528,14 @@ async function listSubagentsForSession(jsonlPath: string, providerSessionId: str
         continue;
       }
       const content = entry.message?.content;
+      // 完成通知的用户消息投递形式（与 attachment 形式并存，后者为旧布局兼容）。
+      const userNotificationText = extractNotificationTextFromUserEntry(entry);
+      if (userNotificationText) {
+        registerNotification(parseAgentNotificationText(
+          userNotificationText,
+          typeof entry.timestamp === 'string' ? entry.timestamp : null,
+        ));
+      }
       if (entry.message?.role === 'assistant' && Array.isArray(content)) {
         for (const part of content as AnyRecord[]) {
           if (part?.type === 'tool_use' && (part.name === 'Agent' || part.name === 'Task')) {
@@ -522,15 +570,7 @@ async function listSubagentsForSession(jsonlPath: string, providerSessionId: str
           });
         }
       } else if (entry.type === 'attachment') {
-        const notification = parseAgentNotificationAttachment(entry);
-        if (notification) {
-          if (notification.toolUseId) {
-            notificationsByToolUseId.set(notification.toolUseId, notification);
-          }
-          if (notification.taskId) {
-            notificationsByTaskId.set(notification.taskId, notification);
-          }
-        }
+        registerNotification(parseAgentNotificationAttachment(entry));
       }
     }
   } catch (error) {

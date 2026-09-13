@@ -8,6 +8,8 @@ import {
   applyHistoryConversation,
   applySubagentEvent as reduceApplyEvent,
   createSessionState,
+  dismissAgent as reduceDismissAgent,
+  hidePill as reduceHidePill,
   markHistoryFailed,
   markHistoryLoading,
   mergeHistory,
@@ -24,12 +26,51 @@ import type { AgentConversationDto, AgentSummaryDto, AgentsSessionState } from '
  */
 const MESSAGE_FLUSH_INTERVAL_MS = 120;
 
+const VIEW_STORAGE_PREFIX = 'qiu-agents-view:';
+
+/** localStorage 中的会话视图偏好（删除过的条目 / 胶囊是否收起） */
+function readPersistedView(sessionId: string): { pillHidden: boolean; dismissed: Record<string, true> } {
+  try {
+    const raw = window.localStorage.getItem(VIEW_STORAGE_PREFIX + sessionId);
+    if (!raw) {
+      return { pillHidden: false, dismissed: {} };
+    }
+    const parsed = JSON.parse(raw) as { pillHidden?: unknown; dismissed?: unknown };
+    const dismissed: Record<string, true> = {};
+    if (Array.isArray(parsed.dismissed)) {
+      for (const id of parsed.dismissed) {
+        if (typeof id === 'string' && id) {
+          dismissed[id] = true;
+        }
+      }
+    }
+    return { pillHidden: parsed.pillHidden === true, dismissed };
+  } catch {
+    return { pillHidden: false, dismissed: {} };
+  }
+}
+
+function persistView(sessionId: string, state: AgentsSessionState): void {
+  try {
+    window.localStorage.setItem(
+      VIEW_STORAGE_PREFIX + sessionId,
+      JSON.stringify({ pillHidden: state.pillHidden, dismissed: Object.keys(state.dismissed) }),
+    );
+  } catch {
+    // localStorage 不可用（隐私模式/配额）：视图偏好降级为内存态
+  }
+}
+
 export type AgentsStoreApi = {
   getSessionState(sessionId: string | null): AgentsSessionState;
   applySubagentEvent(sessionId: string, payload: SubagentEventPayload | null | undefined): void;
   appendAgentMessage(sessionId: string, toolUseId: string, message: NormalizedMessage): void;
   setPanelOpen(sessionId: string, open: boolean): void;
   selectAgent(sessionId: string, taskId: string | null): void;
+  /** 删除一个已停止的条目（运行中拒绝） */
+  dismissAgent(sessionId: string, taskId: string, sessionActive: boolean): void;
+  /** 空闲时关闭浮动胶囊（运行中拒绝） */
+  hidePill(sessionId: string, sessionActive: boolean): void;
   /** 拉取历史 agent 列表（每次会话打开后调用一次；已载入则跳过） */
   loadSession(sessionId: string): Promise<void>;
   /** 拉取某 agent 的完整对话（点开详情时调用） */
@@ -66,6 +107,9 @@ export function useAgentsStore(): AgentsStoreApi {
       const next = updater(previous);
       if (next !== previous) {
         statesRef.current.set(sessionId, next);
+        if (next.pillHidden !== previous.pillHidden || next.dismissed !== previous.dismissed) {
+          persistView(sessionId, next);
+        }
         bump();
       }
     },
@@ -122,11 +166,34 @@ export function useAgentsStore(): AgentsStoreApi {
     [mutate],
   );
 
+  const dismissAgent = useCallback(
+    (sessionId: string, taskId: string, sessionActive: boolean) => {
+      mutate(sessionId, (state) => reduceDismissAgent(state, taskId, sessionActive));
+    },
+    [mutate],
+  );
+
+  const hidePill = useCallback(
+    (sessionId: string, sessionActive: boolean) => {
+      mutate(sessionId, (state) => reduceHidePill(state, sessionActive));
+    },
+    [mutate],
+  );
+
   const loadSession = useCallback(
     async (sessionId: string) => {
       const current = getState(sessionId);
       if (current.historyLoaded || current.historyLoading) {
         return;
+      }
+      // 视图偏好（删除过的条目 / 胶囊隐藏）先于历史合并恢复，历史中对不上号的条目会被过滤
+      const persisted = readPersistedView(sessionId);
+      if (persisted.pillHidden || Object.keys(persisted.dismissed).length > 0) {
+        mutate(sessionId, (state) => ({
+          ...state,
+          pillHidden: state.pillHidden || persisted.pillHidden,
+          dismissed: { ...persisted.dismissed, ...state.dismissed },
+        }));
       }
       mutate(sessionId, markHistoryLoading);
       try {
@@ -185,9 +252,11 @@ export function useAgentsStore(): AgentsStoreApi {
       appendAgentMessage,
       setPanelOpen,
       selectAgent,
+      dismissAgent,
+      hidePill,
       loadSession,
       loadConversation,
     }),
-    [getState, applySubagentEvent, appendAgentMessage, setPanelOpen, selectAgent, loadSession, loadConversation],
+    [getState, applySubagentEvent, appendAgentMessage, setPanelOpen, selectAgent, dismissAgent, hidePill, loadSession, loadConversation],
   );
 }
